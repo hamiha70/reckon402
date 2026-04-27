@@ -10,6 +10,9 @@ importers:
 
   tools/provisioning:
     dependencies:
+      '@noble/hashes':
+        specifier: ^1.6.0
+        version: 1.8.0
       viem:
         specifier: ^2.30.0
         version: 2.48.4

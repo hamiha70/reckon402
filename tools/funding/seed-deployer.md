@@ -26,23 +26,25 @@ The corresponding L0 floor in `funded.sh` stays at 0.01 ETH —
 
 - `cast` on PATH (Foundry — already pinned by the project: `forge`
   and `cast` from the same install).
-- `X402COMMIT_FUNDER_PK` exported from operator's local secret
-  store. The PK lives in `~/Projects/x402commit/facilitator/specs/.env.secrets`
-  (gitignored, operator-controlled). It must NEVER be pasted into
-  a reckon402 file or printed to a terminal output that gets
-  logged.
-- RPC URLs and the destination address come from this repo's
-  Infisical project (`reckon402 / dev`). They are NOT in the
-  operator's outer shell — see "Shell-quoting trap" below.
+- Infisical CLI authenticated against `https://secrets.intentralabs.com`
+  with read access to project `reckon402 / dev`. The funder PK
+  (`X402COMMIT_FUNDER_PK`) lives there as a shared-tier secret
+  alongside the chain RPC URLs and the destination EOA. The
+  operator's local `~/Projects/x402commit/facilitator/specs/.env.secrets`
+  is no longer the source of truth for this recipe — it was the
+  bootstrap copy used to seed Infisical on 2026-04-27 and stays
+  there as a backup, but the recipe below reads exclusively from
+  Infisical.
 
 ## Shell-quoting trap (read before running)
 
 `infisical run -- cast send --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" ...`
-**does not work** because `$BASE_SEPOLIA_RPC_PRIMARY` and
-`$DEPLOYER_EOA` only exist inside the child process that
-`infisical run` spawns. The outer shell expands them to empty
-*before* `infisical run` is even invoked, and `cast send` then
-fails with `error: invalid value '' for '[TO]': invalid string length`.
+**does not work** because `$BASE_SEPOLIA_RPC_PRIMARY`,
+`$X402COMMIT_FUNDER_PK`, and `$DEPLOYER_EOA` only exist inside
+the child process that `infisical run` spawns. The outer shell
+expands them to empty *before* `infisical run` is even invoked,
+and `cast send` fails with `error: invalid value '' for '[TO]':
+invalid string length`.
 
 The fix is to defer expansion until inside the infisical subshell
 by wrapping in `bash -c '...'` with **single quotes**:
@@ -51,34 +53,21 @@ by wrapping in `bash -c '...'` with **single quotes**:
 infisical run … -- bash -c '
   cast send \
     --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
+    --private-key "$X402COMMIT_FUNDER_PK" \
     ...
 '
 ```
 
-Single quotes keep `$BASE_SEPOLIA_RPC_PRIMARY` literal in the
-outer shell. `bash -c` then evaluates them after infisical has
-injected the env. `$X402COMMIT_FUNDER_PK` still passes through
-because it was `export`ed in the outer shell, which `infisical
-run`'s child process inherits.
+Single quotes keep the `$VAR` references literal in the outer
+shell. `bash -c` evaluates them after infisical has injected
+both the chain RPCs and the funder PK on top.
 
-## Stage the funder PK (outer shell)
+## Run (Base Sepolia)
 
 ```bash
 unset AWS_PROFILE
 cd ~/Projects/ETHGlobal/ETHGlobal_OpenAgents_2026/reckon402
 
-export X402COMMIT_FUNDER_PK="$(awk -F'=' '/^DEPLOYER_PRIVATE_KEY=/ {
-  sub(/^DEPLOYER_PRIVATE_KEY=/, ""); gsub(/["'"'"']/, ""); print; exit
-}' ~/Projects/x402commit/facilitator/specs/.env.secrets)"
-
-# Sanity check (length + prefix only — never echo the PK itself).
-[[ -n "$X402COMMIT_FUNDER_PK" ]] \
-  && echo "PK loaded ($(echo -n $X402COMMIT_FUNDER_PK | wc -c) chars), prefix=${X402COMMIT_FUNDER_PK:0:4}*****"
-```
-
-## Run (Base Sepolia)
-
-```bash
 infisical run \
   --projectId 84d8a29b-27e3-46d0-bf72-bbe01215ac35 \
   --env dev \
@@ -109,12 +98,6 @@ infisical run \
       --value 1ether \
       "$DEPLOYER_EOA"
   '
-```
-
-## Tear down PK from outer shell
-
-```bash
-unset X402COMMIT_FUNDER_PK
 ```
 
 ## Verify
@@ -166,8 +149,9 @@ needed.
 ## Why no script
 
 A `seed-deployer.mjs` that read `X402COMMIT_FUNDER_PK` from env
-would work, but it would route a non-reckon402 secret through
-code in this repo. Keeping the action as a documented `cast send`
-invocation keeps the funder PK exclusively in the operator's
-shell, the funder address explicitly in the operator's mind, and
-the resulting tx fully reproducible from this single recipe file.
+would work, but it would route a sensitive secret through code
+in this repo. Keeping the action as a documented `cast send`
+invocation keeps the funder PK exclusively in the
+infisical-injected child process, the funder address explicitly
+in the operator's mind (Infisical UI displays it), and the
+resulting tx fully reproducible from this single recipe file.

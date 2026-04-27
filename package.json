@@ -1,0 +1,16 @@
+{
+  "name": "reckon402",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Closed-loop x402 reputation engine. Public OSS submission to ETHGlobal OpenAgents 2026.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "lint": "echo 'lint not yet wired'",
+    "test": "echo 'test not yet wired'"
+  }
+}

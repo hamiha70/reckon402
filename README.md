@@ -65,6 +65,14 @@ for the full identity layout.
 To be populated during the build window. Scaffold lands first;
 spec-driven layers follow per [`AGENTS.md`](./AGENTS.md).
 
+## Operator runbook
+
+[`RUNBOOK.md`](./RUNBOOK.md) is the single index for operator
+workflows: provisioning, secret pushes, funding, ENS records,
+smoke tests, KMS signer verification, layer checkpoints. Each
+entry points at the canonical recipe under `tools/<area>/` (or
+inlines the action where it doesn't yet have a recipe home).
+
 ## Layout
 
 - `specs/` — implementation contracts (one `.md` per layer/component)

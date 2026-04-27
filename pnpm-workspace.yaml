@@ -6,3 +6,4 @@ packages:
   - "tools/smoke-tests"
   - "tools/provisioning"
   - "tools/sign"
+  - "tools/funding"

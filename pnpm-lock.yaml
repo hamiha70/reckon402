@@ -8,6 +8,12 @@ importers:
 
   .: {}
 
+  tools/funding:
+    dependencies:
+      viem:
+        specifier: ^2.30.0
+        version: 2.48.4
+
   tools/provisioning:
     dependencies:
       '@noble/hashes':

@@ -1,0 +1,13 @@
+{
+  "name": "@reckon402/funding",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Multi-chain balance snapshots for reckon402 EOAs (ETH + USDC across Base + Ethereum × mainnet + Sepolia).",
+  "scripts": {
+    "balances": "node ./check-balances.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.30.0"
+  }
+}

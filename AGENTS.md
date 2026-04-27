@@ -147,6 +147,18 @@ Single source of funds: the deployer is the **first-funder** of every
 other EOA. No address is funded directly from the operator's main
 wallet except the deployer.
 
+**External agent identities** (not in the reckon402-controlled set):
+
+| Identity | Address | Custody |
+|----------|---------|---------|
+| KeeperHub workflow wallet | `0xA1bd1F82D1c13CE11f8480cF705a82b00382c1e4` | Turnkey TEE (non-custodial; KH-managed) |
+
+KH wallet role is documented in `specs/01-eoa-topology.md` "External
+agent identities" + Q-01-5. Default L4 plan: KH workflow hits the
+signing wrapper Lambda which signs via KMS buyer-signer; the KH
+wallet itself only authenticates the workflow and does not sign
+x402 PaymentAuthorizations.
+
 ## KMS resources (v1, locked)
 
 The two KMS-custodied EOAs are backed by project-scoped secp256k1 keys

@@ -115,6 +115,32 @@ PK is already set in Infisical.
 5. **Funding** — deferred. Sepolia funding is operator-on-faucets;
    mainnet funding is operator-from-main-wallet.
 
+## External agent identities
+
+EOAs that exist in third-party (non-AWS, non-Infisical) custody and
+that reckon402 code interacts with from the outside. These are NOT
+in the seven-EOA reckon402-controlled topology above; they are
+identities that show up at the workflow / orchestration boundary.
+
+| Identity | Address | Custody | Role |
+|----------|---------|---------|------|
+| **KeeperHub workflow wallet** | `0xA1bd1F82D1c13CE11f8480cF705a82b00382c1e4` | Turnkey TEE (non-custodial; KH-managed enclave signing) | KH organisation wallet for the operator's KH account; signs KH workflow transactions when a workflow makes direct on-chain calls. Provisioned 2026-04-27 via `kh auth login` against `app.keeperhub.com`. Private key is exportable from the KH UI but normally stays in the enclave. |
+
+**Why this is not in the reckon402 EOA registry above.** The L4 demo
+flow (per `AGENTS.md` layered build) signs **x402 PaymentAuthorizations**
+through the signing wrapper Lambda → AWS KMS buyer-signer key, not
+through the KH wallet. The KH wallet is the authenticated identity of
+the workflow itself — useful for KH-internal audit and for any direct
+KH-side on-chain calls (e.g., a workflow that performs a non-x402
+operation under its own wallet). It is custody-orthogonal to the seven
+reckon402 EOAs and we do not need its private key for the demo.
+
+If a future L4 design pivots to having KH workflows sign x402
+authorizations directly with the KH wallet (bypassing the KMS signing
+wrapper), this identity would graduate to a regular buyer-class EOA
+and would need USDC funding. That decision is captured in Q-01-5
+below.
+
 ## Open questions
 
 - **Q-01-1.** Number of demo buyer agents. Spec proposes 3; tighten
@@ -132,3 +158,12 @@ PK is already set in Infisical.
   (signing wrapper Lambda) — by symmetry, facilitator settle calls
   could also go through a KMS-backed key. Defer until L4 design
   lands; software key is sufficient through L3.
+- **Q-01-5.** KH workflow wallet role in L4. Default plan is "auth
+  identity only, no payment role" — KH workflows call the signing
+  wrapper Lambda which signs via KMS buyer-signer. Alternative is
+  "KH wallet signs x402 PaymentAuthorizations directly" — which
+  removes the Lambda hop but requires funding the KH wallet with
+  USDC and giving up the KMS-backed signing path the rest of the
+  architecture is built around. Disposition: deferred — confirm
+  during L4 spec lock; first half of L4 build will assume the
+  default (Lambda-routed signing).

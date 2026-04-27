@@ -108,10 +108,30 @@ for the operator-side documentation.
 | Demo frontend              | `demo.reckon402.com` (Vercel)                                                  |
 | Landing page + docs        | `reckon402.com` (Cloudflare Pages)                                             |
 | AWS region                 | `eu-central-1`                                                                 |
-| KMS alias                  | `alias/reckon402/mainnet/buyer-signer/evm`                                     |
-| IAM user for signer        | `reckon402-signer`                                                             |
+| KMS alias — deployer       | `alias/reckon402/mainnet/deployer/evm` (IAM user `reckon402-deployer`)         |
+| KMS alias — buyer-signer   | `alias/reckon402/mainnet/buyer-signer/evm` (IAM user `reckon402-signer`)       |
 | Cloudflare resource prefix | `reckon402-*` (e.g., `reckon402-facilitator-prod`, `reckon402-d1-facilitator`) |
 | Settlement chain (demo)    | Base Sepolia for L3 dev; Base mainnet for L4 / submission                      |
+
+## On-chain EOAs (v1, locked)
+
+Seven EOAs total, **same address on Base Sepolia and Base mainnet**.
+Custody design and funding plan: `specs/01-eoa-topology.md`.
+Provisioning log + addresses: `tools/provisioning/results-2026-04-27.md`.
+
+| Role            | Address                                      | Custody  |
+|-----------------|----------------------------------------------|----------|
+| Deployer        | `0x66c2858d9a8605957c516a77262eb66ee6be113c` | KMS      |
+| Buyer-signer    | `0x46bbb05aca9ea24118b8a57c8d3f317503384305` | KMS      |
+| Facilitator     | `0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455` | software |
+| Seller          | `0xD53ffac42496d73B3Faf946786688a8454F57b1f` | software |
+| Buyer-demo-1    | `0x837e30740a4A5bAC5480b4f707924469d42b43De` | software |
+| Buyer-demo-2    | `0xa5B79dCC1ec00730dcE031B803AF9A563B50A186` | software |
+| Buyer-demo-3    | `0x3529C5fe5Dcb1C1E0Bc8a393dF75EB88CF23E1e1` | software |
+
+Single source of funds: the deployer is the **first-funder** of every
+other EOA. No address is funded directly from the operator's main
+wallet except the deployer.
 
 ## Persistence model (v1)
 

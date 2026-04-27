@@ -4,3 +4,33 @@
 .idea/
 *.swp
 .DS_Store
+
+# Node / pnpm
+node_modules/
+.pnpm-debug.log*
+.pnpm-store/
+*.tsbuildinfo
+dist/
+build/
+
+# direnv
+.envrc
+
+# Wrangler / Cloudflare
+.wrangler/
+worker-configuration.d.ts
+
+# Foundry
+out/
+cache/
+broadcast/
+contracts/lib/
+
+# AWS SAM
+.aws-sam/
+
+# Vercel
+.vercel/
+
+# Smoke-test artifacts (committed manually, not auto-tracked)
+tools/smoke-tests/results-*.local.md

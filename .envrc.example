@@ -1,0 +1,22 @@
+# Copy to .envrc (gitignored) and run `direnv allow`.
+
+# Cloudflare API token, scoped to the reckon402.com zone.
+# Create at: Cloudflare dashboard → My Profile → API Tokens
+# Required permissions: Workers Scripts (Edit), D1 (Edit),
+# Workers Routes (Edit), KV (Edit). Zone restriction: reckon402.com.
+export CLOUDFLARE_API_TOKEN=
+export CLOUDFLARE_ACCOUNT_ID=
+
+# AWS profile pointing at the IAM user with KMS Sign permission on
+# alias/reckon402/mainnet/buyer-signer/evm in eu-central-1.
+export AWS_PROFILE=reckon402-signer
+export AWS_REGION=eu-central-1
+
+# Base RPC endpoints (two-RPC redundancy per design pack).
+export BASE_MAINNET_RPC_PRIMARY=
+export BASE_MAINNET_RPC_FALLBACK=
+export BASE_SEPOLIA_RPC_PRIMARY=
+export BASE_SEPOLIA_RPC_FALLBACK=
+
+# KeeperHub API access (populated at L0 smoke-test time).
+export KEEPERHUB_API_KEY=

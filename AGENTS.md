@@ -247,6 +247,34 @@ compat path to multi-tier (KV + DO-SQLite + relational) after hackathon.
 | Wrapper for project CRUD | `~/Projects/aws_setup_2026/scripts/infisical-project.sh` |
 | Wrapper for sensitive single-secret push | `~/Projects/aws_setup_2026/scripts/infisical-secret-put.sh` |
 
+## npm publishing (v1, locked)
+
+| Item | Value |
+| ---- | ----- |
+| Public scope | `@reckon402` |
+| npm org | `reckon402` (admin: `hansmichael`) |
+| Co-existing org | `intentralabs` (kept active for non-Reckon402 OSS — does NOT host any `@reckon402/*` packages) |
+| Default access | `public` |
+| Token storage | Infisical `reckon402/dev` → `NPM_AUTOMATION_TOKEN` (granular, scoped to `@reckon402/*`, expires 2026-07-26) |
+| Token rotation | Revoke + re-issue on or before expiry; re-store via `infisical-secret-put.sh` (`KEY=@/path/to/file` form). Update this row's expiry date in the same commit. |
+| Publish invocation | `infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '...'` (single-quoted body so `$NPM_AUTOMATION_TOKEN` resolves in the Infisical-injected child, not the outer shell) |
+
+Workspace package targets:
+
+- `@reckon402/types` — canonical x402 v2 wire-format types (extracted at L2, default `workspace:*` consumption only)
+- `@reckon402/facilitator-client` — Reckon402 facilitator HTTP client (L3)
+- `@reckon402/middleware-hono` — Hono middleware factory (L3)
+- `@reckon402/buyer-sdk` — buyer-side helpers (L3)
+- `@reckon402/kh-skill` — KeeperHub skill bundle (L4)
+
+**Default policy: no registry publish during L2–L4 build commits.**
+Workspace consumption via `workspace:*` is sufficient for the
+hackathon path. Optional `0.x.0` publishes are an H-9 polish step
+gated on remaining time budget. Token rotation and any actual
+registry publish run under the standard invocation above; the
+plaintext token never lands in `~/.npmrc` between commands
+(`npm config set` immediately followed by `npm config delete`).
+
 ## Repo layout
 
 ```

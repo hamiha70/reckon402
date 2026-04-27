@@ -341,36 +341,48 @@ Probes 1, 2, 3, 4, 8 require the following to be in place before the run:
 
 ## Open questions
 
-- **Q-L0-1.** ENS test name. Build cadence cites `reckon402-test.eth`; need
-  to confirm registration + resolver wiring before `ens.sh` can pass.
-  **Disposition: locked, awaiting operator registration.**
+- **Q-L0-1.** ENS test name. Build cadence cited `reckon402-test.eth`;
+  needed registration + resolver wiring before `ens.sh` could pass.
+  **Disposition: resolved 2026-04-27.**
 
-  Concrete L0 acceptance criteria (operator-runnable via
-  https://app.ens.domains, no smart-contract deploy needed at L0):
+  Concrete acceptance criteria, all met:
 
-  1. Network: **Ethereum Sepolia** (chainId 11155111). Mainnet ENS
-     resolution against a Sepolia-registered name is the canonical
-     reckon402 path through L4 — viem's `getEnsAddress` against the
-     `sepolia` chain object is what `lib/ens-resolve.mjs` uses.
-  2. Name: **`reckon402-test.eth`**.
-  3. Resolver: **default PublicResolver** (no custom resolver at L0;
-     wildcard / CCIP-Read landing in L1 once `gateway.reckon402.com`
-     is up).
-  4. `addr()` record: **`0xD53ffac42496d73B3Faf946786688a8454F57b1f`**
-     (the reckon402 seller EOA). Choosing seller (not deployer) so
-     the test name resolves to a software-key EOA we can later use
-     to issue `setText("avatar", …)` and similar records without
-     touching KMS.
-  5. After registration confirms, push two Infisical keys (`reckon402 / dev`):
+  1. Network: **Ethereum Sepolia** (chainId 11155111).
+  2. Name: **`reckon402-test.eth`** registered via app.ens.domains
+     by the x402commit funder address (`0x9AF7…3F04`); 1-year lease.
+     Owner is the funder (unwrapped path — registry.owner(node) ==
+     funder, no NameWrapper involved).
+  3. Resolver: PublicResolver at
+     `0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5` (Sepolia default).
+  4. `addr()` record: `0xD53ffac42496d73B3Faf946786688a8454F57b1f`
+     (the reckon402 seller EOA). Set via
+     `cast send <resolver> 'setAddr(bytes32,address)' <node> <seller>`
+     in tx
+     [`0xd9725e9c…121d59`](https://sepolia.etherscan.io/tx/0xd9725e9c92c20be8b9788e5caae4711c63c36ef5efb7e91dcd56e4e9ed121d59)
+     (block 10742776, gasUsed 41 744). Both `AddressChanged`
+     (multicoin, coinType 0x3c = ETH) and legacy `AddrChanged`
+     events emitted.
+  5. Infisical (`reckon402 / dev`) now carries:
      - `ENS_TEST_NAME=reckon402-test.eth`
      - `ENS_EXPECTED_ADDRESS=0xD53ffac42496d73B3Faf946786688a8454F57b1f`
-     `ens.sh` will then flip from SKIP to PASS on the next run; this
-     question closes in the same commit that captures the green
-     `run-all.sh` log.
+     - `X402COMMIT_FUNDER_PK` (sensitive; pushed via tmpfs+`--file`
+       so the value never crossed argv)
+     - `X402COMMIT_FUNDER_ADDRESS=0x9AF7467EA3663F6E9cCdD4bC73bC31f537BF3F04`
 
-  CCIP-Read / wildcard probing remains an L1+ story, not an L0
-  blocker. The L0 `ens.sh` only proves "viem -> Sepolia -> resolver
-  -> address" reaches the seller EOA.
+  `ens.sh` resolves green:
+  `PASS ens 709ms resolved=0xD53ffac42496d73B3Faf946786688a8454F57b1f`.
+
+  CCIP-Read / wildcard probing remains an L1+ story (lands when
+  `gateway.reckon402.com` ships), not gating L0. The L0 `ens.sh`
+  proves only "viem -> Sepolia -> registry -> resolver -> addr ->
+  seller EOA" — the canonical happy-path resolution stack the rest
+  of the build depends on.
+
+  The funder PK now lives in Infisical (sensitive shared-tier),
+  which is why `tools/funding/seed-deployer.md` no longer awk-
+  parses `~/Projects/x402commit/facilitator/specs/.env.secrets`
+  on each run. Recipes hydrate `X402COMMIT_FUNDER_PK` the same
+  way they hydrate any other reckon402 secret.
 - **Q-L0-2.** ERC-8004 registry contract address on Base mainnet.
   Disposition: blocking erc8004.sh commit-2; should be sourceable from the
   ERC-8004 reference deployments doc.

@@ -56,6 +56,23 @@ require() {
   command -v "$1" >/dev/null 2>&1 || probe_fail "missing dependency: $1"
 }
 
+# wrangler_bin
+# Echoes the absolute path to the wrangler CLI bundled in
+# tools/smoke-tests/node_modules. Falls back to a system-wide
+# wrangler on PATH if the local one is missing (so the probe is
+# still useful before `pnpm install` runs).
+wrangler_bin() {
+  local local_bin
+  local_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/node_modules/.bin/wrangler"
+  if [[ -x "$local_bin" ]]; then
+    printf '%s\n' "$local_bin"
+  elif command -v wrangler >/dev/null 2>&1; then
+    command -v wrangler
+  else
+    probe_fail "wrangler not found — run 'pnpm install --filter @reckon402/smoke-tests'"
+  fi
+}
+
 # hydrate <KEY>
 # Echoes the secret value from Infisical (reckon402/dev) to stdout.
 # Empty string on failure (caller must check).

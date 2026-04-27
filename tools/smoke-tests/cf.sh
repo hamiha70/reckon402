@@ -7,10 +7,10 @@ source "$DIR/lib/common.sh"
 
 probe_start cf
 require dig
-require wrangler
+WRANGLER="$(wrangler_bin)"
 
 # 1. wrangler whoami succeeds.
-whoami_out="$(wrangler whoami 2>&1)" \
+whoami_out="$("$WRANGLER" whoami 2>&1)" \
   || probe_fail "wrangler whoami failed: $whoami_out"
 
 # Account ID surfaced on its own line in modern wrangler.
@@ -33,7 +33,7 @@ done
 PLACEHOLDER_DIR="$DIR/cf-placeholder"
 [[ -d "$PLACEHOLDER_DIR" ]] || probe_fail "missing $PLACEHOLDER_DIR"
 
-dry_run_out="$(wrangler deploy --dry-run --config "$PLACEHOLDER_DIR/wrangler.toml" 2>&1)" \
+dry_run_out="$("$WRANGLER" deploy --dry-run --config "$PLACEHOLDER_DIR/wrangler.toml" 2>&1)" \
   || probe_fail "wrangler dry-run failed: $dry_run_out"
 
 note="account=${account_id:-unknown} root=${root_a}"

@@ -6,13 +6,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/lib/common.sh"
 
 probe_start d1
-require wrangler
 require jq
+WRANGLER="$(wrangler_bin)"
 
 DB_NAME="reckon402-d1-smoke-test"
 
 # 1. Create database (idempotent — tolerate "already exists").
-create_out="$(wrangler d1 create "$DB_NAME" 2>&1 || true)"
+create_out="$("$WRANGLER" d1 create "$DB_NAME" 2>&1 || true)"
 if echo "$create_out" | grep -qiE 'already exists|database with that name already'; then
   : # OK — pre-existing, continue.
 elif echo "$create_out" | grep -qiE 'created|database_id'; then
@@ -23,7 +23,7 @@ fi
 
 # 2. Schema (idempotent).
 exec_q() {
-  wrangler d1 execute "$DB_NAME" --remote --command "$1" --json 2>&1
+  "$WRANGLER" d1 execute "$DB_NAME" --remote --command "$1" --json 2>&1
 }
 
 schema_out="$(exec_q "CREATE TABLE IF NOT EXISTS l0 (k TEXT PRIMARY KEY, v TEXT, ts INTEGER)")"

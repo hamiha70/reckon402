@@ -87,6 +87,25 @@ cheaper than debugging mid-build.
   small enough to iterate without faucet/funder churn, large enough
   to be a real on-chain value transfer (not a 1-wei stub the EVM
   treats as a no-op fee path).
+- **TypeScript-first for all production surfaces.** Every file under
+  `workers/`, `packages/`, `lambda/`, and `demo/` MUST be `.ts` /
+  `.tsx`. Plain `.js` / `.mjs` is only acceptable in `tools/` for
+  one-shot CLI scripts that are never imported by production code.
+  When a `tools/` module graduates to being consumed by a production
+  package (e.g. `kms-account.mjs` → `packages/buyer-sdk`), rewrite
+  it in TypeScript at that point. The smoke-test `worker.js`
+  placeholder is deleted when the real `workers/agent/` tree lands.
+  `tsconfig.base.json` is the shared strict baseline; each sub-package
+  extends it via `"extends": "../../tsconfig.base.json"`.
+- **No "expected-fail" smoke probes.** Every L0–L4 health check must
+  terminate PASS or SKIP, where SKIP carries a disposition pointer
+  to the open question that gates it (e.g. `ens.sh` SKIP keyed to
+  Q-L0-1, `erc8004.sh` SKIP keyed to Q-L0-2). FAIL rationalised as a
+  "known quirk" is never an accepted disposition: fix the probe,
+  narrow its scope to the part that is actually green, or remove
+  the probe entirely. Hard probes (`infisical`, `cf`, `aws`, `rpc`,
+  `kh`, `d1`, `funded`) must stay green at every layer transition;
+  do not document quirks that the suite is silently tolerating.
 
 ## Secrets and hydration (v1)
 
@@ -115,6 +134,24 @@ hydrated from Infisical. When invoking workloads via
 `env -u AWS_PROFILE …`) so the Infisical-injected
 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` win in the AWS SDK
 credential-resolution chain.
+
+**Shell-expansion under `infisical run`.** Variables hydrated by
+Infisical (`BASE_SEPOLIA_RPC_PRIMARY`, `ETH_SEPOLIA_RPC_PRIMARY`,
+`DEPLOYER_EOA`, etc.) only exist inside the child process that
+`infisical run --env dev -- …` spawns, not in the outer shell that
+invokes the wrapper. Multi-arg commands that reference those
+variables MUST be wrapped as `infisical run … -- bash -c '…'` with
+**single quotes** so the `$VAR` references stay literal until the
+Infisical-injected child starts. The naïve form
+`infisical run … -- cast send --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" "$DEPLOYER_EOA"`
+expands `$BASE_SEPOLIA_RPC_PRIMARY` and `$DEPLOYER_EOA` in the
+outer shell to empty strings before `infisical run` is reached,
+producing silent arg-truncation bugs (typically: `cast` rejecting
+an empty `--rpc-url` or empty TO address). Variables that are
+already exported in the outer shell (e.g. an ad-hoc
+`X402COMMIT_FUNDER_PK`) pass through correctly because
+`infisical run` inherits the outer environment in addition to
+injecting Infisical secrets on top.
 
 ## Locks (non-negotiable)
 

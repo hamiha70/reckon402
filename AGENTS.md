@@ -78,6 +78,15 @@ cheaper than debugging mid-build.
   cannot be done from CLI (e.g., creating a fresh scoped API token
   without a parent token), flag it explicitly and the human operator
   takes over for that one step.
+- **Test amounts: 0.01 USDC per service request.** All x402-flow
+  tests, recipes, and demo scripts use **0.01 USDC** as the canonical
+  per-request price unit unless a specific test narrates otherwise.
+  At 20 USDC seeded per reckon402-controlled EOA on Base Sepolia
+  that's ~2 000 round-trip iterations before refill. Mainnet flows
+  during L4 demo follow the same 0.01-USDC convention. Principle:
+  small enough to iterate without faucet/funder churn, large enough
+  to be a real on-chain value transfer (not a 1-wei stub the EVM
+  treats as a no-op fee path).
 
 ## Secrets and hydration (v1)
 

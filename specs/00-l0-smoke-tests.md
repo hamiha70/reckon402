@@ -34,9 +34,12 @@ Individual probes either:
 
 ## Probe inventory
 
-8 probes total. Each is one bash script under `tools/smoke-tests/`. Probe
+9 probes total. Each is one bash script under `tools/smoke-tests/`. Probe
 order in `run-all.sh` is the order listed below — Infisical first because
-every subsequent probe depends on hydrated secrets.
+every subsequent probe depends on hydrated secrets, then `funded.sh`
+sits at the end so funding regressions surface after the lower-level
+infra checks have established that the RPC endpoints themselves are
+healthy.
 
 | # | Script | Purpose | Hard requirement | PASS / SKIP / FAIL |
 |---|--------|---------|------------------|--------------------|
@@ -48,6 +51,7 @@ every subsequent probe depends on hydrated secrets.
 | 6 | `erc8004.sh` | `getAttestationCount` read on Base mainnet | yes | PASS / FAIL |
 | 7 | `kh.sh` | KeeperHub stub-agent webhook callback | optional | PASS / SKIP / FAIL |
 | 8 | `d1.sh` | `wrangler d1 create` + INSERT/SELECT cycle | yes | PASS / FAIL |
+| 9 | `funded.sh` | Deployer ETH ≥ floor on each Sepolia (regression detector for the funding-source bootstrap) | yes | PASS / FAIL |
 
 Each script:
 
@@ -260,6 +264,66 @@ The 5 s gate accommodates remote-D1 RTT to a Cloudflare data center;
 local D1 (`wrangler dev`) would land in the tens of ms but is not the
 deployment target for any reckon402 worker. A latency above 5 s is a
 genuine network or D1-region problem worth investigating.
+
+### 9. `funded.sh`
+
+**Purpose.** Deployer EOA holds enough Sepolia ETH to broadcast
+transactions on the two testnets the project actually operates on.
+The `aws.sh` probe proves the deployer KMS key signs valid
+signatures; `funded.sh` proves those signatures will land on chain
+because gas is available. Together they form the L0 acceptance bar
+for "this workstation can submit a tx via reckon402's KMS deployer."
+
+This probe is also the regression detector for funding drift: if a
+later step accidentally drains the deployer (failed deploy attempt,
+runaway gas estimate, manual experiment), `run-all.sh` flips red on
+the next run rather than the failure surfacing during a contract
+deploy in the middle of a layer build.
+
+**Steps.**
+1. Hydrate `DEPLOYER_EOA`, `BASE_SEPOLIA_RPC_PRIMARY`,
+   `ETH_SEPOLIA_RPC_PRIMARY` from Infisical.
+2. For each (chain, RPC URL) pair, call `eth_getBalance` for the
+   deployer address.
+3. Convert wei to ETH; assert balance ≥ 0.01 ETH on both chains.
+4. Capture per-chain balance into the summary line.
+
+**Floor rationale.** 0.01 ETH covers approximately:
+
+| Operation | Typical gas | At 1 gwei | At 10 gwei |
+|-----------|-------------|-----------|------------|
+| Plain ETH transfer (fan-out fund) | 21 000 | 0.000 021 ETH | 0.000 21 ETH |
+| ERC-20 transfer (USDC fan-out) | ~50 000 | 0.000 05 ETH | 0.000 5 ETH |
+| Splitter deploy (rough) | ~600 000 | 0.000 6 ETH | 0.006 ETH |
+| ENS PublicResolver `setAddr` | ~50 000 | 0.000 05 ETH | 0.000 5 ETH |
+
+So 0.01 ETH leaves ~10× headroom over a Splitter deploy at 10 gwei
+and ~50× headroom over the ENS resolver writes. Both Sepolias
+typically run gas << 1 gwei but we size for an episodic congestion
+spike.
+
+The current funding round (operator-authorized 2026-04-27) seeded
+1 ETH on each Sepolia, leaving ~100× the 0.01 ETH floor. The
+floor sits well below the seeded amount on purpose — it is a
+"healthy" threshold, not a "topped up" threshold, so triggering
+it means real drain has occurred.
+
+**Pass.** Both chain balances ≥ 0.01 ETH. Summary line:
+`base-sep=<X>eth eth-sep=<Y>eth floor=0.01eth`.
+
+**FAIL — common remediation paths.**
+- One chain below floor → re-run the matching `cast send` from
+  `tools/funding/seed-deployer.md`.
+- Both chains zero → check `DEPLOYER_EOA` value in Infisical
+  (someone may have rotated the KMS key without updating the
+  hydrated address).
+- RPC unreachable → upstream `rpc.sh` should have caught this in
+  probe 4; investigate the failure correlation.
+
+**Forward-compat.** When L4 work seeds Base mainnet ETH for the
+real demo, a third floor row gets added here. The script is
+already structured as a per-(chain, floor) table so the addition
+is one line of config, not a rewrite.
 
 ## Provisioning prerequisites
 

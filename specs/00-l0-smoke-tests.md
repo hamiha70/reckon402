@@ -199,21 +199,32 @@ must be locked before commit-2. Tracked below.
 
 ### 7. `kh.sh`
 
-**Purpose.** KeeperHub registration + webhook callback round-trip.
+**Purpose.** KeeperHub CLI + auth + API reachability smoke. The L4 flow
+(stub-agent registration, webhook callback round-trip) lives in the
+L4 spec, not here — at L0 we only verify the dependency is reachable
+with valid auth.
 
 **Steps.**
-1. Check `KEEPERHUB_API_KEY` hydrated. If empty, exit 2 (SKIP) with a
-   message: "KH not yet provisioned; provision before L4."
-2. Otherwise: register a stub agent via the documented KH API endpoint
-   (consult KH docs at runtime — endpoint URL not hard-coded in spec).
-3. Trigger the agent and confirm a webhook callback arrives at a
-   `wrangler tail`-watched temporary worker that this script creates and
-   tears down inline.
+1. `require kh` — fail if the `kh` CLI is not on `PATH` (operator must
+   install per `README.md` "Operator dependencies").
+2. `kh auth status --json` succeeds, returns `method == "token"`
+   (OAuth keyring from `kh auth login`) or `method == "apikey"`
+   (`KH_API_KEY` env). Capture `email`, `organization_id`.
+3. `kh doctor --json` returns a JSON array; assert that the entries
+   named `CLI Version`, `Auth`, `API`, `Chains` all have
+   `status == "pass"`. The `Wallet` entry is allowed to be `warn`
+   (the creator-wallet REST API requires extra auth we don't need
+   at L0). Any other entry must be `pass`.
 
-**Pass.** Stub agent registered, callback received within 30 s, temp
-worker torn down cleanly.
-**Skip.** `KEEPERHUB_API_KEY` empty.
-**Fail.** Any other error path.
+**Pass.** All four required doctor entries pass. Probe note records
+`user=<email> org=<org-id> chains=<N>`.
+
+**Skip.** Only if `kh` CLI is on `PATH` but neither OAuth keyring nor
+`KH_API_KEY` is configured (non-operator workstation, e.g., bare CI).
+Note instructs running `kh auth login` or setting `KH_API_KEY`.
+
+**Fail.** `kh` not on `PATH`; doctor reports a `fail` on a required
+entry; auth-status JSON malformed.
 
 ### 8. `d1.sh`
 
@@ -266,17 +277,18 @@ Probes 1, 2, 3, 4, 8 require the following to be in place before the run:
   add the missing account-level scopes (`Workers Scripts: Read+Write`,
   `D1: Read+Write`, `Workers Tail: Read`) on top of the original
   zone-level scopes for `reckon402.com`. New value pushed to Infisical
-  at `CLOUDFLARE_API_TOKEN`. Verification: `wrangler whoami` resolves
-  the account cleanly (`0f38f8667bbcbe4f54eda13c8df009e0`); direct
-  REST call `GET /accounts/{id}/workers/scripts` returns success;
-  `GET /accounts/{id}/d1/database` returns success; `wrangler deploy
-  --dry-run` against `tools/smoke-tests/cf-placeholder/` completes
-  with no auth errors. Note: with this scope set,
-  `GET /user/tokens/verify` and `GET /memberships` return errors
-  because the token has no `User → Memberships Read` scope — this
-  is expected and benign; modern wrangler does not depend on those
-  endpoints. Full L0 suite remains green.
+  at `CLOUDFLARE_API_TOKEN`. `cf.sh` is fully green: `wrangler whoami`
+  resolves the account, `wrangler deploy --dry-run` against
+  `tools/smoke-tests/cf-placeholder/` completes with no auth errors,
+  and `d1.sh` round-trip succeeds (proving D1 account-level scope
+  from a second angle).
 - **Q-L0-4.** KH API access. Per build cadence, provisioning during L0 is
   acceptable; if KH is not provisioned by the time `run-all.sh` runs, the
   probe SKIPs cleanly.
-  Disposition: deferred — non-fatal SKIP path documented.
+  **Disposition: resolved 2026-04-27.** Operator authenticated the
+  `kh` CLI via `kh auth login` (device-code OAuth, token cached in
+  OS keyring). `kh doctor --json` returns `pass` on `CLI Version`,
+  `Auth`, `API`, and `Chains`; `Wallet` is `warn` (creator-wallet
+  REST API requires extra auth — not needed at L0). The probe runs
+  against the OAuth keyring session on the operator workstation;
+  `KH_API_KEY` is the CI fallback path and stays unset until L4.

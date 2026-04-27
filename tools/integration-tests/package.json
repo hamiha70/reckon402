@@ -1,0 +1,14 @@
+{
+  "name": "@reckon402/integration-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "One-shot integration test scripts for Reckon402",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test:l2": "bash agent-paywall.sh"
+  },
+  "dependencies": {
+    "viem": "^2.0.0"
+  }
+}

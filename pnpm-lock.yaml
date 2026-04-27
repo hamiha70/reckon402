@@ -16,6 +16,12 @@ importers:
         specifier: ^2.30.0
         version: 2.48.4(typescript@5.9.3)
 
+  tools/integration-tests:
+    dependencies:
+      viem:
+        specifier: ^2.0.0
+        version: 2.48.4(typescript@5.9.3)
+
   tools/provisioning:
     dependencies:
       '@noble/hashes':

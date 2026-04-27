@@ -262,7 +262,19 @@ Probes 1, 2, 3, 4, 8 require the following to be in place before the run:
   Cloudflare dashboard. If neither is available, L0 uses the existing
   global session and the scoped token is provisioned by the operator
   before L1.
-  Disposition: deferred — L0 unblocks via existing session.
+  **Disposition: partially resolved 2026-04-27.** Operator created a
+  scoped token via dashboard; pushed to Infisical as
+  `CLOUDFLARE_API_TOKEN` along with `CLOUDFLARE_ACCOUNT_ID`,
+  `CLOUDFLARE_ZONE_ID` (`reckon402.com` → `381e8c2d529e24332ee646a8f8695019`),
+  and `CLOUDFLARE_ZONE_NAME`. Probe verification showed the token
+  carries **only zone-level scopes** for `reckon402.com` (DNS: Edit,
+  Workers Routes: Edit) and is missing the **account-level** scopes
+  required for L1 deploys (`Workers Scripts: Edit`, `D1: Edit`,
+  optionally `Workers Tail: Read`). Re-issuance with the full
+  permission set is a blocker for L1 deploy automation; `wrangler`
+  OAuth session remains usable as a fallback. Tracked as a follow-up:
+  the next token push to Infisical with the same key name overwrites
+  cleanly.
 - **Q-L0-4.** KH API access. Per build cadence, provisioning during L0 is
   acceptable; if KH is not provisioned by the time `run-all.sh` runs, the
   probe SKIPs cleanly.

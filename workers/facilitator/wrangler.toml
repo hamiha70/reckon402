@@ -1,0 +1,21 @@
+name                = "reckon402-facilitator"
+main                = "src/index.ts"
+compatibility_date  = "2026-04-27"
+
+account_id  = "0f38f8667bbcbe4f54eda13c8df009e0"
+workers_dev = false
+
+[[routes]]
+pattern       = "facilitator.reckon402.com"
+custom_domain = true
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "reckon402-d1-facilitator-dev"
+# database_id filled in after `wrangler d1 create` at deploy time
+
+[vars]
+NETWORK                  = "eip155:84532"
+USDC_ADDRESS             = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+# SPLITTER_ADDRESS set at deploy time via `wrangler secret put` or `[env.dev.vars]`
+# BASE_SEPOLIA_RPC_PRIMARY + BASE_SEPOLIA_RPC_FALLBACK + FACILITATOR_PK via secrets

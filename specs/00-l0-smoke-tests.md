@@ -43,7 +43,7 @@ every subsequent probe depends on hydrated secrets.
 | 1 | `infisical.sh` | Hydration layer reachability + valid CLI session + round-trip read | yes | PASS / FAIL |
 | 2 | `cf.sh` | Cloudflare auth + DNS resolution for root + Wrangler dry-run | yes | PASS / FAIL |
 | 3 | `aws.sh` | AWS STS + KMS alias presence + sign-and-recover round-trip | yes | PASS / FAIL |
-| 4 | `rpc.sh` | `eth_chainId` against 4 endpoints (Base mainnet/Sepolia × primary/fallback) | yes | PASS / FAIL |
+| 4 | `rpc.sh` | `eth_chainId` against 8 endpoints (Base + Ethereum, mainnet+Sepolia × primary+fallback) | yes | PASS / FAIL |
 | 5 | `ens.sh` | CCIP-Read end-to-end against a Sepolia stub | yes | PASS / FAIL |
 | 6 | `erc8004.sh` | `getAttestationCount` read on Base mainnet | yes | PASS / FAIL |
 | 7 | `kh.sh` | KeeperHub stub-agent webhook callback | optional | PASS / SKIP / FAIL |
@@ -129,27 +129,42 @@ soft warnings logged but do not fail the probe.
 
 ### 4. `rpc.sh`
 
-**Purpose.** Two-RPC redundancy across Base mainnet and Base Sepolia.
+**Purpose.** Two-RPC redundancy across the four chains the build touches at
+L0–L4: Base mainnet (settlement at L4), Base Sepolia (settlement at L3),
+Ethereum mainnet (ENS canonical resolution), and Ethereum Sepolia (ENS test
+name + resolver fixtures at L0).
 
-**Steps.** For each of `BASE_MAINNET_RPC_PRIMARY`, `BASE_MAINNET_RPC_FALLBACK`,
-`BASE_SEPOLIA_RPC_PRIMARY`, `BASE_SEPOLIA_RPC_FALLBACK`:
+**Steps.** For each of the eight Infisical keys
+
+- `BASE_MAINNET_RPC_PRIMARY`, `BASE_MAINNET_RPC_FALLBACK`
+- `BASE_SEPOLIA_RPC_PRIMARY`, `BASE_SEPOLIA_RPC_FALLBACK`
+- `ETH_MAINNET_RPC_PRIMARY`, `ETH_MAINNET_RPC_FALLBACK`
+- `ETH_SEPOLIA_RPC_PRIMARY`, `ETH_SEPOLIA_RPC_FALLBACK`
 
 1. Hydrate URL from Infisical via `infisical secrets get <KEY> --plain --silent`.
-   FAIL if any of the four keys is empty.
+   FAIL if any of the eight keys is empty.
 2. POST `{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}` with
    5-second timeout.
 3. Assert response `.result` matches the expected chain ID hex:
    - `0x2105` (8453) for Base mainnet endpoints
    - `0x14a34` (84532) for Base Sepolia endpoints
+   - `0x1` (1) for Ethereum mainnet endpoints
+   - `0xaa36a7` (11155111) for Ethereum Sepolia endpoints
 4. Capture per-endpoint latency in ms.
 
-**Pass.** All four endpoints return correct chain ID. PRIMARY endpoints
+**Pass.** All eight endpoints return correct chain ID. PRIMARY endpoints
 must each be < 200 ms p50; FALLBACK endpoints have no latency requirement
 (acceptable to be slower; they exist for redundancy, not hot path).
 
 **FAIL note.** If any endpoint is unreachable, treat as FAIL — even though
 the fallback exists, an early-detected outage on either pair member is a
 signal that the redundancy is not currently two-deep.
+
+**Provider mix.** Primaries are Alchemy (single account, four chains
+enabled). Fallbacks are anonymous public endpoints (`publicnode.com`):
+zero-cost, rate-limited, sufficient for failover and smoke. Rotation
+out of `publicnode` to a paid second provider is a post-submission
+hardening task, tracked outside this spec.
 
 ### 5. `ens.sh`
 
@@ -159,7 +174,8 @@ tooling-version mismatch.
 
 **Steps.**
 1. Resolve `reckon402-test.eth` (or a configured equivalent) via a viem
-   `getEnsAddress` call against Sepolia, with the resolver pointing at a
+   `getEnsAddress` call against Ethereum Sepolia (RPC URL hydrated from
+   `ETH_SEPOLIA_RPC_PRIMARY`), with the resolver pointing at a
    wildcard-resolver contract that supports CCIP-Read.
 2. Validate that `msg.sender` recovery from the wildcard `callData` returns
    the expected resolver contract address (Pattern A msg.sender recovery).
@@ -252,7 +268,7 @@ Probes 1, 2, 3, 4, 8 require the following to be in place before the run:
 | Item | Provisioning command | Status at spec time |
 |------|---------------------|---------------------|
 | Infisical project `reckon402` | `~/Projects/aws_setup_2026/scripts/infisical-project.sh create reckon402 --slug reckon402` | DONE |
-| Infisical dev secrets: 4 RPC URLs | `infisical secrets set --file=…` (via tmpfs scratch) | DONE |
+| Infisical dev secrets: 8 RPC URLs (Base + Ethereum, mainnet+Sepolia × primary+fallback) | `infisical-secret-put.sh KEY=@/dev/shm/...` | DONE |
 | Infisical dev secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | same pattern | TODO before run |
 | KMS key `alias/reckon402/mainnet/buyer-signer/evm` (`eu-central-1`) | `aws kms create-key …` + `aws kms create-alias …` | TODO before run |
 | IAM user `reckon402-signer` + scoped KMS policy | `aws iam create-user …` + `aws iam create-policy …` + `aws iam attach-user-policy …` | TODO before run |

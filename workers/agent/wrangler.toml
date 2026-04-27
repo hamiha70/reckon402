@@ -1,10 +1,20 @@
-name            = "reckon402-agent"
-main            = "src/index.ts"
+name                = "reckon402-agent"
+main                = "src/index.ts"
 compatibility_date  = "2026-04-27"
 
 account_id  = "0f38f8667bbcbe4f54eda13c8df009e0"
 workers_dev = false
 
 [[routes]]
-pattern      = "agent.reckon402.com"
+pattern       = "agent.reckon402.com"
 custom_domain = true
+
+[vars]
+NETWORK          = "eip155:84532"
+USDC_ADDRESS     = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+AMOUNT           = "10000"                                         # 0.01 USDC
+FACILITATOR_URL  = "https://facilitator.reckon402.com/x402"
+# SPLITTER_ADDRESS is set after the Splitter is deployed (commit 6):
+# wrangler secret put SPLITTER_ADDRESS
+# — or pasted into [vars] here once the address is known and recorded
+#   in AGENTS.md "## L3 deployments".

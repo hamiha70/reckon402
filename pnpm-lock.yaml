@@ -115,6 +115,12 @@ importers:
 
   workers/agent:
     dependencies:
+      '@reckon402/facilitator-client':
+        specifier: workspace:*
+        version: link:../../packages/facilitator-client
+      '@reckon402/middleware-hono':
+        specifier: workspace:*
+        version: link:../../packages/middleware-hono
       '@reckon402/types':
         specifier: workspace:*
         version: link:../../packages/types

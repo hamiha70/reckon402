@@ -1,0 +1,6 @@
+# IDE / editor local state
+.cursor/
+.vscode/
+.idea/
+*.swp
+.DS_Store

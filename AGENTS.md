@@ -87,6 +87,16 @@ cheaper than debugging mid-build.
   small enough to iterate without faucet/funder churn, large enough
   to be a real on-chain value transfer (not a 1-wei stub the EVM
   treats as a no-op fee path).
+- **Sepolia gas funding: 1 ETH seed, 0.01 ETH floor.** The KMS
+  deployer EOA is seeded with **1 ETH** on each of Base Sepolia
+  and Ethereum Sepolia from the x402commit-funder
+  (`X402COMMIT_FUNDER_PK` in Infisical). The L0 `funded.sh` probe
+  enforces a **0.01 ETH per-chain floor** on the deployer at every
+  layer transition. Refill is operator-managed: when `funded.sh`
+  goes red, re-run `tools/funding/seed-deployer.md`. Deployer is
+  the single source of funds for every other reckon402-controlled
+  EOA — no address gets funded directly from the operator's main
+  wallet except the deployer.
 - **TypeScript-first for all production surfaces.** Every file under
   `workers/`, `packages/`, `lambda/`, and `demo/` MUST be `.ts` /
   `.tsx`. Plain `.js` / `.mjs` is only acceptable in `tools/` for
@@ -250,6 +260,20 @@ reckon402/
 ├── demo/          # Vercel frontend
 └── tools/         # build/deploy/smoke-test scripts
 ```
+
+## Operator runbook
+
+`RUNBOOK.md` at repo root is the single index for operator
+workflows: provisioning, secrets, funding, ENS, smoke tests,
+KMS signing, layer checkpoints. Each entry points at the
+canonical recipe under `tools/<area>/<recipe>.md`; the runbook
+itself does not duplicate recipe content. When asked "how do I
+do X?", grep `RUNBOOK.md` first.
+
+Inline sections in `RUNBOOK.md` graduate to their own `.md`
+file under `tools/<area>/` once they exceed ~40 lines. When a
+recipe is added, moved, or graduated, update the
+`RUNBOOK.md` Quick reference table in the same commit.
 
 ## Spec workflow
 

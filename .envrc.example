@@ -1,22 +1,42 @@
 # Copy to .envrc (gitignored) and run `direnv allow`.
+#
+# Reckon402 uses self-hosted Infisical as the dev-time hydration layer.
+# This file carries ONLY the hydration parameters; actual secret values
+# (RPC URLs, Cloudflare tokens, AWS access keys, KeeperHub keys) live
+# in the Infisical project "reckon402" at the URL below and are
+# injected at runtime via `infisical run --env dev -- <command>`.
 
-# Cloudflare API token, scoped to the reckon402.com zone.
-# Create at: Cloudflare dashboard → My Profile → API Tokens
-# Required permissions: Workers Scripts (Edit), D1 (Edit),
-# Workers Routes (Edit), KV (Edit). Zone restriction: reckon402.com.
-export CLOUDFLARE_API_TOKEN=
-export CLOUDFLARE_ACCOUNT_ID=
+# --- Infisical hydration parameters --------------------------------
+export INFISICAL_DOMAIN=https://secrets.intentralabs.com
+export INFISICAL_PROJECT_ID=84d8a29b-27e3-46d0-bf72-bbe01215ac35
+export INFISICAL_ENV=dev
 
-# AWS profile pointing at the IAM user with KMS Sign permission on
+# Universal-Auth machine identity (only required for non-interactive
+# contexts: CI, headless boxes, systemd units). Leave empty on the
+# laptop — `infisical login --domain $INFISICAL_DOMAIN` covers
+# interactive use.
+export INFISICAL_CLIENT_ID=
+export INFISICAL_CLIENT_SECRET=
+
+# --- AWS CLI profile -----------------------------------------------
+# IAM user with kms:Sign + kms:GetPublicKey on
 # alias/reckon402/mainnet/buyer-signer/evm in eu-central-1.
+# Access keys stored in Infisical; configure ~/.aws/credentials
+# manually OR fetch via:
+#   infisical run --env dev -- env | grep AWS_ACCESS_KEY
 export AWS_PROFILE=reckon402-signer
 export AWS_REGION=eu-central-1
 
-# Base RPC endpoints (two-RPC redundancy per design pack).
-export BASE_MAINNET_RPC_PRIMARY=
-export BASE_MAINNET_RPC_FALLBACK=
-export BASE_SEPOLIA_RPC_PRIMARY=
-export BASE_SEPOLIA_RPC_FALLBACK=
+# --- Cloudflare ----------------------------------------------------
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID hydrate from
+# Infisical at runtime. Create a zone-scoped token at:
+#   Cloudflare dashboard → My Profile → API Tokens
+# Required permissions: Workers Scripts (Edit), D1 (Edit),
+# Workers Routes (Edit), KV (Edit). Zone restriction: reckon402.com.
+# Push to Infisical via scripts/infisical-secret-put.sh in aws_setup_2026.
 
-# KeeperHub API access (populated at L0 smoke-test time).
-export KEEPERHUB_API_KEY=
+# --- Convenience wrapper -------------------------------------------
+# Most commands in this repo prefer:
+#   infisical run --env dev -- <command>
+# Add an alias if you find yourself typing it often:
+#   alias r='infisical run --env dev --'

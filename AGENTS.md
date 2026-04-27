@@ -72,6 +72,29 @@ cheaper than debugging mid-build.
 - **`version: 2` only.** Reject `version: 1` in the X-Payment header.
 - **Solidity 0.8.24 + OpenZeppelin 5.3.0** for contracts. Foundry +
   Forge for tests. Vitest for TypeScript tests.
+- **CLI-first for AWS and Cloudflare.** Provisioning, smoke tests, and
+  reads MUST be driven via `aws` CLI and `wrangler` / Cloudflare REST
+  API rather than the AWS Console or Cloudflare dashboard. If a step
+  cannot be done from CLI (e.g., creating a fresh scoped API token
+  without a parent token), flag it explicitly and the human operator
+  takes over for that one step.
+
+## Secrets and hydration (v1)
+
+All developer-workstation env vars (RPC URLs, Cloudflare API tokens,
+AWS access keys for `reckon402-signer`, KeeperHub keys) live in the
+**self-hosted Infisical** project `reckon402` at
+`https://secrets.intentralabs.com`. Local commands run under
+`infisical run --env dev -- …` to inject secrets at runtime.
+`.envrc` (gitignored) only carries the Infisical hydration parameters
+(domain, project ID, optional Universal-Auth client id/secret); no
+plaintext secret values land in repo files.
+
+KMS-resident signing material (the `reckon402-signer` private key) is
+non-retrievable by design and stays in AWS KMS in `eu-central-1`.
+Infisical and KMS are orthogonal; see
+`~/Projects/aws_setup_2026/docs/{infisical-host.md,x402commit-kms.md}`
+for the operator-side documentation.
 
 ## Locks (non-negotiable)
 
@@ -95,6 +118,17 @@ cheaper than debugging mid-build.
 Single-tier **D1-only** for all worker state. Per-paymentId idempotency
 guaranteed by SQLite UNIQUE constraint + `INSERT OR IGNORE`. Forward-
 compat path to multi-tier (KV + DO-SQLite + relational) after hackathon.
+
+## Infisical project locks
+
+| Item | Value |
+| ---- | ----- |
+| Self-hosted host | `https://secrets.intentralabs.com` |
+| Project slug | `reckon402` |
+| Project ID | `84d8a29b-27e3-46d0-bf72-bbe01215ac35` |
+| Default env for dev | `dev` |
+| Wrapper for project CRUD | `~/Projects/aws_setup_2026/scripts/infisical-project.sh` |
+| Wrapper for sensitive single-secret push | `~/Projects/aws_setup_2026/scripts/infisical-secret-put.sh` |
 
 ## Repo layout
 

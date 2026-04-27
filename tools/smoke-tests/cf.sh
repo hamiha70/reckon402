@@ -17,15 +17,21 @@ whoami_out="$("$WRANGLER" whoami 2>&1)" \
 account_id="$(echo "$whoami_out" \
   | grep -oE '[0-9a-f]{32}' | head -n1 || true)"
 
-# 2. Root domain resolves.
-root_a="$(dig +short reckon402.com @1.1.1.1 | grep -E '^[0-9.]+$' | head -n1 || true)"
-[[ -n "$root_a" ]] || probe_fail "reckon402.com does not resolve via 1.1.1.1"
+# 2. Root domain is on Cloudflare nameservers (proves we can deploy
+#    Workers + DNS records into this zone). Apex A record is OPTIONAL
+#    at L0 — Pages/Workers Routes provision the apex during L1.
+ns_records="$(dig +short NS reckon402.com @1.1.1.1 | tr '\n' ',' | sed 's/,$//')"
+[[ "$ns_records" == *"ns.cloudflare.com."* ]] \
+  || probe_fail "reckon402.com NS not on Cloudflare (got: ${ns_records:-empty})"
 
-# 3. Subdomain DNS — soft check, not failure.
+root_a="$(dig +short A reckon402.com @1.1.1.1 | grep -E '^[0-9.]+$' | head -n1 || true)"
+
+# 3. Subdomain DNS — soft check, not failure (L1 work).
 warnings=()
+[[ -z "$root_a" ]] && warnings+=("apex-A-missing")
 for sub in agent facilitator gateway signing demo; do
   if [[ -z "$(dig +short "${sub}.reckon402.com" @1.1.1.1 | head -n1)" ]]; then
-    warnings+=("${sub}.reckon402.com missing")
+    warnings+=("${sub}-missing")
   fi
 done
 
@@ -36,9 +42,9 @@ PLACEHOLDER_DIR="$DIR/cf-placeholder"
 dry_run_out="$("$WRANGLER" deploy --dry-run --config "$PLACEHOLDER_DIR/wrangler.toml" 2>&1)" \
   || probe_fail "wrangler dry-run failed: $dry_run_out"
 
-note="account=${account_id:-unknown} root=${root_a}"
+note="account=${account_id:-unknown} ns=cloudflare"
 if (( ${#warnings[@]} > 0 )); then
-  note="$note subdomains-missing=$(IFS=,; echo "${warnings[*]}")"
+  note="$note pending=$(IFS=,; echo "${warnings[*]}")"
 fi
 
 probe_pass "$note"

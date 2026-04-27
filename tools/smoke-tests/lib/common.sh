@@ -40,15 +40,21 @@ probe_pass() {
   exit 0
 }
 
+# Replace embedded newlines and runs of whitespace with a single
+# separator so the summary line is always parseable as one row.
+_squash() {
+  printf '%s' "$1" | tr '\n' ' ' | tr -s ' '
+}
+
 probe_skip() {
   local reason="${1:-skipped}"
-  printf 'SKIP %s %dms %s\n' "$PROBE_NAME" "$(_probe_elapsed_ms)" "$reason"
+  printf 'SKIP %s %dms %s\n' "$PROBE_NAME" "$(_probe_elapsed_ms)" "$(_squash "$reason")"
   exit 2
 }
 
 probe_fail() {
   local reason="${1:-failed}"
-  printf 'FAIL %s %dms %s\n' "$PROBE_NAME" "$(_probe_elapsed_ms)" "$reason" >&2
+  printf 'FAIL %s %dms %s\n' "$PROBE_NAME" "$(_probe_elapsed_ms)" "$(_squash "$reason")" >&2
   exit 1
 }
 

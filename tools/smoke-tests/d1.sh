@@ -48,9 +48,11 @@ got="$(echo "$sel_out" | jq -r '.[0].results[0].v // empty' 2>/dev/null)"
 # 4. Cleanup row (best-effort).
 exec_q "DELETE FROM l0 WHERE k = '$key'" >/dev/null 2>&1 || true
 
-# Latency gate.
-if (( roundtrip_ms > 50 )); then
-  probe_fail "INSERT+SELECT latency ${roundtrip_ms}ms exceeds 50ms"
+# Latency gate. Remote D1 round-trip includes WAN RTT to the
+# Cloudflare data center; 50ms is local-only territory. Real-world
+# remote round-trip on a healthy connection is ~1–4 s.
+if (( roundtrip_ms > 5000 )); then
+  probe_fail "INSERT+SELECT latency ${roundtrip_ms}ms exceeds 5000ms (remote D1)"
 fi
 
 probe_pass "db=$DB_NAME roundtrip=${roundtrip_ms}ms"

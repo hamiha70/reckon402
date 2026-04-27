@@ -37,9 +37,10 @@ for probe in "${PROBES[@]}"; do
   out="$("$script" 2>&1)"
   rc=$?
 
-  # Parse output: each probe emits "<STATUS> <name> <ms> [note]" on its
-  # last line.
-  last="$(echo "$out" | tail -n1)"
+  # Parse output: each probe emits "<STATUS> <name> <ms> [note]" once,
+  # but multi-line FAIL/SKIP context can interleave. Grep the canonical
+  # summary line (status anchor at line start, followed by " <name> ").
+  last="$(echo "$out" | grep -E "^(PASS|SKIP|FAIL) ${probe} " | tail -n1)"
   read -r status name dur rest <<<"$last" || true
 
   case "$status" in

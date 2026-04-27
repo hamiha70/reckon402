@@ -85,11 +85,15 @@ deploy works.
 
 **Steps.**
 1. `wrangler whoami` → expect "You are logged in" or equivalent (parse for
-   account ID).
-2. `dig +short reckon402.com @1.1.1.1` → expect non-empty A record.
-3. `dig +short {agent,facilitator,gateway,signing,demo}.reckon402.com @1.1.1.1`
-   → record per subdomain, but treat MISSING as a soft warning, not a
-   failure (subdomain DNS is L1 work; verifying root is enough at L0).
+   account ID). Either an OAuth session OR a scoped API token is acceptable
+   at L0; scoped-token migration is tracked under Q-L0-3.
+2. `dig +short NS reckon402.com @1.1.1.1` → expect Cloudflare nameservers
+   (proves the zone is on Cloudflare and we can deploy DNS records into it).
+   Apex A record is OPTIONAL at L0 — Pages/Workers Routes provision it
+   during L1.
+3. `dig +short A {agent,facilitator,gateway,signing,demo}.reckon402.com @1.1.1.1`
+   → record per subdomain, treated as a soft warning, not a failure
+   (subdomain DNS is L1 work).
 4. `wrangler deploy --dry-run` against a placeholder `wrangler.toml` shipped
    under `tools/smoke-tests/cf-placeholder/`. Expect "Total Upload" output
    without errors.
@@ -106,9 +110,11 @@ soft warnings logged but do not fail the probe.
    `Arn`, `UserId`. Soft assertion: `Arn` should reference IAM user
    `reckon402-signer`, but any successful identity is accepted (operator
    may have a different active profile during early provisioning).
-2. `aws kms list-aliases --region eu-central-1` →  parse JSON; assert
-   `alias/reckon402/mainnet/buyer-signer/evm` exists. If absent, FAIL with
-   remediation pointer to "Provisioning" section below.
+2. `aws kms get-public-key --region eu-central-1 --key-id alias/reckon402/mainnet/buyer-signer/evm`
+   → expect a JSON response with `KeySpec=ECC_SECG_P256K1`. This validates
+   alias presence using only `kms:GetPublicKey` (already in the scoped
+   policy); deliberately avoiding `kms:ListAliases` keeps the IAM
+   policy at minimum scope.
 3. Run `tools/smoke-tests/kms-verify.mjs`:
    - Fetch KMS public key via `aws kms get-public-key`.
    - Parse DER `SubjectPublicKeyInfo`, extract uncompressed secp256k1 point.
@@ -222,7 +228,11 @@ worker torn down cleanly.
 4. SELECT the row back; assert equality.
 5. Capture wall time across steps 3 + 4.
 
-**Pass.** Round-trip succeeds, total INSERT+SELECT latency < 50 ms.
+**Pass.** Round-trip succeeds, total INSERT+SELECT latency < 5000 ms.
+The 5 s gate accommodates remote-D1 RTT to a Cloudflare data center;
+local D1 (`wrangler dev`) would land in the tens of ms but is not the
+deployment target for any reckon402 worker. A latency above 5 s is a
+genuine network or D1-region problem worth investigating.
 
 ## Provisioning prerequisites
 

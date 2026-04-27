@@ -19,13 +19,12 @@ sts_out="$(aws sts get-caller-identity --output json 2>&1)" \
 caller_arn="$(echo "$sts_out" | jq -r '.Arn // empty')"
 [[ -n "$caller_arn" ]] || probe_fail "STS returned no Arn"
 
-# 2. KMS alias presence.
-list_out="$(aws kms list-aliases --region "$REGION" --output json 2>&1)" \
-  || probe_fail "aws kms list-aliases failed: $list_out"
-
-found="$(echo "$list_out" | jq -r --arg a "$ALIAS" \
-  '.Aliases[] | select(.AliasName == $a) | .TargetKeyId // empty')"
-[[ -n "$found" ]] || probe_fail "alias $ALIAS not found in $REGION (provision per specs/00-l0-smoke-tests.md Provisioning Prerequisites)"
+# 2. KMS alias presence — verified by calling kms:GetPublicKey on the
+#    alias. This avoids needing kms:ListAliases in the scoped policy
+#    (we deliberately keep the policy at kms:Sign + kms:GetPublicKey
+#    only). A 404 / NotFoundException would surface as a failure here.
+gpk_out="$(aws kms get-public-key --region "$REGION" --key-id "$ALIAS" --output json 2>&1)" \
+  || probe_fail "kms:GetPublicKey on $ALIAS failed: $gpk_out"
 
 # 3. EOA control proof via lib/kms-verify.mjs.
 export AWS_REGION="$REGION"

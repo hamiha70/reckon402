@@ -8,6 +8,12 @@ importers:
 
   .: {}
 
+  tools/provisioning:
+    dependencies:
+      viem:
+        specifier: ^2.30.0
+        version: 2.48.4
+
   tools/smoke-tests:
     dependencies:
       '@aws-sdk/client-kms':

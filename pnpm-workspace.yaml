@@ -4,3 +4,4 @@ packages:
   - "lambda/*"
   - "demo"
   - "tools/smoke-tests"
+  - "tools/provisioning"

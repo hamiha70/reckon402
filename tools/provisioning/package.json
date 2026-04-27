@@ -1,0 +1,13 @@
+{
+  "name": "@reckon402/provisioning",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "One-shot ops scripts for reckon402 on-chain identity provisioning (idempotent).",
+  "scripts": {
+    "eoas": "node ./provision-eoas.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.30.0"
+  }
+}

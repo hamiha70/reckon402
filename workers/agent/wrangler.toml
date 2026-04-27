@@ -1,0 +1,10 @@
+name            = "reckon402-agent"
+main            = "src/index.ts"
+compatibility_date  = "2026-04-27"
+
+account_id  = "0f38f8667bbcbe4f54eda13c8df009e0"
+workers_dev = false
+
+[[routes]]
+pattern      = "agent.reckon402.com"
+custom_domain = true

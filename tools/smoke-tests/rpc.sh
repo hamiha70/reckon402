@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Probe 4 — Base mainnet + Sepolia two-RPC redundancy.
+# Probe 4 — two-RPC redundancy across Base + Ethereum (mainnet + Sepolia).
 # See specs/00-l0-smoke-tests.md §4.
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,19 +15,34 @@ declare -A EXPECTED=(
   [BASE_MAINNET_RPC_FALLBACK]=0x2105
   [BASE_SEPOLIA_RPC_PRIMARY]=0x14a34
   [BASE_SEPOLIA_RPC_FALLBACK]=0x14a34
+  [ETH_MAINNET_RPC_PRIMARY]=0x1
+  [ETH_MAINNET_RPC_FALLBACK]=0x1
+  [ETH_SEPOLIA_RPC_PRIMARY]=0xaa36a7
+  [ETH_SEPOLIA_RPC_FALLBACK]=0xaa36a7
 )
 declare -A IS_PRIMARY=(
   [BASE_MAINNET_RPC_PRIMARY]=1
   [BASE_MAINNET_RPC_FALLBACK]=0
   [BASE_SEPOLIA_RPC_PRIMARY]=1
   [BASE_SEPOLIA_RPC_FALLBACK]=0
+  [ETH_MAINNET_RPC_PRIMARY]=1
+  [ETH_MAINNET_RPC_FALLBACK]=0
+  [ETH_SEPOLIA_RPC_PRIMARY]=1
+  [ETH_SEPOLIA_RPC_FALLBACK]=0
+)
+
+# Probe order is (chain, tier) sorted: keeps the summary line readable.
+KEYS=(
+  BASE_MAINNET_RPC_PRIMARY  BASE_MAINNET_RPC_FALLBACK
+  BASE_SEPOLIA_RPC_PRIMARY  BASE_SEPOLIA_RPC_FALLBACK
+  ETH_MAINNET_RPC_PRIMARY   ETH_MAINNET_RPC_FALLBACK
+  ETH_SEPOLIA_RPC_PRIMARY   ETH_SEPOLIA_RPC_FALLBACK
 )
 
 PRIMARY_LATENCY_MS_MAX=200
 results=()
 
-for key in BASE_MAINNET_RPC_PRIMARY BASE_MAINNET_RPC_FALLBACK \
-           BASE_SEPOLIA_RPC_PRIMARY BASE_SEPOLIA_RPC_FALLBACK; do
+for key in "${KEYS[@]}"; do
   url="$(hydrate "$key")"
   [[ -n "$url" ]] || probe_fail "$key not hydrated from Infisical"
 
@@ -49,7 +64,15 @@ for key in BASE_MAINNET_RPC_PRIMARY BASE_MAINNET_RPC_FALLBACK \
     probe_fail "$key primary latency ${dur}ms exceeds ${PRIMARY_LATENCY_MS_MAX}ms"
   fi
 
-  results+=("${key##*_RPC_}=${dur}ms")
+  # Compact tag in the summary line: family + chain initial + tier.
+  # BASE_MAINNET_RPC_PRIMARY -> base-main-P, ETH_SEPOLIA_RPC_FALLBACK -> eth-sep-F.
+  tag="$(echo "$key" | awk -F_ '{
+    fam = tolower($1);
+    net = ($2 == "MAINNET") ? "main" : "sep";
+    tier = ($4 == "PRIMARY") ? "P" : "F";
+    printf "%s-%s-%s", fam, net, tier;
+  }')"
+  results+=("${tag}=${dur}ms")
 done
 
 probe_pass "$(IFS=,; echo "${results[*]}")"

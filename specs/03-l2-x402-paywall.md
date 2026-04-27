@@ -340,22 +340,18 @@ Integration test buyer:
 
 ## 9. Open questions
 
-**Q-03-α** (confirmed): `02_facilitator.md` §4.1 example shows `requestId: "01J..."`
-(ULID-shaped). Per §3.1 of `00_architecture.md` and §5 of `02_facilitator.md`,
-`requestId` is UUID v4. Disposition: §4.1 example is a typo; UUID v4 is
-canonical. No L2 action; flag to research-repo maintainer.
+**Q-03-α** — RESOLVED: `02_facilitator.md` §4.1 example shows `requestId: "01J..."`
+(ULID-shaped) but §3.1 and §5 both say UUID v4. Resolution: §4.1 example is a typo;
+UUID v4 is canonical. Flag to research-repo maintainer for correction before L3 spec
+authors read that section.
 
-**Q-03-β**: Design pack §4.1 verify request uses `version: 2` (top-level field).
-x402 Foundation canonical spec uses `x402Version: 2` (different field name).
-These are different API layers: `version` is the Reckon402 Facilitator internal
-HTTP API (L3); `x402Version` is the canonical Foundation protocol field (used
-in `PAYMENT-REQUIRED` and `PAYMENT-SIGNATURE` headers). Not a conflict.
-The `Facilitator` interface in `@reckon402/types` takes `PaymentPayload` as
-input (Foundation canonical with `x402Version`). `CdpFacilitator` and
-`Reckon402Facilitator` both translate internally as needed.
+**Q-03-β** — RESOLVED: Design pack §4.1 verify request uses `version: 2`; x402
+Foundation canonical spec uses `x402Version: 2`. These are different API layers —
+no conflict. L3 Reckon402Facilitator HTTP API will use `version: 2` internally;
+`@reckon402/types` `PaymentPayload` uses `x402Version: 2` (Foundation wire). The
+`CdpFacilitator` and future `Reckon402Facilitator` both translate at their boundary.
 
-**Q-03-γ**: x402.org facilitator URL returned 404 on direct HTML fetch. Verify
-it responds to `POST /verify` before relying on it in integration test. Fallback:
-use CDP authenticated endpoint (`https://api.cdp.coinbase.com/platform/v2/x402`)
-with `CDP_API_KEY_ID`/`CDP_API_KEY_SECRET` from Infisical if x402.org endpoint
-is down. Document which endpoint was used in the run log.
+**Q-03-γ** — RESOLVED: x402.org/facilitator POST /verify and /settle respond
+correctly to API calls (HTML GET returns 404, API endpoints work). Two on-chain
+settlements confirmed against this endpoint in the L2 integration run. No fallback
+to CDP authenticated endpoint needed at L2.

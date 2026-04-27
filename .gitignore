@@ -34,3 +34,6 @@ contracts/lib/
 
 # Smoke-test artifacts (committed manually, not auto-tracked)
 tools/smoke-tests/results-*.local.md
+
+# tmp folder
+tmp/

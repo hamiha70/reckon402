@@ -1,20 +1,26 @@
 # Seed the deployer with Sepolia ETH (operator action)
 
+> **Status: COMPLETE for the 2026-04-27 round.** The deployer is at
+> 1 ETH on each Sepolia. See `results-post-funding-2026-04-27.md`.
+> This file is preserved as the **reproducible recipe** for the next
+> top-up round.
+
 Operator-runnable recipe. Uses `cast send` (Foundry) so the funder
 private key never leaves the operator's environment and never lands
 on disk in this repo.
 
 ## What and why
 
-| Chain | Need | Source | Amount | Reason |
-|-------|------|--------|--------|--------|
-| Base Sepolia (84532) | gas for L3 Splitter deploy + intra-project fan-out | `0x9AF7...3F04` (x402commit deployer, operator-controlled) | 0.05 ETH | One Splitter deploy is ~0.005 ETH; 0.05 covers ~10 redeploys + fund-fanouts |
-| Ethereum Sepolia (11155111) | gas for ENS resolver record writes (`addr()`, optional CCIP-Read setup) | `0x9AF7...3F04` (same funder; carries 3.9 SepETH) | 0.05 ETH | Three `setAddr()` calls + a `setText()` clock-in around 0.001 ETH; 0.05 leaves ~50× headroom |
+| Chain | Need | Source | Amount (this round) | Reason |
+|-------|------|--------|---------------------|--------|
+| Base Sepolia (84532) | gas for L3 Splitter deploy + intra-project fan-out | `0x9AF7...3F04` (x402commit funder, operator-controlled) | 1 ETH | ~10× headroom over a full L3 build (Splitter deploy + 7-EOA fan-out) at episodic-spike gas |
+| Ethereum Sepolia (11155111) | gas for ENS resolver record writes (`addr()`, future CCIP-Read setup) | `0x9AF7...3F04` (same funder) | 1 ETH | ~50× headroom over a `setAddr()` + `setText()` flow at episodic-spike gas |
 
-Pre-funding state confirmed in `results-pre-funding-2026-04-27.md`:
-both source addresses are credited; the destination
-(`0x66c2858d9a8605957c516a77262eb66ee6be113c`, the reckon402 KMS
-deployer EOA) is empty on ETH on both Sepolias.
+The 1 ETH per chain figure was operator-set on 2026-04-27 (was
+originally 0.05 ETH per chain in the spec lock; bumped to 1 to
+match operator preference for a single, well-headroomed round).
+The corresponding L0 floor in `funded.sh` stays at 0.01 ETH —
+"healthy threshold," not "topped up threshold," see spec §9.
 
 ## Operator preconditions
 
@@ -22,32 +28,72 @@ deployer EOA) is empty on ETH on both Sepolias.
   and `cast` from the same install).
 - `X402COMMIT_FUNDER_PK` exported from operator's local secret
   store. The PK lives in `~/Projects/x402commit/facilitator/specs/.env.secrets`
-  per the operator's records; it should NEVER be pasted into a
-  reckon402 file or printed to a terminal output that gets logged.
-- RPC URLs from this repo's Infisical (`infisical run -- env` exposes
-  them). The `cast send` invocation reads RPCs from `--rpc-url`
-  flags so we can pass the env values directly.
+  (gitignored, operator-controlled). It must NEVER be pasted into
+  a reckon402 file or printed to a terminal output that gets
+  logged.
+- RPC URLs and the destination address come from this repo's
+  Infisical project (`reckon402 / dev`). They are NOT in the
+  operator's outer shell — see "Shell-quoting trap" below.
 
-## Run (Base Sepolia)
+## Shell-quoting trap (read before running)
+
+`infisical run -- cast send --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" ...`
+**does not work** because `$BASE_SEPOLIA_RPC_PRIMARY` and
+`$DEPLOYER_EOA` only exist inside the child process that
+`infisical run` spawns. The outer shell expands them to empty
+*before* `infisical run` is even invoked, and `cast send` then
+fails with `error: invalid value '' for '[TO]': invalid string length`.
+
+The fix is to defer expansion until inside the infisical subshell
+by wrapping in `bash -c '...'` with **single quotes**:
+
+```bash
+infisical run … -- bash -c '
+  cast send \
+    --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
+    ...
+'
+```
+
+Single quotes keep `$BASE_SEPOLIA_RPC_PRIMARY` literal in the
+outer shell. `bash -c` then evaluates them after infisical has
+injected the env. `$X402COMMIT_FUNDER_PK` still passes through
+because it was `export`ed in the outer shell, which `infisical
+run`'s child process inherits.
+
+## Stage the funder PK (outer shell)
 
 ```bash
 unset AWS_PROFILE
 cd ~/Projects/ETHGlobal/ETHGlobal_OpenAgents_2026/reckon402
 
+export X402COMMIT_FUNDER_PK="$(awk -F'=' '/^DEPLOYER_PRIVATE_KEY=/ {
+  sub(/^DEPLOYER_PRIVATE_KEY=/, ""); gsub(/["'"'"']/, ""); print; exit
+}' ~/Projects/x402commit/facilitator/specs/.env.secrets)"
+
+# Sanity check (length + prefix only — never echo the PK itself).
+[[ -n "$X402COMMIT_FUNDER_PK" ]] \
+  && echo "PK loaded ($(echo -n $X402COMMIT_FUNDER_PK | wc -c) chars), prefix=${X402COMMIT_FUNDER_PK:0:4}*****"
+```
+
+## Run (Base Sepolia)
+
+```bash
 infisical run \
   --projectId 84d8a29b-27e3-46d0-bf72-bbe01215ac35 \
   --env dev \
   --domain https://secrets.intentralabs.com \
-  -- \
-  cast send \
-    --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
-    --private-key "$X402COMMIT_FUNDER_PK" \
-    --value 0.05ether \
-    "$DEPLOYER_EOA"
+  -- bash -c '
+    cast send \
+      --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
+      --private-key "$X402COMMIT_FUNDER_PK" \
+      --value 1ether \
+      "$DEPLOYER_EOA"
+  '
 ```
 
-Expected: a single transaction receipt with `status 1`. Save the
-tx hash; it goes into the post-funding snapshot below.
+Expected: a single transaction receipt with `status 1`, gasUsed
+21000. Save the tx hash; it goes into the post-funding snapshot.
 
 ## Run (Ethereum Sepolia)
 
@@ -56,50 +102,72 @@ infisical run \
   --projectId 84d8a29b-27e3-46d0-bf72-bbe01215ac35 \
   --env dev \
   --domain https://secrets.intentralabs.com \
-  -- \
-  cast send \
-    --rpc-url "$ETH_SEPOLIA_RPC_PRIMARY" \
-    --private-key "$X402COMMIT_FUNDER_PK" \
-    --value 0.05ether \
-    "$DEPLOYER_EOA"
+  -- bash -c '
+    cast send \
+      --rpc-url "$ETH_SEPOLIA_RPC_PRIMARY" \
+      --private-key "$X402COMMIT_FUNDER_PK" \
+      --value 1ether \
+      "$DEPLOYER_EOA"
+  '
+```
+
+## Tear down PK from outer shell
+
+```bash
+unset X402COMMIT_FUNDER_PK
 ```
 
 ## Verify
-
-After both sends confirm, re-run the snapshot:
 
 ```bash
 infisical run \
   --projectId 84d8a29b-27e3-46d0-bf72-bbe01215ac35 \
   --env dev \
   --domain https://secrets.intentralabs.com \
-  -- \
-  node tools/funding/check-balances.mjs
+  -- node tools/funding/check-balances.mjs
 ```
 
-Expected delta vs `results-pre-funding-2026-04-27.md`:
+…then run the L0 funded probe:
 
-- `deployer (KMS)` on `base-sepolia`: 0 -> 0.05 ETH
-- `deployer (KMS)` on `ethereum-sepolia`: 0 -> 0.05 ETH
-- `x402commit-funder (external)` on `base-sepolia`: 3.5 -> ~3.45 ETH (minus 0.05 + gas)
-- `x402commit-funder (external)` on `ethereum-sepolia`: 3.9 -> ~3.85 ETH
+```bash
+infisical run \
+  --projectId 84d8a29b-27e3-46d0-bf72-bbe01215ac35 \
+  --env dev \
+  --domain https://secrets.intentralabs.com \
+  -- ./tools/smoke-tests/funded.sh
+```
 
-The post-funding snapshot is captured into
-`results-post-funding-<date>.md` and committed as the verification
-step that closes task C.
+Expected: `PASS funded …ms base-sep=<X>eth eth-sep=<Y>eth floor=0.01eth deployer=0x66c2…113c`.
+
+## Round 1 actual delta (2026-04-27)
+
+Captured in `results-post-funding-2026-04-27.md`:
+
+- `deployer (KMS)` on `base-sepolia`: 0 → 1 ETH
+- `deployer (KMS)` on `ethereum-sepolia`: 0 → 1 ETH
+- `x402commit-funder` on `base-sepolia`: 3.5 → 2.5 ETH (1 ETH plus ~0.0001 ETH gas)
+- `x402commit-funder` on `ethereum-sepolia`: 3.9 → 2.9 ETH (1 ETH plus ~0.0001 ETH gas)
+
+Tx hashes:
+- Base Sepolia: `0x59539921c505cd94eaca89b68bed031d37f73903baa16e82b870af9abb794c6f`
+- Ethereum Sepolia: `0x8de4851047b6304eb79c7b65a46c06b182e15b4c256ede67c56e84b056338d31`
+
+USDC balances unchanged on every row.
 
 ## Idempotency
 
 `cast send` is not idempotent — re-running this recipe sends a
-second 0.05 ETH on top. If the snapshot already shows the deployer
-funded, do NOT re-run. The `check-balances.mjs` snapshot is the
-authoritative "is it done?" check.
+second 1 ETH on top. If `funded.sh` already PASSes well above
+the floor, do NOT re-run. The `check-balances.mjs` snapshot is
+the authoritative "is it done?" check; `funded.sh` is the
+red/green health gate that triggers if a top-up is actually
+needed.
 
 ## Why no script
 
 A `seed-deployer.mjs` that read `X402COMMIT_FUNDER_PK` from env
-would work, but it would route a non-reckon402 secret through code
-in this repo. Keeping the action as a documented `cast send`
+would work, but it would route a non-reckon402 secret through
+code in this repo. Keeping the action as a documented `cast send`
 invocation keeps the funder PK exclusively in the operator's
 shell, the funder address explicitly in the operator's mind, and
 the resulting tx fully reproducible from this single recipe file.

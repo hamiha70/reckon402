@@ -10,9 +10,11 @@ require node
 
 # Hydrate the ENS open-question values (Q-L0-1) from Infisical, falling
 # back to env. The lib/ens-resolve.mjs SKIPs cleanly if any are missing.
+# RPC source is the same key that rpc.sh exercises in §4 — single source
+# of truth for "Ethereum Sepolia primary".
 export ENS_TEST_NAME="${ENS_TEST_NAME:-$(hydrate ENS_TEST_NAME)}"
 export ENS_EXPECTED_ADDRESS="${ENS_EXPECTED_ADDRESS:-$(hydrate ENS_EXPECTED_ADDRESS)}"
-export SEPOLIA_RPC="${SEPOLIA_RPC:-$(hydrate SEPOLIA_RPC)}"
+export ETH_SEPOLIA_RPC_PRIMARY="${ETH_SEPOLIA_RPC_PRIMARY:-$(hydrate ETH_SEPOLIA_RPC_PRIMARY)}"
 
 set +e
 out="$(node "$DIR/lib/ens-resolve.mjs" 2>&1)"

@@ -11,9 +11,11 @@
  *   ENS_TEST_NAME               the wildcard child to resolve
  *                               (e.g. test.reckon402-test.eth)
  *   ENS_EXPECTED_ADDRESS        expected resolution result
- *   SEPOLIA_RPC                 Sepolia RPC URL (NOT Base Sepolia —
- *                               Mainnet ENS resolution path uses
- *                               Sepolia for the test network)
+ *   ETH_SEPOLIA_RPC_PRIMARY     Ethereum Sepolia RPC URL (NOT Base
+ *                               Sepolia — Mainnet ENS resolution path
+ *                               uses Sepolia for the test network).
+ *                               Hydrated from the same Infisical key
+ *                               that rpc.sh §4 exercises.
  *
  * Open question (Q-L0-1): ENS test name + resolver wiring are not yet
  * locked. Until they are, this script exits 2 (SKIP).
@@ -29,14 +31,15 @@ import { normalize } from "viem/ens";
 
 const NAME = process.env.ENS_TEST_NAME;
 const EXPECTED = process.env.ENS_EXPECTED_ADDRESS;
-const RPC = process.env.SEPOLIA_RPC;
+const RPC = process.env.ETH_SEPOLIA_RPC_PRIMARY;
 
 if (!NAME || !EXPECTED || !RPC) {
   console.error(
     "ens-resolve: SKIP — ENS_TEST_NAME, ENS_EXPECTED_ADDRESS, or\n" +
-    "  SEPOLIA_RPC unset. Resolve open question Q-L0-1 in\n" +
-    "  specs/00-l0-smoke-tests.md (register the test name + deploy a\n" +
-    "  CCIP-Read-compatible resolver on Sepolia, then push to Infisical).",
+    "  ETH_SEPOLIA_RPC_PRIMARY unset. Resolve open question Q-L0-1\n" +
+    "  in specs/00-l0-smoke-tests.md (register the test name + deploy\n" +
+    "  a CCIP-Read-compatible resolver on Sepolia, then push the test\n" +
+    "  name and expected address to Infisical).",
   );
   process.exit(2);
 }

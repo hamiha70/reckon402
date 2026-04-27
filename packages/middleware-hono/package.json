@@ -1,0 +1,30 @@
+{
+  "name": "@reckon402/middleware-hono",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Hono middleware factory that gates a route behind an x402 v2 paywall.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github:hamiha70/reckon402"
+  },
+  "files": ["src"],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reckon402/buyer-sdk": "workspace:*",
+    "@reckon402/types": "workspace:*",
+    "hono": "^4.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

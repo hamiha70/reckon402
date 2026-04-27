@@ -8,6 +8,54 @@ importers:
 
   .: {}
 
+  packages/buyer-sdk:
+    dependencies:
+      '@reckon402/types':
+        specifier: workspace:*
+        version: link:../types
+      viem:
+        specifier: ^2.0.0
+        version: 2.48.4(typescript@5.9.3)
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.2
+        version: 3.2.4
+
+  packages/facilitator-client:
+    dependencies:
+      '@reckon402/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.2
+        version: 3.2.4
+
+  packages/middleware-hono:
+    dependencies:
+      '@reckon402/buyer-sdk':
+        specifier: workspace:*
+        version: link:../buyer-sdk
+      '@reckon402/types':
+        specifier: workspace:*
+        version: link:../types
+      hono:
+        specifier: ^4.12.0
+        version: 4.12.15
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.2
+        version: 3.2.4
+
   packages/types: {}
 
   tools/funding:
@@ -92,6 +140,9 @@ importers:
 
   workers/facilitator:
     dependencies:
+      '@reckon402/buyer-sdk':
+        specifier: workspace:*
+        version: link:../../packages/buyer-sdk
       '@reckon402/types':
         specifier: workspace:*
         version: link:../../packages/types

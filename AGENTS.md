@@ -96,6 +96,17 @@ Infisical and KMS are orthogonal; see
 `~/Projects/aws_setup_2026/docs/{infisical-host.md,x402commit-kms.md}`
 for the operator-side documentation.
 
+AWS profile split on the operator workstation: admin operations
+(creating KMS keys, IAM users, IAM policies) run under
+`AWS_PROFILE=intentra` (which maps to IAM user `intentra-admin`).
+Runtime workloads (smoke tests, Lambda, signing wrapper) use the
+narrowly-scoped `reckon402-deployer` / `reckon402-signer` access keys
+hydrated from Infisical. When invoking workloads via
+`infisical run --env dev -- …`, `unset AWS_PROFILE` (or use
+`env -u AWS_PROFILE …`) so the Infisical-injected
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` win in the AWS SDK
+credential-resolution chain.
+
 ## Locks (non-negotiable)
 
 | Item                       | Value                                                                          |
@@ -108,9 +119,12 @@ for the operator-side documentation.
 | Demo frontend              | `demo.reckon402.com` (Vercel)                                                  |
 | Landing page + docs        | `reckon402.com` (Cloudflare Pages)                                             |
 | AWS region                 | `eu-central-1`                                                                 |
+| AWS account                | `975170806362` (operator-shared account; also hosts `intentra-admin`)          |
 | KMS alias — deployer       | `alias/reckon402/mainnet/deployer/evm` (IAM user `reckon402-deployer`)         |
 | KMS alias — buyer-signer   | `alias/reckon402/mainnet/buyer-signer/evm` (IAM user `reckon402-signer`)       |
+| Cloudflare account ID      | `0f38f8667bbcbe4f54eda13c8df009e0`                                             |
 | Cloudflare resource prefix | `reckon402-*` (e.g., `reckon402-facilitator-prod`, `reckon402-d1-facilitator`) |
+| Primary RPC provider       | Alchemy app `reckon402` (Base mainnet + Base Sepolia); public Base RPC fallback |
 | Settlement chain (demo)    | Base Sepolia for L3 dev; Base mainnet for L4 / submission                      |
 
 ## On-chain EOAs (v1, locked)
@@ -132,6 +146,21 @@ Provisioning log + addresses: `tools/provisioning/results-2026-04-27.md`.
 Single source of funds: the deployer is the **first-funder** of every
 other EOA. No address is funded directly from the operator's main
 wallet except the deployer.
+
+## KMS resources (v1, locked)
+
+The two KMS-custodied EOAs are backed by project-scoped secp256k1 keys
+(`ECC_SECG_P256K1`, usage `SIGN_VERIFY`) in `eu-central-1` /
+account `975170806362`. Cross-repo source of truth:
+`~/Projects/aws_setup_2026/docs/x402commit-kms.md`.
+
+| Role          | Alias                                       | Key ID                                 | IAM user             | Controls EOA                                  |
+|---------------|---------------------------------------------|----------------------------------------|----------------------|-----------------------------------------------|
+| Deployer      | `alias/reckon402/mainnet/deployer/evm`      | `5b6e7c40-49e8-42cf-80a3-c22d52d3f40a` | `reckon402-deployer` | `0x66c2858d9a8605957c516a77262eb66ee6be113c`  |
+| Buyer-signer  | `alias/reckon402/mainnet/buyer-signer/evm`  | `5a0350e0-d502-4579-8d45-d31c843a5f3f` | `reckon402-signer`   | `0x46bbb05aca9ea24118b8a57c8d3f317503384305`  |
+
+Each IAM user carries a scoped policy granting only `kms:Sign` +
+`kms:GetPublicKey` on its single key ARN — no wildcard KMS access.
 
 ## Persistence model (v1)
 

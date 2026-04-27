@@ -5,3 +5,4 @@ packages:
   - "demo"
   - "tools/smoke-tests"
   - "tools/provisioning"
+  - "tools/sign"

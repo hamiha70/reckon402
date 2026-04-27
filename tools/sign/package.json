@@ -1,0 +1,16 @@
+{
+  "name": "@reckon402/sign",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "viem LocalAccount adapter over AWS KMS for reckon402 (deployer + buyer-signer).",
+  "scripts": {
+    "verify": "node ./verify-kms-account.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.700.0",
+    "@noble/curves": "^1.7.0",
+    "@noble/hashes": "^1.6.0",
+    "viem": "^2.30.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@reckon402/smoke-tests",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "L0 infra + sponsor-tech smoke tests.",
+  "scripts": {
+    "all": "./run-all.sh"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.700.0",
+    "@noble/curves": "^1.7.0",
+    "@noble/hashes": "^1.6.0",
+    "viem": "^2.30.0"
+  }
+}

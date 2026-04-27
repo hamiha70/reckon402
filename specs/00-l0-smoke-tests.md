@@ -279,7 +279,34 @@ Probes 1, 2, 3, 4, 8 require the following to be in place before the run:
 
 - **Q-L0-1.** ENS test name. Build cadence cites `reckon402-test.eth`; need
   to confirm registration + resolver wiring before `ens.sh` can pass.
-  Disposition: blocking ens.sh commit-2.
+  **Disposition: locked, awaiting operator registration.**
+
+  Concrete L0 acceptance criteria (operator-runnable via
+  https://app.ens.domains, no smart-contract deploy needed at L0):
+
+  1. Network: **Ethereum Sepolia** (chainId 11155111). Mainnet ENS
+     resolution against a Sepolia-registered name is the canonical
+     reckon402 path through L4 — viem's `getEnsAddress` against the
+     `sepolia` chain object is what `lib/ens-resolve.mjs` uses.
+  2. Name: **`reckon402-test.eth`**.
+  3. Resolver: **default PublicResolver** (no custom resolver at L0;
+     wildcard / CCIP-Read landing in L1 once `gateway.reckon402.com`
+     is up).
+  4. `addr()` record: **`0xD53ffac42496d73B3Faf946786688a8454F57b1f`**
+     (the reckon402 seller EOA). Choosing seller (not deployer) so
+     the test name resolves to a software-key EOA we can later use
+     to issue `setText("avatar", …)` and similar records without
+     touching KMS.
+  5. After registration confirms, push two Infisical keys (`reckon402 / dev`):
+     - `ENS_TEST_NAME=reckon402-test.eth`
+     - `ENS_EXPECTED_ADDRESS=0xD53ffac42496d73B3Faf946786688a8454F57b1f`
+     `ens.sh` will then flip from SKIP to PASS on the next run; this
+     question closes in the same commit that captures the green
+     `run-all.sh` log.
+
+  CCIP-Read / wildcard probing remains an L1+ story, not an L0
+  blocker. The L0 `ens.sh` only proves "viem -> Sepolia -> resolver
+  -> address" reaches the seller EOA.
 - **Q-L0-2.** ERC-8004 registry contract address on Base mainnet.
   Disposition: blocking erc8004.sh commit-2; should be sourceable from the
   ERC-8004 reference deployments doc.

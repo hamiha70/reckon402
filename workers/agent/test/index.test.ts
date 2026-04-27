@@ -5,28 +5,22 @@ const fetch = (path: string) =>
   worker.fetch(new Request(`https://agent.reckon402.com${path}`), {} as never, {} as never)
 
 describe('GET /health', () => {
-  it('returns 200 with ok status', async () => {
+  it('returns 200 with ok status at layer L2', async () => {
     const res = await fetch('/health')
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ status: 'ok', layer: 'L1' })
+    expect(await res.json()).toEqual({ status: 'ok', layer: 'L2' })
   })
 })
 
 describe('GET /research', () => {
-  it('returns 200 with canned JSON when q is provided', async () => {
+  it('returns 402 without PAYMENT-SIGNATURE header', async () => {
     const res = await fetch('/research?q=ethereum')
-    expect(res.status).toBe(200)
-    const body = await res.json() as Record<string, string>
-    expect(body.query).toBe('ethereum')
-    expect(body.agent).toBe('reckon402-demo-research')
-    expect(body.layer).toBe('L1')
-    expect(typeof body.summary).toBe('string')
+    expect(res.status).toBe(402)
+    expect(res.headers.get('PAYMENT-REQUIRED')).not.toBeNull()
   })
 
-  it('returns 400 when q is missing', async () => {
+  it('returns 402 for request without q param', async () => {
     const res = await fetch('/research')
-    expect(res.status).toBe(400)
-    const body = await res.json() as Record<string, string>
-    expect(body.error).toBe('q is required')
+    expect(res.status).toBe(402)
   })
 })

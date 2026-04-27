@@ -15,7 +15,7 @@
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROBES=(infisical cf aws rpc ens erc8004 kh d1)
+PROBES=(infisical cf aws rpc ens erc8004 kh d1 funded)
 
 # Soft check that we are running under infisical run; warn but continue.
 if [[ -z "${INFISICAL_TOKEN:-}" ]]; then

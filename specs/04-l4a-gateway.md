@@ -553,10 +553,28 @@ gateway/src/erc8004/
 - Instantiate a viem `PublicClient` per chain (memoized per request).
 - Resolve the caller's ENS name → agentId via the `agentId_index` D1
   table (§13.2).
-- Call `reputation.getSummary({ chainId, publicClient, cache })`
-  with `clientAddresses: []`, `tag1: 'payment'`, `tag2: 'x402-settlement'`
-  (per design doc §7.1).
+- Call `reputation.getSummaryForAllClients({ chainId, publicClient, cache })`,
+  a library helper that performs the two-step read described in §12.2.1.
 - Instantiate and pass the D1-backed `KVCache` implementation.
+
+### 12.2.1 Two-step reputation read (upstream quirk)
+
+The pinned upstream commit (`04633114`) requires `getSummary` to be called
+with a **non-empty `clientAddresses` array** — the contract reverts with
+`"clientAddresses required"` when the array is empty. Design doc §7.1 had
+this wrong. The library composes the aggregate read in two steps and
+exposes it as a single helper:
+
+```ts
+// reputation.getSummaryForAllClients(args):
+const clients = await reputation.getClients({ chainId, publicClient, cache, agentId })
+if (clients.length === 0) return { count: 0n, summaryValue: 0n, decimals: 0 }
+return reputation.getSummary({ chainId, publicClient, cache, agentId, clients, tag1, tag2 })
+```
+
+Both leg reads are independently cacheable. `getClients` invalidates on
+`NewFeedback` events; `getSummary` invalidates on `NewFeedback` OR
+`FeedbackRevoked`. The call side (L4b) fires both invalidations.
 
 ### 12.3 `cache.ts` (D1 adapter)
 

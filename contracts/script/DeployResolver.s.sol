@@ -7,10 +7,10 @@ import { Reckon402Resolver } from "../src/Reckon402Resolver.sol";
 /// @notice Deploy Reckon402Resolver to Ethereum Sepolia (or mainnet).
 ///
 /// Required env vars (set via Infisical or export before running):
-///   GATEWAY_URL             — e.g. "https://gateway.reckon402.com/lookup/{sender}/{data}"
-///   GATEWAY_SIGNER_ADDRESS  — hot signer address (derived from RECKON402_RESOLVER_SIGNER_PK)
-///   ETH_SEPOLIA_RPC_PRIMARY — Ethereum Sepolia RPC URL
-///   ETHERSCAN_API_KEY       — for --verify flag
+///   GATEWAY_URL                       — e.g. "https://gateway.reckon402.com/lookup/{sender}/{data}"
+///   RECKON402_RESOLVER_SIGNER_ADDRESS — hot signer address (derived from RECKON402_RESOLVER_SIGNER_PK)
+///   ETH_SEPOLIA_RPC_PRIMARY           — Ethereum Sepolia RPC URL
+///   ETHERSCAN_API_KEY                 — for --verify flag
 ///
 /// Deploy to Sepolia:
 ///   infisical run --env dev -- forge script script/DeployResolver.s.sol \
@@ -25,7 +25,7 @@ import { Reckon402Resolver } from "../src/Reckon402Resolver.sol";
 contract DeployResolver is Script {
     function run() external returns (Reckon402Resolver resolver) {
         string memory gatewayUrl = vm.envString("GATEWAY_URL");
-        address signerAddress   = vm.envAddress("GATEWAY_SIGNER_ADDRESS");
+        address signerAddress   = vm.envAddress("RECKON402_RESOLVER_SIGNER_ADDRESS");
 
         string[] memory urls = new string[](1);
         urls[0] = gatewayUrl;

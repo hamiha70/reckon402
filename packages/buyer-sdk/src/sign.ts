@@ -26,6 +26,8 @@ export interface SignPaymentInput {
   buyerAddress?: `0x${string}`
   /** Optional nonce override (default: random 32 bytes). */
   nonce?: `0x${string}`
+  /** Optional validBefore override as unix seconds (default: now + validSeconds). */
+  validBeforeOverride?: bigint
   /** Optional resource URL to embed in the payload. */
   resourceUrl?: string
 }
@@ -68,7 +70,7 @@ export async function signPayment(input: SignPaymentInput): Promise<SignedPaymen
     })()
 
   const validAfter = 0n
-  const validBefore = BigInt(Math.floor(Date.now() / 1000) + validSeconds)
+  const validBefore = input.validBeforeOverride ?? BigInt(Math.floor(Date.now() / 1000) + validSeconds)
 
   const signature = (await account.signTypedData({
     domain: {

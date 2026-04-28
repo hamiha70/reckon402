@@ -338,6 +338,23 @@ in each prompt. Adaptation rule:
 Specs are committed under `specs/`, it is the canonical implementation
 contract.
 
+## L3 deployments (v1, locked)
+
+| Item | Value |
+| ---- | ----- |
+| Splitter (Base Sepolia) | `0x0ad507c6973eba86313794329ad9b12fbf24acd0` |
+| Splitter deploy tx | `0xaa3cb87703c8320a7ece5b2d267d9101fd89199cf9c066fec9fde765b77af443` |
+| Deploy signer | `0x66C2858D9A8605957c516a77262Eb66EE6be113C` (KMS `alias/reckon402/mainnet/deployer/evm`) |
+| D1 database name | `reckon402-d1-facilitator-dev` |
+| D1 database ID | `ad5bd36d-1903-4340-bc27-1f46b878b2c0` |
+| Facilitator worker URL | `https://facilitator.reckon402.com` |
+| Agent worker URL | `https://agent.reckon402.com` |
+
+Full-flow + replay green on 2026-04-28. Evidence:
+`tools/integration-tests/results-full-flow-l3-2026-04-28T07-01-42Z.md` +
+`tools/integration-tests/results-replay-l3-2026-04-28T07-01-51Z.md` +
+`tools/integration-tests/wrangler-tail-2026-04-28T07-01-37Z.log`.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

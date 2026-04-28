@@ -26,18 +26,22 @@ RUN_LOG="$SCRIPT_DIR/run-replay-l3-$STAMP.log"
 ARTIFACT_DIR="$SCRIPT_DIR/run-replay-l3-$STAMP"
 mkdir -p "$ARTIFACT_DIR"
 
-# ── Pick replay nonce ─────────────────────────────────────────────────────
+# ── Pick replay nonce + validBefore ──────────────────────────────────────
 if [ -z "${REPLAY_NONCE:-}" ]; then
-  LATEST_RUN=$(ls -1d "$SCRIPT_DIR"/run-full-flow-l3-* 2>/dev/null | sort | tail -1 || true)
-  if [ -z "$LATEST_RUN" ]; then
+  # Find the latest artifact directory (not the .log file)
+  LATEST_RUN=$(ls -1d "$SCRIPT_DIR"/run-full-flow-l3-*/ 2>/dev/null | sort | tail -1 || true)
+  LATEST_RUN="${LATEST_RUN%/}"
+  if [ -z "$LATEST_RUN" ] || [ ! -d "$LATEST_RUN" ]; then
     echo "ERROR: REPLAY_NONCE not set and no prior full-flow run found" | tee -a "$RUN_LOG"
     exit 1
   fi
   REPLAY_NONCE=$(cat "$LATEST_RUN/nonce.txt")
+  REPLAY_VALID_BEFORE=$(cat "$LATEST_RUN/validBefore.txt" 2>/dev/null || echo "")
   ORIGINAL_PAYMENT_ID=$(cat "$LATEST_RUN/paymentId.txt")
   ORIGINAL_TX=$(cat "$LATEST_RUN/tx-hash.txt")
   echo "Auto-picked from $LATEST_RUN" | tee -a "$RUN_LOG"
 else
+  REPLAY_VALID_BEFORE="${REPLAY_VALID_BEFORE:-}"
   ORIGINAL_PAYMENT_ID="${ORIGINAL_PAYMENT_ID:-}"
   ORIGINAL_TX="${ORIGINAL_TX:-}"
 fi
@@ -55,8 +59,8 @@ echo ""                                             | tee -a "$RUN_LOG"
 : "${SPLITTER_ADDRESS:?SPLITTER_ADDRESS missing}"
 
 # ── Step 1: Re-sign with the SAME nonce, assert paymentId matches ─────────
-echo "[1/4] Re-sign PaymentPayload with REPLAY_NONCE=$REPLAY_NONCE" | tee -a "$RUN_LOG"
-REPLAY_SIG=$(REPLAY_NONCE="$REPLAY_NONCE" node "$SCRIPT_DIR/buyer-sign-l3.mjs" \
+echo "[1/4] Re-sign PaymentPayload with REPLAY_NONCE=$REPLAY_NONCE validBefore=${REPLAY_VALID_BEFORE:-fresh}" | tee -a "$RUN_LOG"
+REPLAY_SIG=$(REPLAY_NONCE="$REPLAY_NONCE" REPLAY_VALID_BEFORE="${REPLAY_VALID_BEFORE:-}" node "$SCRIPT_DIR/buyer-sign-l3.mjs" \
   2> "$ARTIFACT_DIR/buyer-sign.stderr")
 REPLAY_PAYMENT_ID=$(grep "paymentId=" "$ARTIFACT_DIR/buyer-sign.stderr" | sed -E 's/.*paymentId=([0-9a-fx]+).*/\1/')
 echo "  paymentId=$REPLAY_PAYMENT_ID" | tee -a "$RUN_LOG"

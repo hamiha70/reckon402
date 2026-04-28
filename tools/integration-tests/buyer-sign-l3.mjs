@@ -33,6 +33,7 @@ const BUYER_PK = process.env.BUYER_DEMO_1_PK
 const BUYER_ADDRESS = process.env.BUYER_DEMO_1_ADDRESS
 const SPLITTER_ADDRESS = process.env.SPLITTER_ADDRESS
 const REPLAY_NONCE = process.env.REPLAY_NONCE
+const REPLAY_VALID_BEFORE = process.env.REPLAY_VALID_BEFORE
 
 if (!BUYER_PK) {
   console.error('ERROR: BUYER_DEMO_1_PK not set in environment')
@@ -52,6 +53,7 @@ const signed = await signPayment({
   usdcAddress: USDC_BASE_SEPOLIA,
   chainId: CHAIN_ID,
   nonce: REPLAY_NONCE || undefined,
+  validBeforeOverride: REPLAY_VALID_BEFORE ? BigInt(REPLAY_VALID_BEFORE) : undefined,
   resourceUrl: 'https://agent.reckon402.com/research',
 })
 

@@ -1,0 +1,7 @@
+[buyer-sign-l3] buyer=0x837e30740a4A5bAC5480b4f707924469d42b43De
+[buyer-sign-l3] splitter=0x0ad507c6973eba86313794329ad9b12fbf24acd0
+[buyer-sign-l3] amount=10000 (0.01 USDC)
+[buyer-sign-l3] nonce=0x70f80ba004f26f53082ed12b19bc9a8ebb5608763adcc1bdd95dc7ba9fb9cf04
+[buyer-sign-l3] validBefore=1777360303
+[buyer-sign-l3] paymentId=0x9aca8ee87e9f123dc3775a0e3d6f2c3880166269f5d5dec5dcb1939492e01bbc
+[buyer-sign-l3] replay=YES (reused nonce)

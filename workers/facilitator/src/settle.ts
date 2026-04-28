@@ -104,6 +104,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
       hash: transferTx,
       timeout: 60_000,
       pollingInterval: 2000,
+      confirmations: 1,
     })
   } catch (err) {
     return {
@@ -123,13 +124,43 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
     }
   }
 
+  // Poll until the Splitter balance reflects the transfer before submitting
+  // distribute — guards against load-balanced RPC nodes that haven't yet
+  // propagated the confirmed transfer block.
+  const expectedAmount = BigInt(authorization.value)
+  const POLL_INTERVAL_MS = 1000
+  const POLL_TIMEOUT_MS = 30_000
+  const pollStart = Date.now()
+  while (true) {
+    const bal = await publicClient.readContract({
+      address: env.USDC_ADDRESS as Hex,
+      abi: USDC_ABI,
+      functionName: 'balanceOf',
+      args: [env.SPLITTER_ADDRESS as Hex],
+    }) as bigint
+    if (bal >= expectedAmount) break
+    if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
+      return {
+        success: false,
+        transferTx,
+        failureReason: 'OTHER',
+        failureDetail: `splitter_balance_not_reflecting: bal=${bal} expected>=${expectedAmount} after ${POLL_TIMEOUT_MS}ms`,
+      }
+    }
+    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+  }
+
   let distributeTx: Hex
   try {
+    // Explicit gas avoids eth_estimateGas which can hit a stale RPC node
+    // and see InsufficientBalance even after the balance poll passed.
+    // 300_000 is conservative upper-bound for 8 recipients × ~30k each.
     distributeTx = await walletClient.writeContract({
       address: env.SPLITTER_ADDRESS as Hex,
       abi: SPLITTER_ABI,
       functionName: 'distribute',
       args: [paymentId, BigInt(authorization.value)],
+      gas: 300_000n,
     })
   } catch (err) {
     return {

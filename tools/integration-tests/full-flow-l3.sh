@@ -62,11 +62,13 @@ echo "[2/6] Sign PaymentPayload via @reckon402/buyer-sdk"  | tee -a "$RUN_LOG"
 PAYMENT_SIG=$(node "$SCRIPT_DIR/buyer-sign-l3.mjs" 2> "$ARTIFACT_DIR/buyer-sign.stderr")
 PAYMENT_ID=$(grep "paymentId=" "$ARTIFACT_DIR/buyer-sign.stderr" | sed -E 's/.*paymentId=([0-9a-fx]+).*/\1/')
 NONCE=$(grep "nonce=" "$ARTIFACT_DIR/buyer-sign.stderr" | head -1 | sed -E 's/.*nonce=([0-9a-fx]+).*/\1/')
+VALID_BEFORE=$(grep "validBefore=" "$ARTIFACT_DIR/buyer-sign.stderr" | head -1 | sed -E 's/.*validBefore=([0-9]+).*/\1/')
 echo "  paymentId=$PAYMENT_ID" | tee -a "$RUN_LOG"
 echo "  nonce=$NONCE"          | tee -a "$RUN_LOG"
 echo "$PAYMENT_SIG" > "$ARTIFACT_DIR/payment-signature.b64"
 echo "$NONCE" > "$ARTIFACT_DIR/nonce.txt"
 echo "$PAYMENT_ID" > "$ARTIFACT_DIR/paymentId.txt"
+echo "$VALID_BEFORE" > "$ARTIFACT_DIR/validBefore.txt"
 echo "" | tee -a "$RUN_LOG"
 
 # ── Step 3: 200 with valid payment (drives two-tx settle) ─────────────────

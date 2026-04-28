@@ -1,0 +1,532 @@
+{
+    "wallTime": 126,
+    "cpuTime": 61,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "b2cb6157-3e84-461e-9cce-cd938a3ca990"
+    },
+    "scriptName": "reckon402-facilitator",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [],
+    "eventTimestamp": 1777359702752,
+    "event": {
+        "request": {
+            "url": "https://facilitator.reckon402.com/x402/verify",
+            "method": "POST",
+            "headers": {
+                "accept-encoding": "gzip, br",
+                "cf-connecting-ip": "2a06:98c0:3600::103",
+                "cf-ipcountry": "DE",
+                "cf-ray": "9f34327e14c5382b",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "reckon402.com",
+                "connection": "Keep-Alive",
+                "content-length": "1017",
+                "content-type": "application/json",
+                "host": "facilitator.reckon402.com",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "2a06:98c0:3600::103"
+            },
+            "cf": {
+                "requestHeaderNames": {},
+                "httpProtocol": "HTTP/1.1",
+                "tlsCipher": "",
+                "continent": "EU",
+                "asn": 3209,
+                "verifiedBotCategory": "",
+                "country": "DE",
+                "isEUCountry": "1",
+                "region": "Bavaria",
+                "tlsClientCiphersSha1": "",
+                "tlsClientAuth": {
+                    "certIssuerDNLegacy": "",
+                    "certIssuerSKI": "",
+                    "certSubjectDNRFC2253": "",
+                    "certSubjectDNLegacy": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certSKI": "",
+                    "certSerial": "",
+                    "certIssuerDN": "",
+                    "certVerified": "NONE",
+                    "certNotAfter": "",
+                    "certSubjectDN": "",
+                    "certPresented": "0",
+                    "certRevoked": "0",
+                    "certIssuerSerial": "",
+                    "certIssuerDNRFC2253": "",
+                    "certFingerprintSHA1": ""
+                },
+                "tlsClientRandom": "",
+                "tlsClientHelloLength": "",
+                "colo": "FRA",
+                "timezone": "Europe/Berlin",
+                "longitude": "11.57549",
+                "latitude": "48.13743",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestPriority": "",
+                "postalCode": "80097",
+                "city": "Munich",
+                "tlsVersion": "",
+                "regionCode": "BY",
+                "asOrganization": "KABEL-DEUTSCHLAND-CUSTOMER-SERVICES-25",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientExtensionsSha1": ""
+            }
+        },
+        "response": {
+            "status": 200
+        }
+    }
+}
+{
+    "wallTime": 3717,
+    "cpuTime": 50,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "b2cb6157-3e84-461e-9cce-cd938a3ca990"
+    },
+    "scriptName": "reckon402-facilitator",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [],
+    "eventTimestamp": 1777359702893,
+    "event": {
+        "request": {
+            "url": "https://facilitator.reckon402.com/x402/settle",
+            "method": "POST",
+            "headers": {
+                "accept-encoding": "gzip, br",
+                "cf-connecting-ip": "2a06:98c0:3600::103",
+                "cf-ipcountry": "DE",
+                "cf-ray": "9f34327f04ca382b",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "reckon402.com",
+                "connection": "Keep-Alive",
+                "content-length": "1017",
+                "content-type": "application/json",
+                "host": "facilitator.reckon402.com",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "2a06:98c0:3600::103"
+            },
+            "cf": {
+                "requestHeaderNames": {},
+                "httpProtocol": "HTTP/1.1",
+                "tlsCipher": "",
+                "continent": "EU",
+                "asn": 3209,
+                "verifiedBotCategory": "",
+                "country": "DE",
+                "isEUCountry": "1",
+                "region": "Bavaria",
+                "tlsClientCiphersSha1": "",
+                "tlsClientAuth": {
+                    "certIssuerDNLegacy": "",
+                    "certIssuerSKI": "",
+                    "certSubjectDNRFC2253": "",
+                    "certSubjectDNLegacy": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certSKI": "",
+                    "certSerial": "",
+                    "certIssuerDN": "",
+                    "certVerified": "NONE",
+                    "certNotAfter": "",
+                    "certSubjectDN": "",
+                    "certPresented": "0",
+                    "certRevoked": "0",
+                    "certIssuerSerial": "",
+                    "certIssuerDNRFC2253": "",
+                    "certFingerprintSHA1": ""
+                },
+                "tlsClientRandom": "",
+                "tlsClientHelloLength": "",
+                "colo": "FRA",
+                "timezone": "Europe/Berlin",
+                "longitude": "11.57549",
+                "latitude": "48.13743",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestPriority": "",
+                "postalCode": "80097",
+                "city": "Munich",
+                "tlsVersion": "",
+                "regionCode": "BY",
+                "asOrganization": "KABEL-DEUTSCHLAND-CUSTOMER-SERVICES-25",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientExtensionsSha1": ""
+            }
+        },
+        "response": {
+            "status": 200
+        }
+    }
+}
+{
+    "wallTime": 32,
+    "cpuTime": 7,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "b2cb6157-3e84-461e-9cce-cd938a3ca990"
+    },
+    "scriptName": "reckon402-facilitator",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [],
+    "eventTimestamp": 1777359706837,
+    "event": {
+        "request": {
+            "url": "https://facilitator.reckon402.com/x402/receipt/0x9aca8ee87e9f123dc3775a0e3d6f2c3880166269f5d5dec5dcb1939492e01bbc",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "cf-connecting-ip": "146.52.53.101",
+                "cf-ipcountry": "DE",
+                "cf-ray": "9f343297bd391c0f",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "host": "facilitator.reckon402.com",
+                "user-agent": "curl/8.5.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "146.52.53.101"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/2",
+                "requestPriority": "weight=16;exclusive=0;group=0;group-weight=0",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 30,
+                "clientQuicRtt": 0,
+                "colo": "FRA",
+                "asn": 3209,
+                "asOrganization": "KABEL-DEUTSCHLAND-CUSTOMER-SERVICES-25",
+                "country": "DE",
+                "isEUCountry": "1",
+                "city": "Munich",
+                "continent": "EU",
+                "region": "Bavaria",
+                "regionCode": "BY",
+                "timezone": "Europe/Berlin",
+                "longitude": "11.57549",
+                "latitude": "48.13743",
+                "postalCode": "80097",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES256-GCM-SHA384",
+                "tlsClientRandom": "jmkbsuaIfRdQ003BcM8ZMXnvTTNteEz+BIIQMA6p1YY=",
+                "tlsClientCiphersSha1": "GXSPDLP4G3X+prK73a4wBuOaHRc=",
+                "tlsClientExtensionsSha1": "tlH5gnoC5Z1HF45J5OgHEi338V0=",
+                "tlsClientExtensionsSha1Le": "mRCkyUCRFDTLCNHGQsZNFhkU1/4=",
+                "tlsExportedAuthenticator": {
+                    "clientHandshake": "1da6e62a7b2767685eca38ef33aca94cdcc42e744610fe547d22df18495457f5c2c80f3ebaecf7f1be4912748a0ebb89",
+                    "serverHandshake": "9e106ac74bb5e0b322dff7d27b500735ec5c4103768e219acff47c0560a3a0d82ec4f7c6502ae7a16e88687ac87a7279",
+                    "clientFinished": "ac05d89d426882e6a283f28c16b931fe22c54c63fc21ce2662e4238f5995903abbfcf13b86ece7201ae74c776a2e40d4",
+                    "serverFinished": "470a43af0832873623673b24c2fa3b451be70db8be6fd110b0d7ad30f068a45860de5123b602cdf45269dd14dd475a15"
+                },
+                "tlsClientHelloLength": "508",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": "",
+                    "certRFC9440": "",
+                    "certRFC9440TooLarge": false,
+                    "certChainRFC9440": "",
+                    "certChainRFC9440TooLarge": false
+                },
+                "verifiedBotCategory": "",
+                "edgeL4": {
+                    "deliveryRate": 125929
+                }
+            }
+        },
+        "response": {
+            "status": 200
+        }
+    }
+}
+{
+    "wallTime": 16,
+    "cpuTime": 1,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "b2cb6157-3e84-461e-9cce-cd938a3ca990"
+    },
+    "scriptName": "reckon402-facilitator",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [],
+    "eventTimestamp": 1777359711271,
+    "event": {
+        "request": {
+            "url": "https://facilitator.reckon402.com/x402/settle",
+            "method": "POST",
+            "headers": {
+                "accept-encoding": "gzip, br",
+                "cf-connecting-ip": "2a06:98c0:3600::103",
+                "cf-ipcountry": "DE",
+                "cf-ray": "9f3432b36467d2eb",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "reckon402.com",
+                "connection": "Keep-Alive",
+                "content-length": "1017",
+                "content-type": "application/json",
+                "host": "facilitator.reckon402.com",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "2a06:98c0:3600::103"
+            },
+            "cf": {
+                "requestHeaderNames": {},
+                "httpProtocol": "HTTP/1.1",
+                "tlsCipher": "",
+                "continent": "EU",
+                "asn": 3209,
+                "verifiedBotCategory": "",
+                "country": "DE",
+                "isEUCountry": "1",
+                "region": "Bavaria",
+                "tlsClientCiphersSha1": "",
+                "tlsClientAuth": {
+                    "certIssuerDNLegacy": "",
+                    "certIssuerSKI": "",
+                    "certSubjectDNRFC2253": "",
+                    "certSubjectDNLegacy": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certSKI": "",
+                    "certSerial": "",
+                    "certIssuerDN": "",
+                    "certVerified": "NONE",
+                    "certNotAfter": "",
+                    "certSubjectDN": "",
+                    "certPresented": "0",
+                    "certRevoked": "0",
+                    "certIssuerSerial": "",
+                    "certIssuerDNRFC2253": "",
+                    "certFingerprintSHA1": ""
+                },
+                "tlsClientRandom": "",
+                "tlsClientHelloLength": "",
+                "colo": "FRA",
+                "timezone": "Europe/Berlin",
+                "longitude": "11.57549",
+                "latitude": "48.13743",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestPriority": "",
+                "postalCode": "80097",
+                "city": "Munich",
+                "tlsVersion": "",
+                "regionCode": "BY",
+                "asOrganization": "KABEL-DEUTSCHLAND-CUSTOMER-SERVICES-25",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientExtensionsSha1": ""
+            }
+        },
+        "response": {
+            "status": 200
+        }
+    }
+}
+{
+    "wallTime": 75,
+    "cpuTime": 34,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "b2cb6157-3e84-461e-9cce-cd938a3ca990"
+    },
+    "scriptName": "reckon402-facilitator",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [],
+    "eventTimestamp": 1777359711146,
+    "event": {
+        "request": {
+            "url": "https://facilitator.reckon402.com/x402/verify",
+            "method": "POST",
+            "headers": {
+                "accept-encoding": "gzip, br",
+                "cf-connecting-ip": "2a06:98c0:3600::103",
+                "cf-ipcountry": "DE",
+                "cf-ray": "9f3432b2942dd2eb",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "reckon402.com",
+                "connection": "Keep-Alive",
+                "content-length": "1017",
+                "content-type": "application/json",
+                "host": "facilitator.reckon402.com",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "2a06:98c0:3600::103"
+            },
+            "cf": {
+                "requestHeaderNames": {},
+                "httpProtocol": "HTTP/1.1",
+                "tlsCipher": "",
+                "continent": "EU",
+                "asn": 3209,
+                "verifiedBotCategory": "",
+                "country": "DE",
+                "isEUCountry": "1",
+                "region": "Bavaria",
+                "tlsClientCiphersSha1": "",
+                "tlsClientAuth": {
+                    "certIssuerDNLegacy": "",
+                    "certIssuerSKI": "",
+                    "certSubjectDNRFC2253": "",
+                    "certSubjectDNLegacy": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certSKI": "",
+                    "certSerial": "",
+                    "certIssuerDN": "",
+                    "certVerified": "NONE",
+                    "certNotAfter": "",
+                    "certSubjectDN": "",
+                    "certPresented": "0",
+                    "certRevoked": "0",
+                    "certIssuerSerial": "",
+                    "certIssuerDNRFC2253": "",
+                    "certFingerprintSHA1": ""
+                },
+                "tlsClientRandom": "",
+                "tlsClientHelloLength": "",
+                "colo": "FRA",
+                "timezone": "Europe/Berlin",
+                "longitude": "11.57549",
+                "latitude": "48.13743",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestPriority": "",
+                "postalCode": "80097",
+                "city": "Munich",
+                "tlsVersion": "",
+                "regionCode": "BY",
+                "asOrganization": "KABEL-DEUTSCHLAND-CUSTOMER-SERVICES-25",
+                "tlsClientExtensionsSha1Le": "",
+                "tlsClientExtensionsSha1": ""
+            }
+        },
+        "response": {
+            "status": 200
+        }
+    }
+}
+{
+    "wallTime": 25,
+    "cpuTime": 4,
+    "truncated": false,
+    "executionModel": "stateless",
+    "outcome": "ok",
+    "scriptVersion": {
+        "id": "b2cb6157-3e84-461e-9cce-cd938a3ca990"
+    },
+    "scriptName": "reckon402-facilitator",
+    "diagnosticsChannelEvents": [],
+    "exceptions": [],
+    "logs": [],
+    "eventTimestamp": 1777359711491,
+    "event": {
+        "request": {
+            "url": "https://facilitator.reckon402.com/x402/receipt/0x9aca8ee87e9f123dc3775a0e3d6f2c3880166269f5d5dec5dcb1939492e01bbc",
+            "method": "GET",
+            "headers": {
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "cf-connecting-ip": "146.52.53.101",
+                "cf-ipcountry": "DE",
+                "cf-ray": "9f3432b4c8f1dbea",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "connection": "Keep-Alive",
+                "host": "facilitator.reckon402.com",
+                "user-agent": "curl/8.5.0",
+                "x-forwarded-proto": "https",
+                "x-real-ip": "146.52.53.101"
+            },
+            "cf": {
+                "httpProtocol": "HTTP/2",
+                "requestPriority": "weight=16;exclusive=0;group=0;group-weight=0",
+                "edgeRequestKeepAliveStatus": 1,
+                "requestHeaderNames": {},
+                "clientTcpRtt": 26,
+                "clientQuicRtt": 0,
+                "colo": "FRA",
+                "asn": 3209,
+                "asOrganization": "KABEL-DEUTSCHLAND-CUSTOMER-SERVICES-25",
+                "country": "DE",
+                "isEUCountry": "1",
+                "city": "Munich",
+                "continent": "EU",
+                "region": "Bavaria",
+                "regionCode": "BY",
+                "timezone": "Europe/Berlin",
+                "longitude": "11.57549",
+                "latitude": "48.13743",
+                "postalCode": "80097",
+                "tlsVersion": "TLSv1.3",
+                "tlsCipher": "AEAD-AES256-GCM-SHA384",
+                "tlsClientRandom": "7/SlAFx1JfV51djl5x4rn7tUloNIhWyG7NTfaC8rFwQ=",
+                "tlsClientCiphersSha1": "GXSPDLP4G3X+prK73a4wBuOaHRc=",
+                "tlsClientExtensionsSha1": "tlH5gnoC5Z1HF45J5OgHEi338V0=",
+                "tlsClientExtensionsSha1Le": "mRCkyUCRFDTLCNHGQsZNFhkU1/4=",
+                "tlsExportedAuthenticator": {
+                    "clientHandshake": "c4127eb1ca0421beeebd85a375f2aada5d1b989665dd0125c36544ee0e2511bb2a62cc369a750249a354ce8153c7c52e",
+                    "serverHandshake": "50f19f78903bde377ea0f38442c61c88083683a84441e1a8a6c1179e9896724ea09275b5e888f598eade34663572d65f",
+                    "clientFinished": "ff70f4baf8564c431bbc1fb3ea18f3bad32582a7b63678afaea42858ef06c8970736665e798095a9845a322af30ba4d1",
+                    "serverFinished": "e4d118b4b979a09ed014c2ce65580bd721b27ce3ec9f0bb8dae5483635c47bd4118629d27af063d84b04d4faa5a3f422"
+                },
+                "tlsClientHelloLength": "508",
+                "tlsClientAuth": {
+                    "certPresented": "0",
+                    "certVerified": "NONE",
+                    "certRevoked": "0",
+                    "certIssuerDN": "",
+                    "certSubjectDN": "",
+                    "certIssuerDNRFC2253": "",
+                    "certSubjectDNRFC2253": "",
+                    "certIssuerDNLegacy": "",
+                    "certSubjectDNLegacy": "",
+                    "certSerial": "",
+                    "certIssuerSerial": "",
+                    "certSKI": "",
+                    "certIssuerSKI": "",
+                    "certFingerprintSHA1": "",
+                    "certFingerprintSHA256": "",
+                    "certNotBefore": "",
+                    "certNotAfter": "",
+                    "certRFC9440": "",
+                    "certRFC9440TooLarge": false,
+                    "certChainRFC9440": "",
+                    "certChainRFC9440TooLarge": false
+                },
+                "verifiedBotCategory": "",
+                "edgeL4": {
+                    "deliveryRate": 73385
+                }
+            }
+        },
+        "response": {
+            "status": 200
+        }
+    }
+}

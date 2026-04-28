@@ -555,7 +555,9 @@ extends the gateway worker:
 
 ## L4a deployments (v1, locked)
 
-Deployed 2026-04-28. All gates passed. Tag: `L4a1-gateway-static-green` (pending push).
+Deployed 2026-04-28. All gates passed.
+
+**Canonical reproducible tag: `L4a1-gateway-static-green-r2`** (pushed; verified from fresh clone with `git clone --recurse-submodules`). The reproducibility fix landed in commit `bfcd3bf` — Foundry deps re-installed as proper git submodules, gitignore entries blocking `contracts/lib/` removed, root `pnpm test` wired to `pnpm -r run test`. The original tag `L4a1-gateway-static-green` is preserved at the broken commit as historical evidence; do NOT use it for verification or as the L4a₂ pre-flight target.
 
 | Item | Value |
 | ---- | ----- |
@@ -590,9 +592,10 @@ Smoke test results:
 - ENS end-to-end via viem `getEnsText` → Sepolia UniversalResolver → Reckon402Resolver → CCIP-Read → gateway → D1:
   - `seller.reckon402-test.eth` → `x402.facilitator` = `https://facilitator.reckon402.com` PASS
   - `seller.reckon402-test.eth` → `x402.splitter` = `0x0ad507c6973eba86313794329ad9b12fbf24acd0` PASS
-- Forge: 39/39 green (24 Splitter + 15 Resolver)
+- Forge: 39/39 green from fresh clone (1 SplitterFork + 20 Splitter unit + 3 Splitter invariant + 15 Resolver)
+- Vitest: 153/153 green via `pnpm -r run test` from fresh clone (41 gateway + 63 facilitator + 13 buyer-sdk + 15 middleware-hono + 12 facilitator-client + 9 agent)
 
-Tag: `L4a1-gateway-static-green` (pending Gate C push).
+Canonical tag (reproducible): `L4a1-gateway-static-green-r2` (pushed to origin/main). Original tag `L4a1-gateway-static-green` preserved at the broken commit as historical evidence; do not use for verification.
 
 ## Open questions
 

@@ -456,7 +456,7 @@ one-line descriptions.
 ## Test conventions (v1.5)
 
 Established at the Prio-2 tightening pass (2026-04-28). Covers the full
-test suite through commit `abc03d5` (Prio-2 wrap-up, 109 tests total).
+test suite through commit `abc03d5` (Prio-2 wrap-up, 112 tests total).
 Prio-1 fixes are in commit `9dbde53` (+15 tests, all 46 facilitator green).
 
 ### Test layer taxonomy

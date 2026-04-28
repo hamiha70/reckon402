@@ -597,6 +597,121 @@ Smoke test results:
 
 Canonical tag (reproducible): `L4a1-gateway-static-green-r2` (pushed to origin/main). Original tag `L4a1-gateway-static-green` preserved at the broken commit as historical evidence; do not use for verification.
 
+## L4a2 ERC-8004 client + reads (v1, locked)
+
+Shipped 2026-04-28. All gates passed.
+
+**Canonical reproducible tag: `L4a2-erc8004-reads-green`** (pushed;
+verified from fresh clone with `git clone --recurse-submodules`).
+
+### New workspace entry
+
+| Item | Value |
+| ---- | ----- |
+| Package name | `@reckon402/erc-8004-client` (public scope `@reckon402`) |
+| Location | `packages/erc-8004-client/` |
+| Upstream ABI pin (SHA) | `0463311492b3a7fc5fdb6990231cce721ff6cf97` (exported as `UPSTREAM_ABI_COMMIT`) |
+| Spec sections | `specs/04-l4a-gateway.md` §11–§18 |
+
+### Pinned multichain config
+
+| Chain | chainId | Identity | Reputation | Validation |
+|-------|---------|----------|------------|------------|
+| Base Sepolia | 84532 | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | `null` |
+| Base Mainnet | 8453 | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | `null` |
+| Ethereum Sepolia | 11155111 | (same as Base Sepolia) | (same as Base Sepolia) | `null` |
+| Ethereum Mainnet | 1 | (same as Base Mainnet) | (same as Base Mainnet) | `null` |
+
+`ValidationRegistry` is `null` on all four chains at the pinned commit
+(upstream: "under active TEE-community discussion"). Library surfaces
+are implemented but every call throws `VALIDATION_NOT_DEPLOYED`.
+
+### Gateway deployments
+
+| Item | Value |
+| ---- | ----- |
+| Gateway staging URL | `https://gateway-staging.reckon402.com` |
+| Gateway prod URL | `https://gateway.reckon402.com` |
+| Gateway staging version ID | `78cbc720-af0b-4792-8b59-26ad63a9d0f0` |
+| Gateway prod version ID | `9a01a477-b234-4f30-8f32-47737c0148bf` |
+| `ENABLE_ERC8004_READS` shipped as | `"true"` |
+| New wrangler secrets (staging + production) | `BASE_SEPOLIA_RPC`, `GATEWAY_CACHE_HOOK_TOKEN` |
+| New wrangler vars | `ENABLE_ERC8004_READS=true`, `BASE_MAINNET_RPC=""` (placeholder), `CACHE_TTL_REPUTATION_S=300` |
+| D1 migration applied | `gateway/migrations/0002_erc8004_cache.sql` (erc8004_cache + agent_id_index) |
+| D1 seed applied | `gateway/migrations/seed_l4a2.sql` (adds `x402.amount="100000"` on `seller.reckon402-test.eth`; maps it to Base Sepolia agentId=1) |
+| Known agents inventory | `tools/integration-tests/known-agents.md` |
+| HTTP tester | `tools/integration-tests/resolve-l4a.sh --backend {static,erc8004}` |
+
+### Behavioral notes (deviations from design-doc hints)
+
+- `getSummary` requires explicit `clientAddresses`. Upstream reverts
+  on empty array (`"clientAddresses required"`). The library exposes
+  `reputation.getSummaryForAllClients` which does the two-step
+  `getClients` → `getSummary` read and caches both.
+- `identity.getAgent` is a library-side composite (`ownerOf +
+  getAgentWallet + tokenURI`); upstream has no such function.
+- Event names: upstream uses `Registered` not `AgentRegistered`;
+  `NewFeedback` not `FeedbackGiven`. ABI subsets use upstream names.
+- `reputation.giveFeedback` has 8 args upstream
+  (`agentId, value:int128, valueDecimals:uint8, tag1, tag2, endpoint,
+  feedbackURI, feedbackHash`) — not the 6 the M.0 handoff sketch
+  suggested.
+- D1 `LIKE` with our canonical cache-key prefix is rejected with
+  `SQLITE_ERROR 7500 "pattern too complex"`. The cache-invalidate
+  hook uses `substr(cache_key, 1, ?) = ?` for prefix match. Surfaced
+  during staging deploy smoke, fixed mid-session.
+
+### Smoke test results (post-deploy)
+
+- `resolve-l4a.sh --backend static` vs staging + production: PASS
+  (regression guard; byte-equal to L4a₁).
+- `resolve-l4a.sh --backend erc8004` vs staging + production: PASS
+  (returns `value=100000` — base price; agent 1 has 0
+  `"payment"/"x402-settlement"`-tagged feedback entries on Base
+  Sepolia at 2026-04-28, so tier bps = 0. L4b settle-hook will seed
+  the tagged feedback that drives the demo Act-1 pricing story).
+- Cache populated on first read: confirmed via direct D1 query
+  (`reputation.getClients:92f39bdb...` + `reputation.getSummary:45b36d9a...`).
+- Cache-invalidate hook end-to-end: POST `/hooks/cache-invalidate`
+  with valid bearer token deletes both cache rows (`deleted: 2`),
+  follow-up `SELECT cache_key FROM erc8004_cache` returns zero rows.
+  401 on missing / wrong token.
+- Forge: 39/39 green from fresh clone (unchanged from L4a₁).
+- Vitest: 224/224 green via `pnpm -r run test` from fresh clone, of
+  which 56/56 in the new `@reckon402/erc-8004-client` with live
+  `BASE_SEPOLIA_RPC` hydrated (53/53 offline, 3 live-RPC tests
+  skipped when unset).
+
+### Known forward-compat / L4b carryover
+
+- Real writes to Identity / Reputation registries (L4b).
+- Cache-invalidate hook **call side** — facilitator hitting the
+  receive-side hook after a confirmed settle (L4b).
+- KMS signing wrapper for writes (L4b).
+- Reputation-gated resolution (gateway blocks resolve if summary
+  below threshold) — L4c demo.
+- ValidationRegistry — blocked on upstream deployment.
+- ENS mainnet registration — post-hackathon.
+
+## LLM-friendly tech docs
+
+Curated, LLM-optimised reference docs live under `LLM_friendly_tech_docs/`
+(local-only, gitignored — fetched out-of-band, not committed).
+**Before writing any code that touches a covered technology, read the
+corresponding doc(s) first** — they are the authoritative source of truth
+for API surface, wire formats, and gotchas for this project.
+
+| Technology | Files |
+|------------|-------|
+| ENS | `LLM_friendly_tech_docs/ens/llms.txt` (index), `LLM_friendly_tech_docs/ens/llms-full.txt` (full reference) |
+
+When writing ENS-related code (name resolution, reverse resolution,
+CCIP-Read, ENS wildcard, `gateway.reckon402.com` off-chain resolver, ENS
+subname registration), read `LLM_friendly_tech_docs/ens/llms-full.txt`
+before producing any implementation. Do not rely on pre-training
+knowledge alone for ENS — the docs cover breaking changes and current
+API conventions that differ from older patterns.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

@@ -323,6 +323,37 @@ file under `tools/<area>/` once they exceed ~40 lines. When a
 recipe is added, moved, or graduated, update the
 `RUNBOOK.md` Quick reference table in the same commit.
 
+## MCP servers (agent tooling)
+
+Implementation agents in this repo have these MCP servers available
+locally (per `~/.claude.json`). Use them deliberately — default to
+repo files first; reach for an MCP only when a specific external
+lookup is needed.
+
+| Server | Use when |
+| ------ | -------- |
+| `alchemy` | Base/Ethereum Sepolia RPC queries (preferred over public RPC for integration tests and balance probes); mainnet RPC at H-1 cutover. |
+| `aws` | AWS docs / IaC / pricing for Lambda + KMS work (mainly L4b Signing Wrapper, occasional KMS quirks). |
+| `cloudflare` | Workers / D1 / Pages / wrangler docs + observability (L4a Gateway, L4c Demo, any wrangler/d1 issue). |
+| `context7` | Library/SDK docs (viem, hono, ezccip, vitest, miniflare, foundry, just). First stop for "how does X library do Y" — cheaper and more current than web search. |
+| `puppeteer` | Browser automation for L4c demo-flow verification (click-through, render checks). Not needed for backend work. |
+
+**Per-prompt MCP allowlist.** Each layer's prompt explicitly names
+which MCPs are in-scope for that session. MCPs off the allowlist are
+off-limits — do not speculatively call out-of-scope servers "to be
+helpful." This keeps sessions deterministic and reviewable.
+
+**Never paste secrets through MCPs.** Private keys, API tokens, KMS
+material, and Infisical-injected values never transit any MCP. Public
+RPC response data is fine; sensitive request bodies are not.
+
+**`context7` over web search for library questions.** Curated docs
+beat hallucination-prone blog posts and stale Stack Overflow answers.
+
+**`cloudflare` MCP is read-only for docs.** Production `wrangler`
+deploys still run from the local CLI under `infisical run`; the MCP
+is for understanding, not execution.
+
 ## Spec workflow
 
 Specs are produced by adapting external design docs supplied by the user
@@ -337,23 +368,6 @@ in each prompt. Adaptation rule:
 
 Specs are committed under `specs/`, it is the canonical implementation
 contract.
-
-## L3 deployments (v1, locked)
-
-| Item | Value |
-| ---- | ----- |
-| Splitter (Base Sepolia) | `0x0ad507c6973eba86313794329ad9b12fbf24acd0` |
-| Splitter deploy tx | `0xaa3cb87703c8320a7ece5b2d267d9101fd89199cf9c066fec9fde765b77af443` |
-| Deploy signer | `0x66C2858D9A8605957c516a77262Eb66EE6be113C` (KMS `alias/reckon402/mainnet/deployer/evm`) |
-| D1 database name | `reckon402-d1-facilitator-dev` |
-| D1 database ID | `ad5bd36d-1903-4340-bc27-1f46b878b2c0` |
-| Facilitator worker URL | `https://facilitator.reckon402.com` |
-| Agent worker URL | `https://agent.reckon402.com` |
-
-Full-flow + replay green on 2026-04-28. Evidence:
-`tools/integration-tests/results-full-flow-l3-2026-04-28T07-01-42Z.md` +
-`tools/integration-tests/results-replay-l3-2026-04-28T07-01-51Z.md` +
-`tools/integration-tests/wrangler-tail-2026-04-28T07-01-37Z.log`.
 
 ## Open questions
 

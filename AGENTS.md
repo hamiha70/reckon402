@@ -369,6 +369,73 @@ in each prompt. Adaptation rule:
 Specs are committed under `specs/`, it is the canonical implementation
 contract.
 
+## Operator ergonomics
+
+`just` is the primary developer entrypoint for this repo. It wraps
+leaf operator commands only — not the full multi-step deploy
+orchestration (that gating is the audit trail; see below).
+
+### Rationale and locks (final)
+
+Decided at the L3-green → L4-start boundary (2026-04-28). Locked in
+`reckon402_handoff_prompts.md` § I.8 "Deferred to L3-green → L4-start
+boundary (operator ergonomics)" and confirmed overturning the prior
+pnpm-first lock. Do not re-litigate.
+
+### Rules
+
+- **`just` at the repo root, not `make`, not `turbo`, not pnpm as
+  orchestrator.** pnpm remains the JS/TS task runner via per-package
+  scripts; `just` calls `pnpm --filter @reckon402/<pkg> <task>`
+  directly. `make` is hard-banned; `turbo` is deferred (no
+  build-graph caching problem at hackathon scale).
+- **Runbooks are canonical; recipes are sugar.** `tools/deploy/*.md`
+  and `tools/funding/*.md` are the authoritative operator surface and
+  audit trail. Recipes wrap the leaf commands; they do NOT replace or
+  drift away from the runbooks. When a runbook changes, update the
+  recipe to match — not the reverse.
+- **Do NOT wrap the deploy orchestration.** No `just deploy-l3`.
+  The 10-step gating + manual operator sign-off + per-step output
+  capture IS the audit trail. Wrap leaf commands only.
+- **Infisical only; no `.env` files.** `set dotenv-load := false` in
+  the justfile. Non-secret defaults (RPC URLs, chainIds, contract
+  addresses) live inside the justfile as recipe-local variables. No
+  `.env` allowance — it creates a dual source of truth and the
+  "non-sensitive" line drifts over time.
+- **All Infisical invocations go through `tools/with-secrets.sh`.**
+  Single source of the `infisical run --env dev --domain https://secrets.intentralabs.com`
+  invocation. Recipes call `{{secrets}} <command>`; no hard-coded
+  `infisical run ...` anywhere else.
+- **Multi-step recipe bodies go in `tools/scripts/<name>.sh`**, not
+  chained `bash -c` inline. Scripts use `#!/usr/bin/env bash` +
+  `set -euo pipefail` + positional parameter validation.
+- **Per-package pnpm scripts stay as-is.** Do NOT consolidate or
+  rewrite existing per-package `test`/`build`/`lint` scripts.
+
+### Tier-1 recipes (most-used)
+
+```bash
+just preflight-l3           # L3 deploy pre-flight (KMS + balance + RPC probes)
+just balance                # ETH + USDC snapshot for all reckon402 EOAs
+just tail-facilitator       # wrangler tail reckon402-facilitator-prod
+just tail-agent             # wrangler tail reckon402-agent-prod
+just fullflow-l3            # live end-to-end L3 integration test
+just replay-l3              # replay-protection demo (run fullflow-l3 first)
+just seed deployer 0.1      # seed deployer EOA with 0.1 ETH on Base Sepolia
+just seed facilitator 0.1   # seed facilitator EOA with 0.1 ETH on Base Sepolia
+```
+
+Run `just` (or `just --list`) to see all available recipes with
+one-line descriptions.
+
+### Adding new recipes
+
+1. Update the runbook / leaf script first (runbook is canonical).
+2. Add or update the `just` recipe to match.
+3. Commit in the order: spec/runbook → recipe → verify.
+4. If the recipe body needs more than a single command, put it in
+   `tools/scripts/<name>.sh` (not inline bash in the justfile).
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

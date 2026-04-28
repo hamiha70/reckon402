@@ -20,6 +20,7 @@ cd ~/Projects/ETHGlobal/ETHGlobal_OpenAgents_2026/reckon402
       `DEPLOYER_AWS_ACCESS_KEY_ID`, `DEPLOYER_AWS_SECRET_ACCESS_KEY`,
       `BASE_SEPOLIA_RPC_PRIMARY`, `BASE_SEPOLIA_RPC_FALLBACK`,
       `FACILITATOR_PK`, `BUYER_DEMO_1_PK`, `CLOUDFLARE_API_TOKEN`.
+- [ ] Ergonomics shorthand: `just preflight-l3` runs Step 0 below (raw command stays canonical).
 
 ## Step 0 — Preflight (5-probe safety gate)
 

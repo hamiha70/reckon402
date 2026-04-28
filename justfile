@@ -34,3 +34,8 @@ replay-l3:
 # kind: deployer | facilitator    amount: e.g. 0.1
 seed kind amount:
     {{secrets}} bash tools/scripts/seed.sh {{kind}} {{amount}}
+
+# Return ETH from a reckon402 EOA to the funder. Usage: just refund <kind> <amount>
+# kind: deployer | facilitator    amount: e.g. 0.1
+refund kind amount:
+    {{secrets}} bash tools/scripts/refund.sh {{kind}} {{amount}}

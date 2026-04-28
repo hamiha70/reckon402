@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
-# resolve-l4a.sh — HTTP-direct tester for the Reckon402 CCIP-Read gateway (L4a₁)
+# resolve-l4a.sh — HTTP-direct tester for the Reckon402 CCIP-Read gateway (L4a₁+L4a₂)
 #
 # Usage:
 #   bash tools/integration-tests/resolve-l4a.sh [--backend static] [--gateway <url>] [--name <ens-name>] [--key <record-key>]
-#   bash tools/integration-tests/resolve-l4a.sh --backend erc8004
+#   bash tools/integration-tests/resolve-l4a.sh --backend erc8004 [--key x402.amount]
 #
 # Flags:
-#   --backend static     (default) test the D1-backed static lookup path
-#   --backend erc8004    print "deferred to L4a₂" and exit 0
+#   --backend static     (default) regression guard on the D1-backed static
+#                        lookup path — output must be byte-equal to L4a₁.
+#   --backend erc8004    hits the flag-true gateway branch; validates the
+#                        cross-chain ERC-8004 read landed + pricing-tier
+#                        math applied. Expects the gateway to have
+#                        ENABLE_ERC8004_READS=true and the ENS name
+#                        indexed in agent_id_index.
 #   --gateway <url>      gateway base URL (default: https://gateway.reckon402.com)
 #   --name <ens-name>    ENS name to resolve (default: seller.reckon402-test.eth)
-#   --key <record-key>   x402 record key to fetch (default: x402.facilitator)
+#   --key <record-key>   x402 record key to fetch
+#                        (default: x402.facilitator for static; x402.amount for erc8004)
 #
 # Exit codes:
 #   0 — test passed (or --backend erc8004 deferred)
@@ -33,7 +39,7 @@ set -euo pipefail
 BACKEND="static"
 GATEWAY_URL="https://gateway.reckon402.com"
 ENS_NAME="seller.reckon402-test.eth"
-RECORD_KEY="x402.facilitator"
+RECORD_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -45,13 +51,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$BACKEND" == "erc8004" ]]; then
-  echo "[resolve-l4a] --backend erc8004: ERC-8004 reader deferred to L4a₂"
-  echo "[resolve-l4a] EXIT 0 (deferred, not a failure)"
-  exit 0
+if [[ -z "$RECORD_KEY" ]]; then
+  if [[ "$BACKEND" == "erc8004" ]]; then
+    RECORD_KEY="x402.amount"
+  else
+    RECORD_KEY="x402.facilitator"
+  fi
 fi
 
-echo "[resolve-l4a] Testing static-dispatch backend"
+case "$BACKEND" in
+  static|erc8004) ;;
+  *) echo "Unknown backend: $BACKEND (valid: static, erc8004)" >&2; exit 1 ;;
+esac
+
+echo "[resolve-l4a] Testing backend: $BACKEND"
 echo "[resolve-l4a] Gateway: $GATEWAY_URL"
 echo "[resolve-l4a] ENS name: $ENS_NAME"
 echo "[resolve-l4a] Record key: $RECORD_KEY"
@@ -61,6 +74,8 @@ echo ""
 
 CALLER_ADDR="0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"  # vitalik.eth — fixture caller
 RESOLVER_ADDR="0x0000000000000000000000000000000000000001"  # placeholder sender
+
+export ENS_NAME RECORD_KEY CALLER_ADDR
 
 CALL_DATA_JSON=$(node --input-type=module <<'NODEEOF'
 import { encodeAbiParameters } from 'viem'
@@ -195,7 +210,21 @@ EXPECTED_VALUES["search.reckon402-test.eth|x402.facilitator"]="https://facilitat
 LOOKUP_KEY="${ENS_NAME}|${RECORD_KEY}"
 EXPECTED="${EXPECTED_VALUES[$LOOKUP_KEY]:-}"
 
-if [[ -n "$EXPECTED" ]]; then
+if [[ "$BACKEND" == "erc8004" && "$RECORD_KEY" == "x402.amount" ]]; then
+  # ERC-8004 path asserts: value is a decimal integer string, ≤ the
+  # seeded base value (100000 USDC base-units). The exact post-discount
+  # value depends on the live reputation summary of the indexed agent
+  # and is not promised stable (see tools/integration-tests/known-agents.md).
+  if [[ ! "$VALUE" =~ ^[0-9]+$ ]]; then
+    echo "[resolve-l4a] FAIL: expected decimal integer, got $VALUE"
+    exit 1
+  fi
+  if (( VALUE > 100000 )); then
+    echo "[resolve-l4a] FAIL: discounted amount $VALUE exceeds base 100000"
+    exit 1
+  fi
+  echo "[resolve-l4a] ERC-8004 cross-check PASS: value=$VALUE ≤ base 100000"
+elif [[ -n "$EXPECTED" ]]; then
   if [[ "$VALUE" == "$EXPECTED" ]]; then
     echo "[resolve-l4a] Cross-check PASS: value matches D1 seed"
   else
@@ -209,5 +238,5 @@ else
 fi
 
 echo ""
-echo "[resolve-l4a] PASS — gateway responded correctly to static lookup"
+echo "[resolve-l4a] PASS — gateway $BACKEND path responded correctly"
 exit 0

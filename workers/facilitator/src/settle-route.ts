@@ -60,7 +60,17 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
     }, 400)
   }
 
-  const paymentId = computePaymentId(auth)
+  let paymentId: `0x${string}`
+  try {
+    paymentId = computePaymentId(auth)
+  } catch {
+    return c.json({
+      success: false,
+      transaction: '',
+      network: c.env.NETWORK,
+      errorReason: 'INVALID_AUTHORIZATION',
+    }, 400)
+  }
 
   // Replay short-circuit: if the row is already CONFIRMED or RECONCILED,
   // return the existing snapshot unchanged. This is how replay-l3.sh

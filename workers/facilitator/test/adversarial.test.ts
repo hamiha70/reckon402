@@ -206,16 +206,13 @@ describe('adversarial — oversized payload fields', () => {
         extra: { name: 'USDC', version: '2' },
       },
     })))
-    // Actual behaviour (documented via this test): viem's encodePacked receives
-    // a nonce longer than bytes32, throws an internal error, and the handler
-    // propagates a 500 "Internal Server Error" with a plain-text (non-JSON) body.
-    // This is acceptable — it is NOT a 200 — but it does surface a gap: the
-    // handler lacks a try/catch around the paymentId derivation path for
-    // malformed nonce lengths. Noted as a future hardening opportunity; not
-    // a blocker for L3 since the middleware validates the auth struct before
-    // the facilitator is ever called.
-    expect(res.status).not.toBe(200)
-    // Body may be non-JSON on a 500 from an uncaught throw; do not call .json().
+    // computePaymentId is wrapped in try/catch in settle-route.ts; a malformed
+    // nonce (wrong byte length for bytes32) must return 400 INVALID_AUTHORIZATION
+    // with a JSON body — not a 500 plain-text unhandled throw.
+    expect(res.status).toBe(400)
+    const body = await res.json() as { success: boolean; errorReason: string }
+    expect(body.success).toBe(false)
+    expect(body.errorReason).toBe('INVALID_AUTHORIZATION')
   })
 })
 

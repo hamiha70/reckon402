@@ -141,6 +141,89 @@ describe('splitSignature — high-S malleability (s > secp256k1 n/2)', () => {
   })
 })
 
+describe('EIP-3009 nonce uniqueness (Tier 2 #7)', () => {
+  // EIP-3009 uses a bytes32 nonce as a one-time-use anti-replay token at the
+  // USDC contract level. The nonce is part of the EIP-712 signed message, so
+  // a different nonce → a different signature → a different authorization.
+  //
+  // For Reckon402, the nonce also feeds directly into paymentId via:
+  //   paymentId = keccak256(encodePacked(from, to, value, validAfter, validBefore, nonce))
+  //
+  // Invariant: two authorizations that differ ONLY in their nonce must produce
+  // distinct paymentIds. If they collided, replay protection would break — the
+  // second authorization would look like a replay of the first, and the D1
+  // idempotency guard would silently discard it.
+
+  it('distinct nonces produce distinct paymentIds (replay protection relies on this)', async () => {
+    const { computePaymentId } = await import('../src/payment-id.js')
+
+    const base = {
+      from: '0x837e30740a4A5bAC5480b4f707924469d42b43De',
+      to:   '0x1111111111111111111111111111111111111111',
+      value: '10000',
+      validAfter: '0',
+      validBefore: '1999999999',
+    }
+
+    const nonces = [
+      '0x' + '00'.repeat(32),
+      '0x' + '01'.repeat(32),
+      '0x' + 'ff'.repeat(32),
+      '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      '0x' + 'ab'.repeat(32),
+    ] as const
+
+    const paymentIds = nonces.map((nonce) => computePaymentId({ ...base, nonce }))
+
+    // All five paymentIds must be distinct.
+    const unique = new Set(paymentIds)
+    expect(unique.size).toBe(nonces.length)
+
+    // Each paymentId must still be a valid 32-byte hex.
+    for (const pid of paymentIds) {
+      expect(pid).toMatch(/^0x[0-9a-f]{64}$/)
+    }
+  })
+
+  it('same authorization with identical nonce always yields the same paymentId (idempotency)', async () => {
+    const { computePaymentId } = await import('../src/payment-id.js')
+
+    const auth = {
+      from: '0x837e30740a4A5bAC5480b4f707924469d42b43De',
+      to:   '0x1111111111111111111111111111111111111111',
+      value: '10000',
+      validAfter: '0',
+      validBefore: '1999999999',
+      nonce: '0x' + 'cc'.repeat(32),
+    } as const
+
+    // Same nonce → same paymentId, every call. This is the D1 replay key.
+    expect(computePaymentId(auth)).toBe(computePaymentId(auth))
+    expect(computePaymentId(auth)).toBe(computePaymentId(auth))
+  })
+
+  it('50 pseudo-random distinct nonces all produce distinct paymentIds', async () => {
+    const { computePaymentId } = await import('../src/payment-id.js')
+
+    const base = {
+      from: '0x837e30740a4A5bAC5480b4f707924469d42b43De',
+      to:   '0x1111111111111111111111111111111111111111',
+      value: '10000',
+      validAfter: '0',
+      validBefore: '1999999999',
+    }
+
+    const seen = new Set<string>()
+    for (let i = 0; i < 50; i++) {
+      const nonce = ('0x' + i.toString(16).padStart(64, '0')) as `0x${string}`
+      const pid = computePaymentId({ ...base, nonce })
+      expect(seen.has(pid)).toBe(false)
+      seen.add(pid)
+    }
+    expect(seen.size).toBe(50)
+  })
+})
+
 describe('recoverEip3009Signer', () => {
   it('recovers the signer from a valid EIP-3009 TransferWithAuthorization', async () => {
     // Deterministic test PK (NOT a real key).

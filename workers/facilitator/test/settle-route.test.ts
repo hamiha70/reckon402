@@ -511,6 +511,119 @@ describe('POST /x402/settle — FAILED replay', () => {
   })
 })
 
+// ────────────────────── concurrent settle race ──────────────────────
+
+describe('POST /x402/settle — concurrent settle race (Promise.all)', () => {
+  it('only one of two simultaneous settle calls invokes settleOnChain; loser short-circuits', async () => {
+    // Scenario: two requests arrive at the same time for the same paymentId.
+    // Both read the row as SUBMITTED (or it doesn't exist yet). D1's
+    // UPDATE ... WHERE state='SUBMITTED' is the single arbiter — exactly one
+    // call gets changes=1 (winner); the other gets changes=0 (loser) and must
+    // return without calling settleOnChain.
+    //
+    // Simulated with a "slow" D1 fake: the UPDATE result is deferred via a
+    // promise whose resolution is controlled by the test. Both requests start
+    // before either gets the UPDATE result, reproducing the actual race window.
+
+    const db = makeFakeDb()
+
+    // Pre-seed the SUBMITTED row so both requests skip the INSERT OR IGNORE path
+    // and go straight to the guarded UPDATE.
+    const { computePaymentId } = await import('../src/payment-id.js')
+    const pid = computePaymentId(FIXTURE_AUTH)
+    db.setRow({
+      payment_id: pid,
+      request_id: '00000000-0000-4000-8000-000000000010',
+      state: 'SUBMITTED',
+      network: NETWORK,
+      version: 2,
+      auth_from: FIXTURE_AUTH.from,
+      auth_to: FIXTURE_AUTH.to,
+      auth_value: FIXTURE_AUTH.value,
+      auth_valid_after: Number(FIXTURE_AUTH.validAfter),
+      auth_valid_before: Number(FIXTURE_AUTH.validBefore),
+      auth_nonce: FIXTURE_AUTH.nonce,
+      transaction: null,
+      submitted_at: Date.now(),
+      block_number: null,
+      block_timestamp: null,
+      confirmed_at: null,
+      gas_used: null,
+      retry_count: 0,
+      last_retry_at: null,
+      reconcile_notes: null,
+      failure_reason: null,
+      failure_detail: null,
+    })
+
+    // Slow D1 gate: the first UPDATE call resolves only after the second has
+    // also called prepare(), so both are "in-flight" simultaneously.
+    let resolveGate!: () => void
+    const gate = new Promise<void>((r) => { resolveGate = r })
+    let updateCallCount = 0
+
+    const originalPrepare = db.prepare.bind(db)
+    vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+      if (/UPDATE receipts\s+SET state = 'PENDING_CONFIRMATION'/i.test(sql)) {
+        const stmt = originalPrepare(sql)
+        return {
+          bind(...args: unknown[]) {
+            const bound = stmt.bind(...args)
+            return {
+              async run() {
+                updateCallCount++
+                if (updateCallCount === 1) {
+                  // First caller: wait until second caller has also arrived at this point.
+                  await gate
+                }
+                return bound.run()
+              },
+              first: bound.first.bind(bound),
+            }
+          },
+        }
+      }
+      return originalPrepare(sql)
+    })
+
+    const settleSpy = vi.spyOn(settleModule, 'settleOnChain').mockResolvedValue({
+      success: true,
+      transferTx: '0xracewinner',
+      distributeTx: '0xracewinnerdist',
+      blockNumber: 99n,
+      blockTimestamp: 1735000002n,
+      gasUsed: 120000n,
+    } satisfies SettleOutcome)
+
+    // Fire both requests simultaneously; resolve the gate when both are queued.
+    const req1 = makeApp(makeEnv(db)).fetch(settleReq())
+    const req2 = makeApp(makeEnv(db)).fetch(settleReq())
+
+    // Wait a microtask tick to let both requests reach the UPDATE gate, then open it.
+    await new Promise<void>((r) => setTimeout(r, 0))
+    resolveGate()
+
+    const [res1, res2] = await Promise.all([req1, req2])
+
+    // Exactly ONE call to settleOnChain — the loser must not submit a tx.
+    expect(settleSpy).toHaveBeenCalledTimes(1)
+
+    // The winner returns 200; the loser short-circuits. Since the winner drives
+    // the row to CONFIRMED, the loser's re-read sees CONFIRMED and returns 200 too.
+    expect(res1.status).toBe(200)
+    expect(res2.status).toBe(200)
+
+    // The winner's response has no X-Reckon402-Replay; we can't deterministically
+    // know which is which, but at least one must not be a replay.
+    const replayHeaders = [
+      res1.headers.get('X-Reckon402-Replay'),
+      res2.headers.get('X-Reckon402-Replay'),
+    ]
+    const nonReplayCount = replayHeaders.filter((h) => h === null).length
+    expect(nonReplayCount).toBeGreaterThanOrEqual(1)
+  })
+})
+
 // ────────────────────── bad-input guards ──────────────────────
 
 describe('POST /x402/settle — input validation', () => {

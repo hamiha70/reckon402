@@ -16,7 +16,7 @@ export async function receiptByPaymentId(c: Context<{ Bindings: Env }>) {
 
 export async function receiptByTx(c: Context<{ Bindings: Env }>) {
   const tx = c.req.param('transaction')
-  const row = await readRow(c, `SELECT * FROM receipts WHERE transaction = ?1`, tx)
+  const row = await readRow(c, `SELECT * FROM receipts WHERE "transaction" = ?1`, tx)
   if (!row) return c.json({ error: 'RECEIPT_NOT_FOUND', transaction: tx }, 404)
   c.header('X-Reckon402-Request-Id', row.request_id)
   return c.json(buildSettleResponse(row), 200)

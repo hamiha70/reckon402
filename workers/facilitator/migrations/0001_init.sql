@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   auth_valid_before INTEGER NOT NULL,
   auth_nonce        TEXT    NOT NULL,
 
-  transaction       TEXT,
+  "transaction"     TEXT,
   submitted_at      INTEGER NOT NULL,
   block_number      INTEGER,
   block_timestamp   INTEGER,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   td_deposited_at   INTEGER
 );
 
-CREATE INDEX IF NOT EXISTS idx_receipts_transaction ON receipts (transaction);
+CREATE INDEX IF NOT EXISTS idx_receipts_transaction ON receipts ("transaction");
 CREATE INDEX IF NOT EXISTS idx_receipts_request_id  ON receipts (request_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_state       ON receipts (state);
 CREATE INDEX IF NOT EXISTS idx_receipts_auth_from   ON receipts (auth_from);

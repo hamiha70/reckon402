@@ -151,7 +151,7 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
       .prepare(
         `UPDATE receipts
          SET state = 'CONFIRMED',
-             transaction = ?2,
+             "transaction" = ?2,
              block_number = ?3,
              block_timestamp = ?4,
              confirmed_at = ?5,
@@ -174,7 +174,7 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
       .prepare(
         `UPDATE receipts
          SET state = 'FAILED',
-             transaction = COALESCE(?2, transaction),
+             "transaction" = COALESCE(?2, "transaction"),
              failure_reason = ?3,
              failure_detail = ?4
          WHERE payment_id = ?1`,

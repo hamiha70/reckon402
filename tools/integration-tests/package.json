@@ -6,9 +6,12 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "test:l2": "bash agent-paywall.sh"
+    "test:l2": "bash agent-paywall.sh",
+    "test:l3-full-flow": "bash full-flow-l3.sh",
+    "test:l3-replay": "bash replay-l3.sh"
   },
   "dependencies": {
+    "@reckon402/buyer-sdk": "workspace:*",
     "viem": "^2.0.0"
   }
 }

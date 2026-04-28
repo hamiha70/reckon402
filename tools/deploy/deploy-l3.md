@@ -21,6 +21,32 @@ cd ~/Projects/ETHGlobal/ETHGlobal_OpenAgents_2026/reckon402
       `BASE_SEPOLIA_RPC_PRIMARY`, `BASE_SEPOLIA_RPC_FALLBACK`,
       `FACILITATOR_PK`, `BUYER_DEMO_1_PK`, `CLOUDFLARE_API_TOKEN`.
 
+## Step 0 — Preflight (5-probe safety gate)
+
+**Run first. Do not skip.** Four minutes of probing saves hours of
+chasing silent failures on live infra.
+
+```bash
+infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
+  export AWS_ACCESS_KEY_ID="$DEPLOYER_AWS_ACCESS_KEY_ID"
+  export AWS_SECRET_ACCESS_KEY="$DEPLOYER_AWS_SECRET_ACCESS_KEY"
+  export AWS_REGION="eu-central-1"
+  unset AWS_PROFILE
+  node tools/deploy/preflight-l3.mjs
+'
+```
+
+Must exit 0. Probes:
+
+1. Primary RPC reachable within 5s.
+2. Fallback RPC reachable within 5s.
+3. KMS deployer derives to `0x66c2…113c` AND sign+recover roundtrip works.
+4. `FACILITATOR_PK` derives to `0x0A02…c455` (matches AGENTS.md).
+5. Both deployer + facilitator EOAs ≥ 0.01 ETH on Base Sepolia.
+
+If any probe fails, STOP. Fix the root cause (not a workaround) and re-run
+preflight. Do NOT proceed to step 1 with a red probe.
+
 ## Step 1 — Build contracts
 
 ```bash

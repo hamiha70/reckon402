@@ -523,6 +523,44 @@ Never silently fix a production bug inside the same commit that adds the test.
   (`full-flow-l4.sh`) that drives the KH workflow wallet through the full
   stack. Do NOT modify existing `full-flow-l3.sh` or `replay-l3.sh`.
 
+## L4a deployments (v1, pending deploy)
+
+Scaffold shipped 2026-04-28. Resolver deploy + ENS wiring + Worker deploy
+are operator steps that follow after this commit.
+
+| Item | Value |
+| ---- | ----- |
+| Reckon402Resolver (Ethereum Sepolia) | `<TBD — populated post forge deploy>` |
+| Resolver deploy tx | `<TBD>` |
+| Resolver deploy signer | `<TBD — address derived from RECKON402_RESOLVER_SIGNER_PK>` |
+| Initial signer (hot key handle) | Infisical `RECKON402_RESOLVER_SIGNER_PK` (dev env) |
+| Gateway D1 database name | `reckon402-d1-gateway-dev` |
+| Gateway D1 database ID | `<TBD — populated by: wrangler d1 create reckon402-d1-gateway-dev>` |
+| Gateway staging URL | `https://gateway-staging.reckon402.com` |
+| Gateway prod URL | `https://gateway.reckon402.com` |
+| ENS name | `reckon402-test.eth` on Ethereum Sepolia (chainId 11155111) |
+| ENS registry | `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e` |
+| Sepolia RPC key handle | Infisical `ETH_SEPOLIA_RPC` (dev env) |
+| `ENABLE_ERC8004_READS` shipped as | `"false"` |
+| `STEALTH_ENABLED` shipped as | `"false"` |
+| Spec | `specs/04-l4a-gateway.md` |
+| ENS resolver runbook | `tools/ens/set-resolver.md` |
+| HTTP tester | `tools/integration-tests/resolve-l4a.sh` |
+
+Operator deploy sequence:
+1. `wrangler d1 create reckon402-d1-gateway-dev` → update `database_id` in `gateway/wrangler.toml`
+2. `wrangler d1 execute … --file gateway/migrations/0001_init.sql`
+3. `npx tsx gateway/scripts/seed_d1.ts --print-sql | wrangler d1 execute … --command -`
+4. `infisical run -- forge script gateway/script/DeployResolver.s.sol --broadcast --verify`
+5. Pin resolver address in `deployments/sepolia.json` + `gateway/wrangler.toml [vars]`
+6. `wrangler secret put RECKON402_RESOLVER_SIGNER_PK` + `wrangler secret put ETH_SEPOLIA_RPC`
+7. `wrangler deploy --env staging` → run `tools/integration-tests/resolve-l4a.sh`
+8. `wrangler deploy --env production`
+9. `tools/ens/set-resolver.md` — point `reckon402-test.eth` at `Reckon402Resolver`
+10. Push tag `L4a1-gateway-static-green`
+
+Full-flow tester green: TBD (run after step 8).
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

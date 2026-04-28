@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_navigate",
+      "Bash(dig *)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(aws sts get-caller-identity *)",
+      "Bash(aws s3 ls *)",
+      "Bash(aws s3 ls)"
+    ]
+  }
+}

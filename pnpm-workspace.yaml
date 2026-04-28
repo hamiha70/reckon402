@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "workers/*"
+  - "gateway"
   - "lambda/*"
   - "demo"
   - "tools/smoke-tests"

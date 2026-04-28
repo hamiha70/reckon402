@@ -1,0 +1,14 @@
+{
+  "11155111": {
+    "network": "ethereum-sepolia",
+    "Reckon402Resolver": {
+      "address": "<TBD — populated post-deploy>",
+      "deployTx": "<TBD>",
+      "deployedAt": "<TBD>",
+      "initialSigner": "<TBD — address derived from RECKON402_RESOLVER_SIGNER_PK>",
+      "gatewayUrls": [
+        "https://gateway.reckon402.com/lookup/{sender}/{data}"
+      ]
+    }
+  }
+}

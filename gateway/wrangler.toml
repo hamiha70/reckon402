@@ -1,0 +1,31 @@
+name                = "reckon402-gateway"
+main                = "src/index.ts"
+compatibility_date  = "2026-04-28"
+compatibility_flags = ["nodejs_compat"]
+
+account_id  = "0f38f8667bbcbe4f54eda13c8df009e0"
+workers_dev = false
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "reckon402-d1-gateway-dev"
+database_id   = "<populated by: wrangler d1 create reckon402-d1-gateway-dev>"
+
+[vars]
+RESOLVER_CONTRACT_ADDRESS_SEPOLIA = "<populated post-deploy>"
+ENABLE_ERC8004_READS              = "false"
+STEALTH_ENABLED                   = "false"
+
+# secrets bound at deploy time via `wrangler secret put` (from Infisical):
+#   RECKON402_RESOLVER_SIGNER_PK   — hot signer key (0x-prefixed 32-byte hex)
+#   ETH_SEPOLIA_RPC                — Ethereum Sepolia RPC URL
+
+[env.production]
+[[env.production.routes]]
+pattern       = "gateway.reckon402.com/*"
+custom_domain = true
+
+[env.staging]
+[[env.staging.routes]]
+pattern       = "gateway-staging.reckon402.com/*"
+custom_domain = true

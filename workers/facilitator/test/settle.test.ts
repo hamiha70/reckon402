@@ -20,6 +20,7 @@ type WriteContractArgs = {
 const writeContractMock = vi.fn()
 const waitForReceiptMock = vi.fn()
 const getBlockMock = vi.fn()
+const readContractMock = vi.fn()
 
 vi.mock('viem', async (importActual) => {
   const actual = await importActual<typeof import('viem')>()
@@ -28,6 +29,7 @@ vi.mock('viem', async (importActual) => {
     createPublicClient: () => ({
       waitForTransactionReceipt: waitForReceiptMock,
       getBlock: getBlockMock,
+      readContract: readContractMock,
     }),
     createWalletClient: () => ({
       writeContract: writeContractMock,
@@ -78,6 +80,7 @@ describe('settleOnChain — two-tx happy path', () => {
       .mockResolvedValueOnce({ status: 'success', blockNumber: 42n, gasUsed: 50000n })
       .mockResolvedValueOnce({ status: 'success', blockNumber: 43n, gasUsed: 70000n })
     getBlockMock.mockResolvedValue({ timestamp: 1735000001n })
+    readContractMock.mockResolvedValue(10000n) // balance poll: balance already sufficient
 
     const input = makeInput()
     const outcome = await settleOnChain(ENV, input)
@@ -127,6 +130,7 @@ describe('settleOnChain — two-tx happy path', () => {
       .mockResolvedValueOnce({ status: 'success', blockNumber: 1n, gasUsed: 50000n })
       .mockResolvedValueOnce({ status: 'success', blockNumber: 2n, gasUsed: 70000n })
     getBlockMock.mockResolvedValue({ timestamp: 100n })
+    readContractMock.mockResolvedValue(10000n) // balance poll: balance already sufficient
 
     await settleOnChain(ENV, makeInput())
     expect(waitForReceiptMock).toHaveBeenCalledTimes(2)
@@ -186,6 +190,7 @@ describe('settleOnChain — failure paths', () => {
     waitForReceiptMock
       .mockResolvedValueOnce({ status: 'success', blockNumber: 42n, gasUsed: 50000n })
       .mockResolvedValueOnce({ status: 'reverted', blockNumber: 43n, gasUsed: 30000n })
+    readContractMock.mockResolvedValue(10000n) // balance poll passes
 
     const outcome = await settleOnChain(ENV, makeInput())
     expect(outcome.success).toBe(false)
@@ -214,6 +219,7 @@ describe('settleOnChain — failure paths', () => {
       .mockResolvedValueOnce('0xtransferOk')
       .mockRejectedValueOnce(new Error('nonce too low'))
     waitForReceiptMock.mockResolvedValueOnce({ status: 'success', blockNumber: 42n, gasUsed: 50000n })
+    readContractMock.mockResolvedValue(10000n) // balance poll passes
 
     const outcome = await settleOnChain(ENV, makeInput())
     expect(outcome.success).toBe(false)
@@ -221,6 +227,61 @@ describe('settleOnChain — failure paths', () => {
       expect(outcome.failureReason).toBe('OTHER')
       expect(outcome.failureDetail).toMatch(/distribute_submit_failed/)
       expect(outcome.transferTx).toBe('0xtransferOk')
+    }
+  })
+
+  it('balance poll resolves after N retries then distribute succeeds', async () => {
+    // First two balanceOf calls return 0 (stale RPC), third returns the expected amount.
+    // The test verifies settle proceeds normally once the balance is visible.
+    readContractMock
+      .mockResolvedValueOnce(0n)
+      .mockResolvedValueOnce(0n)
+      .mockResolvedValueOnce(10000n)
+    writeContractMock
+      .mockResolvedValueOnce('0xtransfer')
+      .mockResolvedValueOnce('0xdistribute')
+    waitForReceiptMock
+      .mockResolvedValueOnce({ status: 'success', blockNumber: 10n, gasUsed: 50000n })
+      .mockResolvedValueOnce({ status: 'success', blockNumber: 11n, gasUsed: 70000n })
+    getBlockMock.mockResolvedValue({ timestamp: 1735000001n })
+
+    // Use fake timers so the 1s poll intervals don't make the test slow.
+    vi.useFakeTimers()
+    const settlePromise = settleOnChain(ENV, makeInput())
+    // Advance past each poll interval (3 polls × 1000ms each).
+    await vi.runAllTimersAsync()
+    const outcome = await settlePromise
+    vi.useRealTimers()
+
+    expect(outcome.success).toBe(true)
+    if (outcome.success) {
+      expect(outcome.transferTx).toBe('0xtransfer')
+      expect(outcome.distributeTx).toBe('0xdistribute')
+    }
+    // readContract called 3 times (twice stale, once with balance).
+    expect(readContractMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('balance poll timeout returns splitter_balance_not_reflecting failure', async () => {
+    // Balance never reaches the expected amount — simulates persistent RPC staleness.
+    readContractMock.mockResolvedValue(0n)
+    writeContractMock.mockResolvedValueOnce('0xtransfer')
+    waitForReceiptMock.mockResolvedValueOnce({ status: 'success', blockNumber: 10n, gasUsed: 50000n })
+
+    vi.useFakeTimers()
+    const settlePromise = settleOnChain(ENV, makeInput())
+    // Advance well past the 30s poll timeout.
+    await vi.advanceTimersByTimeAsync(35_000)
+    const outcome = await settlePromise
+    vi.useRealTimers()
+
+    expect(outcome.success).toBe(false)
+    if (!outcome.success) {
+      expect(outcome.failureReason).toBe('OTHER')
+      expect(outcome.failureDetail).toMatch(/splitter_balance_not_reflecting/)
+      expect(outcome.transferTx).toBe('0xtransfer')
+      // distribute must NOT have been submitted.
+      expect(writeContractMock).toHaveBeenCalledTimes(1)
     }
   })
 })

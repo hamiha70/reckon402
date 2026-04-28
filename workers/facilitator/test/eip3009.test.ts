@@ -14,6 +14,17 @@ describe('splitSignature', () => {
     expect(v).toBe(28)
   })
 
+  it('handles v=27 (legacy Ethereum recovery id 0)', () => {
+    // Some wallets emit v=27 instead of v=28. splitSignature must pass it
+    // through unchanged so USDC.transferWithAuthorization gets the right value.
+    const sig =
+      ('0x' + 'cc'.repeat(32) + 'dd'.repeat(32) + '1b') as `0x${string}`
+    const { r, s, v } = splitSignature(sig)
+    expect(r).toBe('0x' + 'cc'.repeat(32))
+    expect(s).toBe('0x' + 'dd'.repeat(32))
+    expect(v).toBe(27)
+  })
+
   it('rejects wrong-length input', () => {
     expect(() => splitSignature('0xabcd' as `0x${string}`)).toThrow(/65-byte/)
   })

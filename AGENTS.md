@@ -97,6 +97,26 @@ cheaper than debugging mid-build.
   the single source of funds for every other reckon402-controlled
   EOA — no address gets funded directly from the operator's main
   wallet except the deployer.
+- **Top-up rounds: 0.1 ETH per round, deployer→other-EOA path.**
+  Top-ups *after* the initial 1-ETH seed should target **0.1 ETH per
+  round**, not 1 ETH. The Base Sepolia public faucet daily ceiling
+  is ~1 ETH/day per recipient — a single 1-ETH top-up burns a full
+  day's faucet quota and leaves no headroom if the funder itself
+  runs dry. Realized state (round 2, 2026-04-28): facilitator EOA
+  `0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455` funded with 1 ETH
+  from `X402COMMIT_FUNDER_PK` (tx
+  `0xb78cccd849e5feef4df9e83895b3715e987c27bcfc835bccd481bd8162c37e84`)
+  ahead of L3 deploy. Two deviations from the rule above acknowledged:
+  (a) round size was 1 ETH not 0.1 ETH (oversight, faucet quota
+  burned for the day); (b) funded directly from the funder rather
+  than from the deployer (pragmatic — no KMS-signed value-transfer
+  tool yet for deployer → other-EOA top-ups). Round 3+ should
+  converge to (a) 0.1 ETH amounts and (b) deployer-as-source once
+  the KMS value-transfer tool exists. Open question / future work:
+  automated refund (e.g., a Cloudflare cron probe that triggers a
+  signing-wrapper-issued top-up when a watched EOA crosses the 0.01
+  ETH floor). Until then, the operator runs `tools/funding/seed-*.md`
+  recipes manually when `funded.sh` goes red.
 - **TypeScript-first for all production surfaces.** Every file under
   `workers/`, `packages/`, `lambda/`, and `demo/` MUST be `.ts` /
   `.tsx`. Plain `.js` / `.mjs` is only acceptable in `tools/` for
@@ -317,24 +337,6 @@ in each prompt. Adaptation rule:
 
 Specs are committed under `specs/`, it is the canonical implementation
 contract.
-
-## LLM-friendly tech docs
-
-Curated, LLM-optimised reference docs live under `LLM_friendly_tech_docs/`.
-**Before writing any code that touches a covered technology, read the
-corresponding doc(s) first** — they are the authoritative source of truth
-for API surface, wire formats, and gotchas for this project.
-
-| Technology | Files |
-|------------|-------|
-| ENS | `LLM_friendly_tech_docs/ens/llms.txt` (index), `llms-full.txt` (full reference) |
-
-When writing ENS-related code (name resolution, reverse resolution, CCIP-Read,
-ENS wildcard, `gateway.reckon402.com` off-chain resolver, ENS subname
-registration), read `LLM_friendly_tech_docs/ens/llms-full.txt` before
-producing any implementation. Do not rely on pre-training knowledge alone for
-ENS — the docs cover breaking changes and current API conventions that differ
-from older patterns.
 
 ## Open questions
 

@@ -318,6 +318,24 @@ in each prompt. Adaptation rule:
 Specs are committed under `specs/`, it is the canonical implementation
 contract.
 
+## LLM-friendly tech docs
+
+Curated, LLM-optimised reference docs live under `LLM_friendly_tech_docs/`.
+**Before writing any code that touches a covered technology, read the
+corresponding doc(s) first** — they are the authoritative source of truth
+for API surface, wire formats, and gotchas for this project.
+
+| Technology | Files |
+|------------|-------|
+| ENS | `LLM_friendly_tech_docs/ens/llms.txt` (index), `llms-full.txt` (full reference) |
+
+When writing ENS-related code (name resolution, reverse resolution, CCIP-Read,
+ENS wildcard, `gateway.reckon402.com` off-chain resolver, ENS subname
+registration), read `LLM_friendly_tech_docs/ens/llms-full.txt` before
+producing any implementation. Do not rely on pre-training knowledge alone for
+ENS — the docs cover breaking changes and current API conventions that differ
+from older patterns.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

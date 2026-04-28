@@ -46,6 +46,19 @@ importers:
         specifier: ^3.1.2
         version: 3.2.4
 
+  packages/erc-8004-client:
+    dependencies:
+      viem:
+        specifier: ^2.0.0
+        version: 2.48.4(typescript@5.9.3)
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.2
+        version: 3.2.4
+
   packages/facilitator-client:
     dependencies:
       '@reckon402/types':

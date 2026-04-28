@@ -1,0 +1,28 @@
+{
+  "name": "@reckon402/erc-8004-client",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Canonical ERC-8004 read+write client (Identity, Reputation, Validation) — viem-based, multichain, cache-aware. Consumed by @reckon402/gateway (reads) and @reckon402/facilitator (writes).",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github:hamiha70"
+  },
+  "files": ["src"],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

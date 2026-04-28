@@ -551,7 +551,7 @@ Operator deploy sequence:
 1. `wrangler d1 create reckon402-d1-gateway-dev` → update `database_id` in `gateway/wrangler.toml`
 2. `wrangler d1 execute … --file gateway/migrations/0001_init.sql`
 3. `npx tsx gateway/scripts/seed_d1.ts --print-sql | wrangler d1 execute … --command -`
-4. `infisical run -- forge script gateway/script/DeployResolver.s.sol --broadcast --verify`
+4. `infisical run -- forge script contracts/script/DeployResolver.s.sol --broadcast --verify`
 5. Pin resolver address in `deployments/sepolia.json` + `gateway/wrangler.toml [vars]`
 6. `wrangler secret put RECKON402_RESOLVER_SIGNER_PK` + `wrangler secret put ETH_SEPOLIA_RPC_PRIMARY`
 7. `wrangler deploy --env staging` → run `tools/integration-tests/resolve-l4a.sh`

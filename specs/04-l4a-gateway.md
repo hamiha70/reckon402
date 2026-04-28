@@ -31,7 +31,6 @@ gateway/
 ├── package.json
 ├── tsconfig.json
 ├── wrangler.toml
-├── foundry.toml
 ├── README.md
 │
 ├── src/
@@ -52,17 +51,6 @@ gateway/
 │   └── lib/
 │       └── errors.ts          # error taxonomy → HTTP status
 │
-├── contracts/
-│   ├── Reckon402Resolver.sol
-│   ├── interfaces/
-│   │   ├── IExtendedResolver.sol
-│   │   └── IERC3668.sol
-│   └── test/
-│       └── Reckon402Resolver.t.sol
-│
-├── script/
-│   └── DeployResolver.s.sol
-│
 ├── migrations/
 │   └── 0001_init.sql
 │
@@ -73,6 +61,15 @@ gateway/
 └── scripts/
     └── seed_d1.ts
 ```
+
+Solidity sources for the resolver live in the root `contracts/` Foundry
+project alongside the L3 Splitter (single `lib/`, single `forge build`):
+
+- `contracts/src/Reckon402Resolver.sol`
+- `contracts/src/interfaces/IExtendedResolver.sol`
+- `contracts/src/interfaces/IERC3668.sol`
+- `contracts/test/Reckon402Resolver.t.sol`
+- `contracts/script/DeployResolver.s.sol`
 
 **Wrangler bindings:**
 

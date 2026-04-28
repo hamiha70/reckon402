@@ -2,10 +2,11 @@
   "11155111": {
     "network": "ethereum-sepolia",
     "Reckon402Resolver": {
-      "address": "<TBD — populated post-deploy>",
-      "deployTx": "<TBD>",
-      "deployedAt": "<TBD>",
-      "initialSigner": "<TBD — address derived from RECKON402_RESOLVER_SIGNER_PK>",
+      "address": "0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a",
+      "deployTx": "0xb658d064556f217be83f322f9800f19dcc07bff61a6dde22f85d7fa28edc945f",
+      "deployedAt": "2026-04-28T17:22:00+02:00",
+      "deployedAtBlock": 10749903,
+      "initialSigner": "0xFeB56Dc4D71c481B298Bef74C041ae6903eF9EDc",
       "gatewayUrls": [
         "https://gateway.reckon402.com/lookup/{sender}/{data}"
       ]

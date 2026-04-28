@@ -22,12 +22,17 @@ function makeFakeDb(initialRows: Array<{ cache_key: string; value_json: string; 
           return null
         },
         async run(): Promise<D1RunResult> {
-          if (sql.includes('DELETE FROM erc8004_cache WHERE cache_key LIKE')) {
-            const pattern = boundArgs[0] as string
-            const prefix = pattern.replace(/%$/, '')
+          if (sql.includes('DELETE FROM erc8004_cache WHERE substr(cache_key')) {
+            // Production uses substr(cache_key, 1, ?) = ? (D1 LIKE rejects
+            // our long patterns with SQLITE_ERROR 7500 "pattern too complex").
+            // Mock mirrors that shape: boundArgs = [prefixLength, prefix].
+            const prefixLen = boundArgs[0] as number
+            const prefix = boundArgs[1] as string
             const before = rows.length
             for (let i = rows.length - 1; i >= 0; i--) {
-              if (rows[i]!.cache_key.startsWith(prefix)) rows.splice(i, 1)
+              if (rows[i]!.cache_key.substring(0, prefixLen) === prefix) {
+                rows.splice(i, 1)
+              }
             }
             const changes = before - rows.length
             log.push({ sql, args: boundArgs, changes })

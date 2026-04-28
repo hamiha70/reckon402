@@ -105,12 +105,10 @@ export async function cacheInvalidateHandler(c: Context<{ Bindings: Env }>) {
     // format: "erc8004:{chainId}:{contract.toLowerCase()}:{fn}:{argsDigest}"
     // Match all argsDigest variants by wildcard on the trailing portion.
     const prefix = cacheKey({ chainId, contract, fn: key, args: '' })
-    const pattern = `${prefix}%`
-    // Extra narrow: reputation keys involve agentId, but argsDigest is
-    // SHA-256 of the args — we can't scope by agentId at DB layer.
     // Over-invalidation is acceptable for the hackathon scope; strict
-    // agent-scoped invalidation is a future optimization.
-    const n = await cache.deletePattern(pattern)
+    // agent-scoped invalidation requires knowing the argsDigest → agentId
+    // map, which the library doesn't persist.
+    const n = await cache.deletePattern(prefix)
     if (n > 0) deleted += n
   }
 

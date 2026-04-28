@@ -52,15 +52,23 @@ export class D1Erc8004Cache implements KVCache {
   }
 
   /**
-   * Pattern-based delete used by the cache-invalidate hook. Deletes
-   * every key matching `cache_key LIKE pattern`. Returns the number
-   * of rows deleted (-1 on D1 error).
+   * Prefix-based delete used by the cache-invalidate hook. Deletes
+   * every row whose `cache_key` starts with `prefix`.
+   *
+   * Implemented via `substr(cache_key, 1, N) = prefix` rather than
+   * `LIKE 'prefix%'` because D1's underlying SQLite rejects long LIKE
+   * patterns containing multiple literal special characters (`0x`,
+   * `:`, `.`) with `SQLITE_ERROR [7500]: LIKE or GLOB pattern too
+   * complex`. Canonical cache keys always contain those three so LIKE
+   * is never reliable here.
+   *
+   * Returns the number of rows deleted (-1 on D1 error).
    */
-  async deletePattern(pattern: string): Promise<number> {
+  async deletePattern(prefix: string): Promise<number> {
     try {
       const result = await this.db
-        .prepare('DELETE FROM erc8004_cache WHERE cache_key LIKE ?')
-        .bind(pattern)
+        .prepare('DELETE FROM erc8004_cache WHERE substr(cache_key, 1, ?) = ?')
+        .bind(prefix.length, prefix)
         .run()
       return result.meta.changes ?? 0
     } catch (err) {

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import { Script, console } from "forge-std/Script.sol";
-import { Reckon402Resolver } from "../contracts/Reckon402Resolver.sol";
+import { Reckon402Resolver } from "../src/Reckon402Resolver.sol";
 
 /// @notice Deploy Reckon402Resolver to Ethereum Sepolia (or mainnet).
 ///

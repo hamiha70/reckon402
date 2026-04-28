@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import { Test, console } from "forge-std/Test.sol";
-import { Reckon402Resolver } from "../Reckon402Resolver.sol";
+import { Reckon402Resolver } from "../src/Reckon402Resolver.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract Reckon402ResolverTest is Test {
@@ -125,6 +125,7 @@ contract Reckon402ResolverTest is Test {
     }
 
     function test_resolveCallback_staleTimestamp_reverts() public {
+        vm.warp(1_700_000_000);
         bytes memory result = abi.encode("stale data");
         bytes memory extraData = abi.encode("extra");
         uint64 staleTimestamp = uint64(block.timestamp - resolver.FRESHNESS_WINDOW() - 1);

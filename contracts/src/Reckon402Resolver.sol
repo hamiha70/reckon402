@@ -138,7 +138,7 @@ contract Reckon402Resolver is IExtendedResolver, ERC165, Ownable {
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC165, IERC165)
+        override
         returns (bool)
     {
         return

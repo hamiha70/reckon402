@@ -10,6 +10,9 @@ importers:
 
   gateway:
     dependencies:
+      '@reckon402/erc-8004-client':
+        specifier: workspace:*
+        version: link:../packages/erc-8004-client
       hono:
         specifier: ^4.12.0
         version: 4.12.15

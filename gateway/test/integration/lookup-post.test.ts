@@ -105,13 +105,15 @@ describe('POST /lookup — happy path', () => {
     expect(res.status).toBe(400)
   })
 
-  test('returns 501 NOT_IMPLEMENTED when ENABLE_ERC8004_READS=true', async () => {
+  test('flag=true + non-pricing key + known merchant → 200 with static value unchanged', async () => {
     const env = makeEnv(TEST_MERCHANTS, { ENABLE_ERC8004_READS: 'true' })
     const app = makeApp(env)
 
-    const callData = buildCallData('seller.reckon402-test.eth', CALLER, 'x402.pricing')
+    // x402.facilitator is a non-pricing key — should round-trip byte-equal
+    // to the L4a₁ path even with the flag enabled.
+    const callData = buildCallData('seller.reckon402-test.eth', CALLER, 'x402.facilitator')
     const res = await app.request('POST', '/lookup', { sender: RESOLVER, data: callData })
-    expect(res.status).toBe(501)
+    expect(res.status).toBe(200)
   })
 })
 

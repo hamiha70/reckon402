@@ -52,6 +52,10 @@ export function makeEnv(
     STEALTH_ENABLED: 'false',
     RECKON402_RESOLVER_SIGNER_PK: ('0x' + 'ab'.repeat(32)) as Hex,
     ETH_SEPOLIA_RPC_PRIMARY: 'https://fake-rpc.example.com',
+    BASE_SEPOLIA_RPC: 'https://fake-base-sepolia.example.com',
+    BASE_MAINNET_RPC: '',
+    CACHE_TTL_REPUTATION_S: '300',
+    GATEWAY_CACHE_HOOK_TOKEN: 'test-token',
     ...overrides,
   }
 }

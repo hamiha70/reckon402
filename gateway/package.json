@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@reckon402/erc-8004-client": "workspace:*",
     "hono": "^4.12.0",
     "viem": "^2.0.0"
   },

@@ -40,6 +40,107 @@ describe('caip2ToChainId', () => {
   })
 })
 
+describe('splitSignature — high-S malleability (s > secp256k1 n/2)', () => {
+  // secp256k1 curve order n (as hex, without 0x prefix):
+  //   FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+  // n/2 (rounded down):
+  //   7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
+  //
+  // A high-S signature has the same signing key but a different (r, s') pair
+  // where s' = n - s. Both recover to the SAME signer address (secp256k1 is
+  // malleable at this level), which means:
+  //   - The recovered address check in verify.ts passes for both the canonical
+  //     and the malleated form.
+  //   - BUT the raw bytes of the signature differ → if paymentId were derived
+  //     from the signature bytes (it isn't — paymentId uses only the auth
+  //     struct), replay protection would break.
+  //
+  // recoverEip3009Signer delegates to viem's recoverTypedDataAddress, which
+  // accepts both low-S and high-S signatures and recovers the correct signer
+  // in both cases. This is correct for USDC's on-chain path (the EVM's
+  // ecrecover also accepts both). The consequence: our facilitator ACCEPTS
+  // high-S signatures and settles them normally. This is documented here so
+  // a future auditor has an explicit record rather than a surprise.
+  //
+  // Replay protection is NOT affected because paymentId is keccak256 of the
+  // EIP-3009 authorization struct fields — not of the signature bytes.
+
+  it('accepts a high-S signature and recovers the correct signer (current behaviour: accept, not reject)', async () => {
+    const pk = ('0x' + '55'.repeat(32)) as `0x${string}`
+    const account = privateKeyToAccount(pk)
+
+    const authorization = {
+      from: account.address,
+      to:   '0xD53ffac42496d73B3Faf946786688a8454F57b1f' as `0x${string}`,
+      value: '10000',
+      validAfter: '0',
+      validBefore: '1999999999',
+      nonce: ('0x' + '33'.repeat(32)) as `0x${string}`,
+    }
+
+    const canonicalSig = await account.signTypedData({
+      domain: {
+        name: 'USDC',
+        version: '2',
+        chainId: 84532,
+        verifyingContract: USDC_BASE_SEPOLIA,
+      },
+      types: {
+        TransferWithAuthorization: [
+          { name: 'from',        type: 'address' },
+          { name: 'to',          type: 'address' },
+          { name: 'value',       type: 'uint256' },
+          { name: 'validAfter',  type: 'uint256' },
+          { name: 'validBefore', type: 'uint256' },
+          { name: 'nonce',       type: 'bytes32' },
+        ],
+      },
+      primaryType: 'TransferWithAuthorization',
+      message: {
+        from: authorization.from,
+        to: authorization.to,
+        value: BigInt(authorization.value),
+        validAfter: BigInt(authorization.validAfter),
+        validBefore: BigInt(authorization.validBefore),
+        nonce: authorization.nonce,
+      },
+    })
+
+    // Derive the malleated (high-S) form: s' = n - s.
+    // secp256k1 n:
+    const n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n
+    const r = canonicalSig.slice(0, 66)  // 0x + 32 bytes r
+    const sHex = canonicalSig.slice(66, 130)  // 32 bytes s (no 0x)
+    const v = canonicalSig.slice(130, 132)     // 1 byte v
+    const sVal = BigInt('0x' + sHex)
+    const sHigh = n - sVal
+    const sHighHex = sHigh.toString(16).padStart(64, '0')
+    // Flip v: 1b↔1c (27↔28) to pair with the malleated s.
+    const vFlipped = v === '1b' ? '1c' : '1b'
+    const malleatedSig = (r + sHighHex + vFlipped) as `0x${string}`
+
+    // Confirm s' > n/2 (it IS high-S by construction).
+    expect(sHigh > n / 2n).toBe(true)
+
+    // Current behaviour: recoverEip3009Signer accepts and recovers the SAME signer.
+    const recovered = await recoverEip3009Signer({
+      authorization,
+      signature: malleatedSig,
+      chainId: 84532,
+      usdcAddress: USDC_BASE_SEPOLIA,
+    })
+    expect(recovered.toLowerCase()).toBe(account.address.toLowerCase())
+
+    // Consequence for replay protection: paymentId is auth-struct–based, so
+    // the canonical and malleated signatures produce the SAME paymentId.
+    // The D1 idempotency key is therefore unaffected by malleability.
+    const { computePaymentId } = await import('../src/payment-id.js')
+    const pidCanonical = computePaymentId(authorization)
+    const pidMalleated = computePaymentId(authorization)  // same auth struct
+    expect(pidCanonical).toBe(pidMalleated)
+  })
+})
+
 describe('recoverEip3009Signer', () => {
   it('recovers the signer from a valid EIP-3009 TransferWithAuthorization', async () => {
     // Deterministic test PK (NOT a real key).

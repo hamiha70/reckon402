@@ -4,4 +4,3 @@ broadcast/
 .env
 
 # Foundry deps installed via forge install
-lib/

@@ -24,7 +24,6 @@ worker-configuration.d.ts
 out/
 cache/
 broadcast/
-contracts/lib/
 
 # AWS SAM
 .aws-sam/

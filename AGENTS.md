@@ -523,23 +523,30 @@ Never silently fix a production bug inside the same commit that adds the test.
   (`full-flow-l4.sh`) that drives the KH workflow wallet through the full
   stack. Do NOT modify existing `full-flow-l3.sh` or `replay-l3.sh`.
 
-## L4a deployments (v1, pending deploy)
+## L4a deployments (v1, locked)
 
-Scaffold shipped 2026-04-28. Resolver deploy + ENS wiring + Worker deploy
-are operator steps that follow after this commit.
+Deployed 2026-04-28. All gates passed. Tag: `L4a1-gateway-static-green` (pending push).
 
 | Item | Value |
 | ---- | ----- |
-| Reckon402Resolver (Ethereum Sepolia) | `<TBD — populated post forge deploy>` |
-| Resolver deploy tx | `<TBD>` |
-| Resolver deploy signer | `<TBD — address derived from RECKON402_RESOLVER_SIGNER_PK>` |
+| Reckon402Resolver (Ethereum Sepolia) | `0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a` |
+| Resolver deploy tx | `0xb658d064556f217be83f322f9800f19dcc07bff61a6dde22f85d7fa28edc945f` |
+| Resolver deploy block | `10749903` |
+| Resolver deploy signer | `0xFeB56Dc4D71c481B298Bef74C041ae6903eF9EDc` (funder EOA) |
+| Etherscan | Verified — https://sepolia.etherscan.io/address/0x479660b8760b32045ff4b9a64f9ba2eef8521f3a#code |
 | Initial signer (hot key handle) | Infisical `RECKON402_RESOLVER_SIGNER_PK` (dev env) |
 | Gateway D1 database name | `reckon402-d1-gateway-dev` |
-| Gateway D1 database ID | `<TBD — populated by: wrangler d1 create reckon402-d1-gateway-dev>` |
+| Gateway D1 database ID | `926ca731-4952-438e-a70c-f19722dc25b0` |
 | Gateway staging URL | `https://gateway-staging.reckon402.com` |
 | Gateway prod URL | `https://gateway.reckon402.com` |
+| Gateway staging version ID | `cc70404f-2e9f-4694-9ffe-af6ed31b02ec` |
+| Gateway prod version ID | `5e697d8d-f46f-4aea-8e6d-544609e18e47` |
+| Wrangler secrets | `RECKON402_RESOLVER_SIGNER_PK`, `ETH_SEPOLIA_RPC_PRIMARY` (staging + production) |
 | ENS name | `reckon402-test.eth` on Ethereum Sepolia (chainId 11155111) |
 | ENS registry | `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e` |
+| ENS swap tx | `0xc852b44767e2318d24ac024f83e2be9342f2e25bdfe566157cdcf076519bf975` |
+| ENS swap block | `10750233` |
+| Sepolia UniversalResolver | `0xeeeeeeee14d718c2b47d9923deab1335e144eeee` (viem built-in) |
 | Sepolia RPC key handle | Infisical `ETH_SEPOLIA_RPC_PRIMARY` (dev env) |
 | `ENABLE_ERC8004_READS` shipped as | `"false"` |
 | `STEALTH_ENABLED` shipped as | `"false"` |
@@ -547,19 +554,15 @@ are operator steps that follow after this commit.
 | ENS resolver runbook | `tools/ens/set-resolver.md` |
 | HTTP tester | `tools/integration-tests/resolve-l4a.sh` |
 
-Operator deploy sequence:
-1. `wrangler d1 create reckon402-d1-gateway-dev` → update `database_id` in `gateway/wrangler.toml`
-2. `wrangler d1 execute … --file gateway/migrations/0001_init.sql`
-3. `npx tsx gateway/scripts/seed_d1.ts --print-sql | wrangler d1 execute … --command -`
-4. `infisical run -- forge script contracts/script/DeployResolver.s.sol --broadcast --verify`
-5. Pin resolver address in `deployments/sepolia.json` + `gateway/wrangler.toml [vars]`
-6. `wrangler secret put RECKON402_RESOLVER_SIGNER_PK` + `wrangler secret put ETH_SEPOLIA_RPC_PRIMARY`
-7. `wrangler deploy --env staging` → run `tools/integration-tests/resolve-l4a.sh`
-8. `wrangler deploy --env production`
-9. `tools/ens/set-resolver.md` — point `reckon402-test.eth` at `Reckon402Resolver`
-10. Push tag `L4a1-gateway-static-green`
+Smoke test results:
+- `resolve-l4a.sh` vs staging: PASS (exit 0, value `https://facilitator.reckon402.com`, age 1s, sig 132 chars)
+- `resolve-l4a.sh` vs production: PASS (exit 0, value `https://facilitator.reckon402.com`, age 2s, sig 132 chars)
+- ENS end-to-end via viem `getEnsText` → Sepolia UniversalResolver → Reckon402Resolver → CCIP-Read → gateway → D1:
+  - `seller.reckon402-test.eth` → `x402.facilitator` = `https://facilitator.reckon402.com` PASS
+  - `seller.reckon402-test.eth` → `x402.splitter` = `0x0ad507c6973eba86313794329ad9b12fbf24acd0` PASS
+- Forge: 39/39 green (24 Splitter + 15 Resolver)
 
-Full-flow tester green: TBD (run after step 8).
+Tag: `L4a1-gateway-static-green` (pending Gate C push).
 
 ## Open questions
 

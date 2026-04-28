@@ -27,7 +27,7 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   REGISTRY=0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e
-  RESOLVER_ADDRESS=<RECKON402_RESOLVER_SEPOLIA>  # from deployments/sepolia.json
+  RESOLVER_ADDRESS=0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a  # from deployments/sepolia.json
   NODE=$(cast namehash "reckon402-test.eth")
 
   echo "Setting resolver for reckon402-test.eth..."
@@ -53,7 +53,7 @@ Gas estimate: ~30 000. Record the tx hash here after execution.
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   REGISTRY=0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e
-  RESOLVER_ADDRESS=<RECKON402_RESOLVER_SEPOLIA>
+  RESOLVER_ADDRESS=0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a
   NODE=$(cast namehash "reckon402-test.eth")
 
   RESOLVER=$(cast call "$REGISTRY" "resolver(bytes32)(address)" "$NODE" \
@@ -70,7 +70,7 @@ should revert with `OffchainLookup`. Confirm via:
 
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
-  RESOLVER_ADDRESS=<RECKON402_RESOLVER_SEPOLIA>
+  RESOLVER_ADDRESS=0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a
   # DNS-encode "reckon402-test.eth" and call resolve() — expect revert
   cast call "$RESOLVER_ADDRESS" \
     "resolve(bytes,bytes)(bytes)" \

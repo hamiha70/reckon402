@@ -523,6 +523,36 @@ Never silently fix a production bug inside the same commit that adds the test.
   (`full-flow-l4.sh`) that drives the KH workflow wallet through the full
   stack. Do NOT modify existing `full-flow-l3.sh` or `replay-l3.sh`.
 
+### Reproducibility + tooling (post-L4a₁ updates)
+
+L4a₁ surfaced three failure modes worth pinning as conventions before L4a₂
+extends the gateway worker:
+
+- **One foundry project at repo root.** All Solidity (Splitter, Resolver,
+  future contracts) lives in the root `contracts/` Foundry project. Do NOT
+  create nested `foundry.toml` files inside worker packages — the L4a₁
+  scaffold tried this (`gateway/contracts/` + `gateway/foundry.toml`) and
+  shipped a fabricated "9 unit + 1 fuzz tests green" claim because the
+  nested project never had `forge install` run. Single root project means
+  single `lib/`, single `forge test` covers all contracts, single source
+  of truth for solc + evm_version + remappings.
+
+- **Fresh-clone reproducibility is the green-gate.** Every layer's DOD
+  requires `git clean -fdx && pnpm install && (cd contracts && forge build
+  && forge test) && pnpm test` to pass without manual intervention. Test
+  counts reported in commit messages must reflect this fresh-clone run,
+  not transient sandbox state. If a contract claim cannot be reproduced
+  from a clean checkout, the layer is not green.
+
+- **Wrangler env-bindings are NOT inherited by named environments.**
+  `[vars]` and `[[d1_databases]]` declared at the top of `wrangler.toml`
+  do NOT automatically propagate into `[env.staging]` or `[env.production]`.
+  Every named environment that needs a binding or env var must duplicate
+  the block under its own header. Custom-domain `pattern` entries also
+  reject `/*` wildcards — use the bare hostname only. Both gotchas
+  surfaced during the L4a₁ deploy; preserve in any future worker-deploy
+  session.
+
 ## L4a deployments (v1, locked)
 
 Deployed 2026-04-28. All gates passed. Tag: `L4a1-gateway-static-green` (pending push).

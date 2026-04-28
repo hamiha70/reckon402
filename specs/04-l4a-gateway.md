@@ -80,7 +80,7 @@ gateway/
 |---------|------|---------|
 | `DB` | D1 | `reckon402-d1-gateway-dev` (merchant config) |
 | `RECKON402_RESOLVER_SIGNER_PK` | secret | Hot signer key for CCIP-Read response signing |
-| `ETH_SEPOLIA_RPC` | secret | Ethereum Sepolia RPC URL |
+| `ETH_SEPOLIA_RPC_PRIMARY` | secret | Ethereum Sepolia RPC URL |
 | `RESOLVER_CONTRACT_ADDRESS_SEPOLIA` | var | Deployed `Reckon402Resolver` on Sepolia |
 | `ENABLE_ERC8004_READS` | var | `"false"` in L4a₁ |
 | `STEALTH_ENABLED` | var | `"false"` always |

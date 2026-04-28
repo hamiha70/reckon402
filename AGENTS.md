@@ -540,7 +540,7 @@ are operator steps that follow after this commit.
 | Gateway prod URL | `https://gateway.reckon402.com` |
 | ENS name | `reckon402-test.eth` on Ethereum Sepolia (chainId 11155111) |
 | ENS registry | `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e` |
-| Sepolia RPC key handle | Infisical `ETH_SEPOLIA_RPC` (dev env) |
+| Sepolia RPC key handle | Infisical `ETH_SEPOLIA_RPC_PRIMARY` (dev env) |
 | `ENABLE_ERC8004_READS` shipped as | `"false"` |
 | `STEALTH_ENABLED` shipped as | `"false"` |
 | Spec | `specs/04-l4a-gateway.md` |
@@ -553,7 +553,7 @@ Operator deploy sequence:
 3. `npx tsx gateway/scripts/seed_d1.ts --print-sql | wrangler d1 execute … --command -`
 4. `infisical run -- forge script gateway/script/DeployResolver.s.sol --broadcast --verify`
 5. Pin resolver address in `deployments/sepolia.json` + `gateway/wrangler.toml [vars]`
-6. `wrangler secret put RECKON402_RESOLVER_SIGNER_PK` + `wrangler secret put ETH_SEPOLIA_RPC`
+6. `wrangler secret put RECKON402_RESOLVER_SIGNER_PK` + `wrangler secret put ETH_SEPOLIA_RPC_PRIMARY`
 7. `wrangler deploy --env staging` → run `tools/integration-tests/resolve-l4a.sh`
 8. `wrangler deploy --env production`
 9. `tools/ens/set-resolver.md` — point `reckon402-test.eth` at `Reckon402Resolver`

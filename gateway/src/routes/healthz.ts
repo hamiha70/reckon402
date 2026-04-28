@@ -33,8 +33,8 @@ export async function healthzHandler(c: Context<{ Bindings: Env }>) {
       }
     }),
     probe('eth_sepolia_rpc', async () => {
-      if (!env.ETH_SEPOLIA_RPC) throw new Error('ETH_SEPOLIA_RPC not set')
-      const client = createPublicClient({ chain: sepolia, transport: http(env.ETH_SEPOLIA_RPC) })
+      if (!env.ETH_SEPOLIA_RPC_PRIMARY) throw new Error('ETH_SEPOLIA_RPC_PRIMARY not set')
+      const client = createPublicClient({ chain: sepolia, transport: http(env.ETH_SEPOLIA_RPC_PRIMARY) })
       await client.getBlockNumber()
     }),
   ])

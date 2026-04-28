@@ -51,7 +51,7 @@ export function makeEnv(
     ENABLE_ERC8004_READS: 'false',
     STEALTH_ENABLED: 'false',
     RECKON402_RESOLVER_SIGNER_PK: ('0x' + 'ab'.repeat(32)) as Hex,
-    ETH_SEPOLIA_RPC: 'https://fake-rpc.example.com',
+    ETH_SEPOLIA_RPC_PRIMARY: 'https://fake-rpc.example.com',
     ...overrides,
   }
 }

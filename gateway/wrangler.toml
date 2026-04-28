@@ -18,7 +18,7 @@ STEALTH_ENABLED                   = "false"
 
 # secrets bound at deploy time via `wrangler secret put` (from Infisical):
 #   RECKON402_RESOLVER_SIGNER_PK   — hot signer key (0x-prefixed 32-byte hex)
-#   ETH_SEPOLIA_RPC                — Ethereum Sepolia RPC URL
+#   ETH_SEPOLIA_RPC_PRIMARY        — Ethereum Sepolia RPC URL
 
 [env.production]
 [[env.production.routes]]

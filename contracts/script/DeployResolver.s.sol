@@ -9,12 +9,12 @@ import { Reckon402Resolver } from "../src/Reckon402Resolver.sol";
 /// Required env vars (set via Infisical or export before running):
 ///   GATEWAY_URL             — e.g. "https://gateway.reckon402.com/lookup/{sender}/{data}"
 ///   GATEWAY_SIGNER_ADDRESS  — hot signer address (derived from RECKON402_RESOLVER_SIGNER_PK)
-///   ETH_SEPOLIA_RPC         — Ethereum Sepolia RPC URL
+///   ETH_SEPOLIA_RPC_PRIMARY — Ethereum Sepolia RPC URL
 ///   ETHERSCAN_API_KEY       — for --verify flag
 ///
 /// Deploy to Sepolia:
 ///   infisical run --env dev -- forge script script/DeployResolver.s.sol \
-///     --rpc-url $ETH_SEPOLIA_RPC \
+///     --rpc-url $ETH_SEPOLIA_RPC_PRIMARY \
 ///     --broadcast \
 ///     --verify \
 ///     --verifier-url https://api-sepolia.etherscan.io/api \

@@ -22,7 +22,7 @@
  * Logs paymentId + nonce to stderr for the replay script to capture.
  */
 
-import { signPayment, encodeXPaymentHeader } from '@reckon402/buyer-sdk'
+import { signPayment, encodeXPaymentHeader } from '../../packages/buyer-sdk/dist/index.js'
 
 const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e'
 const NETWORK = 'eip155:84532'

@@ -66,6 +66,9 @@ importers:
 
   tools/integration-tests:
     dependencies:
+      '@reckon402/buyer-sdk':
+        specifier: workspace:*
+        version: link:../../packages/buyer-sdk
       viem:
         specifier: ^2.0.0
         version: 2.48.4(typescript@5.9.3)

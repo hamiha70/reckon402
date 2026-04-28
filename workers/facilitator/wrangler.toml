@@ -12,7 +12,7 @@ custom_domain = true
 [[d1_databases]]
 binding       = "DB"
 database_name = "reckon402-d1-facilitator-dev"
-# database_id filled in after `wrangler d1 create` at deploy time
+database_id   = "ad5bd36d-1903-4340-bc27-1f46b878b2c0"
 
 [vars]
 NETWORK                  = "eip155:84532"

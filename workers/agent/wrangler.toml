@@ -14,7 +14,4 @@ NETWORK          = "eip155:84532"
 USDC_ADDRESS     = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 AMOUNT           = "10000"                                         # 0.01 USDC
 FACILITATOR_URL  = "https://facilitator.reckon402.com/x402"
-# SPLITTER_ADDRESS is set after the Splitter is deployed (commit 6):
-# wrangler secret put SPLITTER_ADDRESS
-# — or pasted into [vars] here once the address is known and recorded
-#   in AGENTS.md "## L3 deployments".
+SPLITTER_ADDRESS = "0x0ad507c6973eba86313794329ad9b12fbf24acd0"

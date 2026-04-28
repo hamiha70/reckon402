@@ -453,6 +453,76 @@ one-line descriptions.
 4. If the recipe body needs more than a single command, put it in
    `tools/scripts/<name>.sh` (not inline bash in the justfile).
 
+## Test conventions (v1.5)
+
+Established at the Prio-2 tightening pass (2026-04-28). Covers the full
+test suite through commit `abc03d5` (Prio-2 wrap-up, 109 tests total).
+Prio-1 fixes are in commit `9dbde53` (+15 tests, all 46 facilitator green).
+
+### Test layer taxonomy
+
+| Layer | What it tests | Where | Runner |
+| ----- | ------------- | ----- | ------ |
+| **Unit** | Single pure function: `computePaymentId`, `splitSignature`, `caip2ToChainId`, `buildSettleResponse` | `workers/facilitator/test/{payment-id,eip3009,receipt-builder,state-machine}.test.ts`; `packages/buyer-sdk/test/{payment-id,sign-encode}.test.ts` | Vitest |
+| **Route integration** | Full Hono route handler with a fake D1 binding; asserts HTTP status, response body shape, SQL call sequence | `workers/facilitator/test/{settle-route,verify-route}.test.ts`; `workers/agent/test/{index,env-validation}.test.ts` | Vitest |
+| **SDK integration** | Real buyer-sdk encode/sign + real facilitator-client request body shape; no live HTTP | `packages/buyer-sdk/test/wire-roundtrip.test.ts`; `packages/{middleware-hono,facilitator-client}/test/*.test.ts` | Vitest |
+| **Property / fuzz** | ≥50 structurally varied inputs; determinism, collision resistance | `workers/facilitator/test/payment-id.test.ts` (fuzz describe); `workers/facilitator/test/eip3009.test.ts` (nonce uniqueness) | Vitest |
+| **Adversarial sweep** | Malformed/oversized/injected inputs rejected cleanly | `workers/facilitator/test/adversarial.test.ts` | Vitest |
+| **Cross-impl byte-equality** | `computePaymentId` re-export from facilitator == buyer-sdk export | `workers/facilitator/test/payment-id.test.ts` (cross-package describe) | Vitest |
+| **Foundry unit** | Solidity Splitter contract (constructor, distribute, access control) | `contracts/test/Splitter.t.sol` | Forge |
+| **Live integration** | Full on-chain flow against Base Sepolia (not part of `pnpm test`; run manually) | `tools/integration-tests/full-flow-l3.sh`, `replay-l3.sh` | Shell |
+
+### Mocking conventions and known limits
+
+**What IS mocked and why:**
+
+| Mock target | Rationale | Known limit |
+| ----------- | --------- | ----------- |
+| `settleOnChain` (spy in settle-route tests) | Isolates the D1 state-machine from the two-tx on-chain path | Does not test the viem/RPC path; settle.test.ts covers that separately |
+| `viem` `createPublicClient`/`createWalletClient` (settle.test.ts) | Asserts exact contract call arguments without live RPC | Does not verify on-chain revert handling beyond the receipt status |
+| `globalThis.fetch` (middleware-hono, facilitator-client, agent tests) | Isolates middleware/SDK from live facilitator HTTP | Does NOT exercise the actual serialization path between buyer and facilitator — wire-roundtrip.test.ts closes this gap |
+| Fake D1 (`makeFakeDb`) | Reproduces the exact SQL shapes and state transitions without miniflare | D1's real isolation level is untested (see K.9 open question: miniflare `_real_workerd`) |
+
+**Mocking anti-patterns to avoid (audit lessons):**
+
+- **Mock-passthrough blindspot**: if a mock returns a pre-cooked result without
+  exercising real serialization, a field rename or encoding change in the
+  production code will pass every unit test and fail live. Fix: `wire-roundtrip.test.ts`
+  exercises the actual encode/decode path end-to-end with no intermediate mock.
+- **Argument assertions omitted**: mocking `settleOnChain` and asserting only
+  its call count is insufficient — assert the exact args it received (auth fields,
+  signature bytes, paymentId). All settle-route tests follow this rule.
+- **State-only assertions**: asserting the HTTP status without checking the
+  D1 row state (or vice versa) leaves the persistence contract untested. The
+  richer `makeFakeDb` in settle-route.test.ts records every SQL call for
+  shape + parameter assertion.
+
+### No production-code patches from tests
+
+Tests surface bugs; production-code fixes go through their own commit cycle.
+If a new test reveals a real production bug:
+
+1. Commit the failing test as-is (the test is expected to fail).
+2. Stop and report: minimal repro + suspected fix location.
+3. A separate commit (or session) applies the production fix and the test
+   goes green in that commit.
+
+Never silently fix a production bug inside the same commit that adds the test.
+
+### How to extend the suite for L4
+
+- **L4a (CCIP-Read gateway)**: add `workers/gateway/test/` following the
+  same route-integration pattern as settle-route.test.ts. The CCIP-Read
+  `ccipRead` callback and ENS text-record response shape are the key test targets.
+- **L4b (signing wrapper Lambda)**: unit tests for the KMS signing adapter
+  under `lambda/test/`. Mock `@aws-sdk/client-kms` at the module level
+  (same pattern as viem mock in settle.test.ts).
+- **L4c (demo frontend)**: Puppeteer browser tests (allowed at L4c per
+  the MCP allowlist). Kept separate from the Vitest suite.
+- **L4 integration**: update `tools/integration-tests/` with a new script
+  (`full-flow-l4.sh`) that drives the KH workflow wallet through the full
+  stack. Do NOT modify existing `full-flow-l3.sh` or `replay-l3.sh`.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

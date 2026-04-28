@@ -1,0 +1,14 @@
+{
+  "name": "@reckon402/deploy",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "L3 deploy + preflight scripts. KMS-signed Splitter deployment + 5-probe pre-deploy gate.",
+  "scripts": {
+    "preflight": "node ./preflight-l3.mjs",
+    "deploy:splitter": "node ./deploy-splitter.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.30.0"
+  }
+}

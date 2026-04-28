@@ -6,6 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 account_id  = "0f38f8667bbcbe4f54eda13c8df009e0"
 workers_dev = false
 
+# Top-level bindings are for `wrangler dev` only. Named envs (staging,
+# production) do NOT inherit these blocks — duplicate everything
+# under each [env.<name>] below (L4a₁ lesson 1).
+
 [[d1_databases]]
 binding       = "DB"
 database_name = "reckon402-d1-gateway-dev"
@@ -13,12 +17,16 @@ database_id   = "926ca731-4952-438e-a70c-f19722dc25b0"
 
 [vars]
 RESOLVER_CONTRACT_ADDRESS_SEPOLIA = "0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a"
-ENABLE_ERC8004_READS              = "false"
+ENABLE_ERC8004_READS              = "true"
 STEALTH_ENABLED                   = "false"
+BASE_MAINNET_RPC                  = ""
+CACHE_TTL_REPUTATION_S            = "300"
 
 # secrets bound at deploy time via `wrangler secret put` (from Infisical):
 #   RECKON402_RESOLVER_SIGNER_PK   — hot signer key (0x-prefixed 32-byte hex)
 #   ETH_SEPOLIA_RPC_PRIMARY        — Ethereum Sepolia RPC URL
+#   BASE_SEPOLIA_RPC               — Base Sepolia RPC URL (L4a₂)
+#   GATEWAY_CACHE_HOOK_TOKEN       — bearer token for /hooks/cache-invalidate (L4a₂)
 
 [env.production]
 [[env.production.d1_databases]]
@@ -28,8 +36,10 @@ database_id   = "926ca731-4952-438e-a70c-f19722dc25b0"
 
 [env.production.vars]
 RESOLVER_CONTRACT_ADDRESS_SEPOLIA = "0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a"
-ENABLE_ERC8004_READS              = "false"
+ENABLE_ERC8004_READS              = "true"
 STEALTH_ENABLED                   = "false"
+BASE_MAINNET_RPC                  = ""
+CACHE_TTL_REPUTATION_S            = "300"
 
 [[env.production.routes]]
 pattern       = "gateway.reckon402.com"
@@ -43,8 +53,10 @@ database_id   = "926ca731-4952-438e-a70c-f19722dc25b0"
 
 [env.staging.vars]
 RESOLVER_CONTRACT_ADDRESS_SEPOLIA = "0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a"
-ENABLE_ERC8004_READS              = "false"
+ENABLE_ERC8004_READS              = "true"
 STEALTH_ENABLED                   = "false"
+BASE_MAINNET_RPC                  = ""
+CACHE_TTL_REPUTATION_S            = "300"
 
 [[env.staging.routes]]
 pattern       = "gateway-staging.reckon402.com"

@@ -9,7 +9,7 @@ workers_dev = false
 [[d1_databases]]
 binding       = "DB"
 database_name = "reckon402-d1-gateway-dev"
-database_id   = "<populated by: wrangler d1 create reckon402-d1-gateway-dev>"
+database_id   = "926ca731-4952-438e-a70c-f19722dc25b0"
 
 [vars]
 RESOLVER_CONTRACT_ADDRESS_SEPOLIA = "0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a"

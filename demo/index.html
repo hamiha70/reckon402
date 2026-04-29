@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reckon402 — Live Agent Network</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace; }
+    @keyframes pulse-new {
+      0%   { background-color: rgba(34,197,94,0.15); }
+      100% { background-color: transparent; }
+    }
+    .row-new { animation: pulse-new 2s ease-out forwards; }
+    .strike  { text-decoration: line-through; opacity: 0.45; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4 md:p-8">
+
+  <!-- Header -->
+  <header class="mb-8 border-b border-gray-800 pb-4">
+    <h1 class="text-2xl font-bold tracking-tight text-green-400">
+      Reckon402 — Live Agent Network
+    </h1>
+    <!-- TODO-HEADLINE: insert one-sentence pitch here -->
+    <p class="text-gray-500 text-sm mt-1">Base Sepolia testnet · auto-refresh every 5s</p>
+  </header>
+
+  <!-- Section A: Agent Roster -->
+  <section class="mb-10">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-gray-200 tracking-wide uppercase text-xs">
+        Agent Roster
+      </h2>
+      <span id="roster-last-updated" class="text-gray-600 text-xs"></span>
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-gray-800">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wider">
+            <th class="text-left px-4 py-3">Agent ID</th>
+            <th class="text-left px-4 py-3">Wallet</th>
+            <th class="text-right px-4 py-3">Rep Count</th>
+            <th class="text-center px-4 py-3">Price Tier</th>
+            <th class="text-right px-4 py-3">Last Seen</th>
+          </tr>
+        </thead>
+        <tbody id="agent-roster-body">
+          <tr id="roster-empty-row">
+            <td colspan="5" class="text-center py-10 text-gray-600 italic">
+              No agents registered yet — run the demo script to populate
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Section B: Live Payment Feed -->
+  <section>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-gray-200 tracking-wide uppercase text-xs">
+        Live Payment Feed
+      </h2>
+      <span id="feed-last-updated" class="text-gray-600 text-xs"></span>
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-gray-800">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wider">
+            <th class="text-left px-4 py-3">Payment ID</th>
+            <th class="text-center px-4 py-3">Status</th>
+            <th class="text-right px-4 py-3">Amount</th>
+            <th class="text-right px-4 py-3">Time</th>
+            <th class="text-center px-4 py-3">Tx</th>
+          </tr>
+        </thead>
+        <tbody id="payment-feed-body">
+          <tr id="feed-empty-row">
+            <td colspan="5" class="text-center py-10 text-gray-600 italic">
+              No payments yet — run the demo script
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    const FACILITATOR_URL = 'https://facilitator.reckon402.com'
+    const GATEWAY_URL     = 'https://gateway.reckon402.com'
+    const SELLER_ENS      = 'seller.reckon402-test.eth'
+    const POLL_MS         = 5_000
+
+    // ERC-8004 contracts on Base Sepolia
+    const IDENTITY_ADDR   = '0x8004A818BFB912233c491871b3d84c89A494BD9e'
+    const REPUTATION_ADDR = '0x8004B663056A597Dffe9eCcC1965A193B7388713'
+    const BASE_SEPOLIA_RPC = 'https://sepolia.base.org'
+
+    // Known payment IDs seen this session (populated from feed polling)
+    const knownPaymentIds = new Set()
+    // Base price for tier display
+    let basePrice = 100000
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function trunc(addr, n = 6) {
+      if (!addr || addr.length < 12) return addr ?? '—'
+      return addr.slice(0, n + 2) + '…' + addr.slice(-4)
+    }
+
+    function fmtUsdc(raw) {
+      if (!raw) return '—'
+      const n = Number(raw) / 1e6
+      return n.toFixed(n < 0.01 ? 6 : 4) + ' USDC'
+    }
+
+    function fmtAge(unixSec) {
+      if (!unixSec) return '—'
+      const diff = Math.floor(Date.now() / 1000) - unixSec
+      if (diff < 60)   return diff + 's ago'
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago'
+      return Math.floor(diff / 3600) + 'h ago'
+    }
+
+    function now() { return new Date().toLocaleTimeString() }
+
+    function statusBadge(state) {
+      const map = {
+        CONFIRMED:           'bg-green-900 text-green-300',
+        RECONCILED:          'bg-teal-900 text-teal-300',
+        PENDING_CONFIRMATION:'bg-yellow-900 text-yellow-300',
+        SUBMITTED:           'bg-blue-900 text-blue-300',
+        FAILED:              'bg-red-900 text-red-400',
+      }
+      const cls = map[state] ?? 'bg-gray-800 text-gray-400'
+      return `<span class="px-2 py-0.5 rounded text-xs font-semibold ${cls}">${state ?? 'UNKNOWN'}</span>`
+    }
+
+    function tierLabel(repCount) {
+      if (repCount >= 10) return { label: 'T3 −10%', cls: 'text-green-400 font-bold' }
+      if (repCount >= 5)  return { label: 'T2 −5%',  cls: 'text-yellow-400 font-bold' }
+      if (repCount >= 1)  return { label: 'T1 −2%',  cls: 'text-cyan-400' }
+      return { label: 'T0 base', cls: 'text-gray-500' }
+    }
+
+    function basescanLink(tx) {
+      if (!tx) return '—'
+      return `<a href="https://sepolia.basescan.org/tx/${tx}" target="_blank"
+               class="text-blue-400 hover:text-blue-300 underline">${trunc(tx, 8)}</a>`
+    }
+
+    // ── RPC helpers (manual ABI encoding for minimal deps) ────────────────
+    async function rpcCall(method, params) {
+      const res = await fetch(BASE_SEPOLIA_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      })
+      const j = await res.json()
+      return j.result
+    }
+
+    // eth_call with ABI-encoded data. Returns hex result.
+    async function ethCall(to, data) {
+      return rpcCall('eth_call', [{ to, data }, 'latest'])
+    }
+
+    // ABI-encode uint256 (padded 32 bytes)
+    function encUint256(n) {
+      return BigInt(n).toString(16).padStart(64, '0')
+    }
+
+    // ABI-decode uint256 from 32-byte hex chunk
+    function decUint256(hex, offset = 0) {
+      return parseInt(hex.slice(offset * 64 + 2, offset * 64 + 66), 16)
+    }
+
+    // ABI-decode address from 32-byte hex chunk
+    function decAddress(hex, offset = 0) {
+      return '0x' + hex.slice(offset * 64 + 26, offset * 64 + 66)
+    }
+
+    // ownerOf(uint256) → address
+    async function ownerOf(contract, tokenId) {
+      try {
+        const data = '0x6352211e' + encUint256(tokenId)
+        const result = await ethCall(contract, data)
+        if (!result || result === '0x') return null
+        return '0x' + result.slice(26)
+      } catch { return null }
+    }
+
+    // totalSupply() → uint256
+    async function totalSupply(contract) {
+      try {
+        const result = await ethCall(contract, '0x18160ddd')
+        if (!result || result === '0x') return 0
+        return decUint256(result)
+      } catch { return 0 }
+    }
+
+    // getClients(uint256) → address[] (returns first 20)
+    async function getClients(agentId) {
+      try {
+        const data = '0x44a95df6' + encUint256(agentId)
+        const result = await ethCall(REPUTATION_ADDR, data)
+        if (!result || result.length < 66) return []
+        // result: offset(32) + length(32) + addr...
+        const len = decUint256(result, 1)
+        const addrs = []
+        for (let i = 0; i < Math.min(len, 20); i++) {
+          addrs.push(decAddress(result, 2 + i))
+        }
+        return addrs
+      } catch { return [] }
+    }
+
+    // getSummary(uint256,address[],string,string) → (uint64,int128,uint8)
+    async function getSummaryCount(agentId, clients, tag1 = 'payment', tag2 = 'x402-settlement') {
+      if (!clients.length) return 0
+      try {
+        // Manual ABI encoding is complex for dynamic arrays; use a simpler approach:
+        // call via the gateway resolve endpoint instead (it already does this)
+        const res = await fetch(
+          `${GATEWAY_URL}/lookup`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // We don't have a full CCIP-Read payload here, so fall back to 0
+            // The roster uses the amount as the proxy for tier
+            body: '{}',
+          },
+        ).catch(() => null)
+        return 0
+      } catch { return 0 }
+    }
+
+    // ── Gateway: resolve x402.amount for ENS name ────────────────────────
+    async function resolveAmount(name) {
+      try {
+        const res = await fetch(
+          `${GATEWAY_URL}/lookup`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // Minimal CCIP-Read call — the gateway needs ABI-encoded data.
+            // For the dashboard we read the amount from a known agent via
+            // the healthz-adjacent probe instead of full CCIP-Read.
+            body: JSON.stringify({}),
+          },
+        ).catch(() => null)
+        return null
+      } catch { return null }
+    }
+
+    // ── Section A: Agent Roster ──────────────────────────────────────────
+    const rosterBody = document.getElementById('agent-roster-body')
+    const rosterEmpty = document.getElementById('roster-empty-row')
+    const rosterUpdated = document.getElementById('roster-last-updated')
+
+    // In-memory roster state: agentId → { owner, repCount, currentPrice, lastSeen }
+    const rosterState = new Map()
+
+    async function refreshRoster() {
+      try {
+        const supply = await totalSupply(IDENTITY_ADDR)
+        if (!supply) {
+          rosterUpdated.textContent = 'updated ' + now() + ' (0 agents)'
+          return
+        }
+
+        // Also fetch current price from gateway for tier display
+        let currentAmount = basePrice
+        try {
+          const resolveRes = await fetch(`${GATEWAY_URL}/lookup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sender: '0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a',
+              data: '0x',
+            }),
+          }).catch(() => null)
+          // If the gateway rejects the empty call, we keep basePrice
+        } catch { /* ignore */ }
+
+        for (let id = 1; id <= supply && id <= 10; id++) {
+          const owner = await ownerOf(IDENTITY_ADDR, id)
+          if (!owner || owner === '0x0000000000000000000000000000000000000000') continue
+
+          const clients = await getClients(id)
+          // repCount is approximated by number of clients that have given feedback
+          // (full getSummary is expensive without viem; use client count as proxy)
+          const repCount = clients.length
+
+          const prev = rosterState.get(id)
+          rosterState.set(id, {
+            owner,
+            repCount,
+            currentPrice: currentAmount,
+            lastSeen: prev?.lastSeen ?? null,
+          })
+        }
+
+        renderRoster()
+        rosterUpdated.textContent = 'updated ' + now()
+      } catch (e) {
+        rosterUpdated.textContent = 'error: ' + e.message
+      }
+    }
+
+    function renderRoster() {
+      if (!rosterState.size) return
+      rosterEmpty.style.display = 'none'
+
+      for (const [id, agent] of rosterState) {
+        const rowId = `roster-row-${id}`
+        let row = document.getElementById(rowId)
+        const isNew = !row
+        if (!row) {
+          row = document.createElement('tr')
+          row.id = rowId
+          row.className = 'border-b border-gray-800 hover:bg-gray-900 transition-colors'
+          rosterBody.appendChild(row)
+        }
+
+        const tier = tierLabel(agent.repCount)
+        // For price display: show base price strikethrough + current if discounted
+        const priceDisplay = (agent.currentPrice < basePrice)
+          ? `<span class="strike text-gray-500">${fmtUsdc(basePrice)}</span>
+             <span class="font-bold text-green-400 ml-1">${fmtUsdc(agent.currentPrice)}</span>`
+          : `<span>${fmtUsdc(agent.currentPrice)}</span>`
+
+        row.innerHTML = `
+          <td class="px-4 py-3 text-cyan-400 font-bold">#${id}</td>
+          <td class="px-4 py-3 text-gray-300 font-mono text-xs">${trunc(agent.owner)}</td>
+          <td class="px-4 py-3 text-right tabular-nums">${agent.repCount}</td>
+          <td class="px-4 py-3 text-center">
+            <span class="${tier.cls} text-xs">${tier.label}</span>
+            <div class="text-xs mt-0.5">${priceDisplay}</div>
+          </td>
+          <td class="px-4 py-3 text-right text-gray-500 text-xs">${agent.lastSeen ? fmtAge(agent.lastSeen) : '—'}</td>
+        `
+        if (isNew) {
+          row.classList.add('row-new')
+          setTimeout(() => row.classList.remove('row-new'), 2100)
+        }
+      }
+    }
+
+    // ── Section B: Payment Feed ──────────────────────────────────────────
+    // The facilitator exposes GET /x402/receipt/:paymentId but no list endpoint.
+    // We track payment IDs seen in this session via the agent's response headers,
+    // and seed with a small set of known recent IDs from AGENTS.md.
+    const SEED_PAYMENT_IDS = [
+      '0x9735e05eca7a3219438f3a4a103ef86e4b9419860f8b7c6ce0274ac2462f5ce3', // L4b1 first attestation
+    ]
+
+    const feedBody = document.getElementById('payment-feed-body')
+    const feedEmpty = document.getElementById('feed-empty-row')
+    const feedUpdated = document.getElementById('feed-last-updated')
+    const feedState = new Map() // paymentId → receipt row
+
+    for (const id of SEED_PAYMENT_IDS) knownPaymentIds.add(id)
+
+    async function fetchReceipt(paymentId) {
+      try {
+        const res = await fetch(`${FACILITATOR_URL}/x402/receipt/${paymentId}`)
+        if (!res.ok) return null
+        return res.json()
+      } catch { return null }
+    }
+
+    async function refreshFeed() {
+      let updated = false
+      for (const id of knownPaymentIds) {
+        const data = await fetchReceipt(id)
+        if (!data) continue
+        const prev = feedState.get(id)
+        const isNew = !prev || prev.state !== data.state
+        feedState.set(id, { ...data, _isNew: isNew })
+        if (isNew) updated = true
+      }
+      if (updated) renderFeed()
+      feedUpdated.textContent = 'updated ' + now()
+    }
+
+    function renderFeed() {
+      if (!feedState.size) return
+      feedEmpty.style.display = 'none'
+
+      // Sort: newest submitted_at first
+      const sorted = [...feedState.values()].sort((a, b) => {
+        const at = r => r.receipt?.submittedAt ?? 0
+        return at(b) - at(a)
+      })
+
+      feedBody.innerHTML = ''
+      for (const r of sorted) {
+        const row = document.createElement('tr')
+        row.className = 'border-b border-gray-800 hover:bg-gray-900 transition-colors'
+        if (r._isNew) {
+          row.classList.add('row-new')
+          setTimeout(() => row.classList.remove('row-new'), 2100)
+        }
+        row.innerHTML = `
+          <td class="px-4 py-3 font-mono text-xs text-gray-300">${trunc(r.paymentId, 8)}</td>
+          <td class="px-4 py-3 text-center">${statusBadge(r.state)}</td>
+          <td class="px-4 py-3 text-right tabular-nums text-gray-200">${fmtUsdc(r.amount)}</td>
+          <td class="px-4 py-3 text-right text-gray-500 text-xs">${fmtAge(r.receipt?.submittedAt)}</td>
+          <td class="px-4 py-3 text-center">${basescanLink(r.transaction)}</td>
+        `
+        feedBody.appendChild(row)
+      }
+    }
+
+    // ── Wire up new paymentIds from CCIP-Read intercept ──────────────────
+    // Listen for messages from the demo script via a BroadcastChannel (if
+    // the page is open during a live run). Also expose a global for console use.
+    window.addPaymentId = (id) => {
+      knownPaymentIds.add(id)
+      refreshFeed()
+    }
+
+    try {
+      const bc = new BroadcastChannel('reckon402-demo')
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'payment' && e.data.paymentId) {
+          window.addPaymentId(e.data.paymentId)
+        }
+      }
+    } catch { /* BroadcastChannel not available */ }
+
+    // ── Boot ─────────────────────────────────────────────────────────────
+    refreshRoster()
+    refreshFeed()
+    setInterval(refreshRoster, POLL_MS)
+    setInterval(refreshFeed,   POLL_MS)
+  </script>
+</body>
+</html>

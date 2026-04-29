@@ -1,10 +1,13 @@
 import type { Context } from 'hono'
 import type { Env } from './env.js'
 import type { PaymentPayload, PaymentRequirements } from '@reckon402/types'
+import { makeLogger } from '@reckon402/logger'
 import { computePaymentId } from './payment-id.js'
 import { settleOnChain } from './settle.js'
 import { buildSettleResponse, type ReceiptRow } from './receipt-builder.js'
 import { maybeWriteAttestation } from './treasury/attestation.js'
+
+const log = makeLogger('settle-route')
 
 /**
  * POST /x402/settle — design pack 02_facilitator.md §4.2.
@@ -161,7 +164,7 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
     )
   } catch (err) {
     const detail = `settleOnChain_unhandled_throw: ${(err as Error).message ?? String(err)}`
-    console.error(`[settle] ERROR paymentId=${paymentId} ${detail}`)
+    log.error('settleOnChain_throw', { paymentId, detail })
     await c.env.DB
       .prepare(
         `UPDATE receipts SET state = 'FAILED', failure_reason = 'OTHER', failure_detail = ?2 WHERE payment_id = ?1`,
@@ -224,7 +227,7 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
           distributeTx: outcome.distributeTx,
           authValue: auth.value,
         },
-      ).catch((err) => console.error('maybeWriteAttestation_unhandled', err)),
+      ).catch((err) => log.error('attestation_unhandled', { paymentId, detail: (err as Error).message })),
     )
   } else {
     await c.env.DB

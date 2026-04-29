@@ -103,6 +103,21 @@ importers:
         specifier: ^3.1.2
         version: 3.2.4(@types/node@22.19.17)
 
+  packages/kh-skill:
+    dependencies:
+      '@reckon402/buyer-sdk':
+        specifier: workspace:*
+        version: link:../buyer-sdk
+      '@reckon402/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/logger: {}
+
   packages/middleware-hono:
     dependencies:
       '@reckon402/buyer-sdk':
@@ -221,6 +236,9 @@ importers:
       '@reckon402/erc-8004-client':
         specifier: workspace:*
         version: link:../../packages/erc-8004-client
+      '@reckon402/logger':
+        specifier: workspace:^
+        version: link:../../packages/logger
       '@reckon402/types':
         specifier: workspace:*
         version: link:../../packages/types

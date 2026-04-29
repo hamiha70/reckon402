@@ -87,8 +87,8 @@ bash "$INTEGRATION_DIR/resolve-l4a.sh" \
   --key x402.amount 2>&1 | tee "$BEFORE_JSON"
 RESOLVE_EXIT=$?
 set -e
-BEFORE_AMOUNT=$(grep -oE '"value":"[0-9]+"' "$BEFORE_JSON" | head -1 \
-  | sed -E 's/.*"([0-9]+)".*/\1/' || echo "UNKNOWN")
+BEFORE_AMOUNT=$(grep -oE 'Decoded value: [0-9]+' "$BEFORE_JSON" | head -1 \
+  | grep -oE '[0-9]+$' || echo "UNKNOWN")
 if [ "$BEFORE_AMOUNT" = "UNKNOWN" ]; then
   warn "Could not parse x402.amount from gateway; proceeding with UNKNOWN baseline"
 else
@@ -192,8 +192,8 @@ bash "$INTEGRATION_DIR/resolve-l4a.sh" \
   --name "$SELLER_NAME" \
   --key x402.amount 2>&1 | tee "$AFTER_JSON"
 set -e
-AFTER_AMOUNT=$(grep -oE '"value":"[0-9]+"' "$AFTER_JSON" | head -1 \
-  | sed -E 's/.*"([0-9]+)".*/\1/' || echo "UNKNOWN")
+AFTER_AMOUNT=$(grep -oE 'Decoded value: [0-9]+' "$AFTER_JSON" | head -1 \
+  | grep -oE '[0-9]+$' || echo "UNKNOWN")
 info "  x402.amount AFTER = $AFTER_AMOUNT"
 
 if [[ "$BEFORE_AMOUNT" =~ ^[0-9]+$ ]] && [[ "$AFTER_AMOUNT" =~ ^[0-9]+$ ]]; then

@@ -2,9 +2,12 @@ import { createPublicClient, createWalletClient, http, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { baseSepolia } from 'viem/chains'
 import type { EIP3009Authorization } from '@reckon402/types'
+import { makeLogger } from '@reckon402/logger'
 import { USDC_ABI } from './abi/usdc.js'
 import { SPLITTER_ABI } from './abi/splitter.js'
 import { splitSignature } from './eip3009.js'
+
+const log = makeLogger('settle')
 
 /**
  * Two-tx settlement per design pack 02_facilitator.md §7 + spec 04 §3.4:
@@ -81,7 +84,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
     address: account.address,
     blockTag: 'pending',
   })
-  console.info(`[settle] INFO  paymentId=${paymentId} baseNonce=${baseNonce} facilitator=${account.address}`)
+  log.info('nonce_fetched', { paymentId, baseNonce, facilitator: account.address })
 
   let transferTx: Hex
   try {
@@ -103,10 +106,10 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
     })
   } catch (err) {
     const detail = `transferWithAuthorization_submit_failed: ${(err as Error).message}`
-    console.error(`[settle] ERROR paymentId=${paymentId} ${detail}`)
+    log.error('transfer_submit_failed', { paymentId, detail })
     return { success: false, failureReason: 'OTHER', failureDetail: detail }
   }
-  console.info(`[settle] INFO  paymentId=${paymentId} transfer_submitted tx=${transferTx} nonce=${baseNonce}`)
+  log.info('transfer_submitted', { paymentId, tx: transferTx, nonce: baseNonce })
 
   let transferReceipt
   try {
@@ -118,10 +121,10 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
     })
   } catch (err) {
     const detail = `transfer_receipt_timeout: ${(err as Error).message}`
-    console.error(`[settle] ERROR paymentId=${paymentId} ${detail}`)
+    log.error('transfer_timeout', { paymentId, detail })
     return { success: false, transferTx, failureReason: 'OTHER', failureDetail: detail }
   }
-  console.info(`[settle] INFO  paymentId=${paymentId} transfer_confirmed block=${transferReceipt.blockNumber}`)
+  log.info('transfer_confirmed', { paymentId, block: String(transferReceipt.blockNumber) })
 
   if (transferReceipt.status !== 'success') {
     return {
@@ -173,10 +176,10 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
     })
   } catch (err) {
     const detail = `distribute_submit_failed: ${(err as Error).message}`
-    console.error(`[settle] ERROR paymentId=${paymentId} ${detail}`)
+    log.error('distribute_submit_failed', { paymentId, detail })
     return { success: false, transferTx, failureReason: 'OTHER', failureDetail: detail }
   }
-  console.info(`[settle] INFO  paymentId=${paymentId} distribute_submitted tx=${distributeTx} nonce=${baseNonce + 1}`)
+  log.info('distribute_submitted', { paymentId, tx: distributeTx, nonce: baseNonce + 1 })
 
   let distReceipt
   try {
@@ -215,7 +218,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
   } catch {
     const latestBlock = await publicClient.getBlock({ blockTag: 'latest' })
     blockTimestamp = latestBlock.timestamp
-    console.info(`[settle] INFO  paymentId=${paymentId} block_fetch_fallback block=${transferReceipt.blockNumber} using_latest=${latestBlock.number}`)
+    log.warn('block_fetch_fallback', { paymentId, block: String(transferReceipt.blockNumber), usingLatest: String(latestBlock.number) })
   }
 
   return {

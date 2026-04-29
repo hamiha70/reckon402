@@ -33,4 +33,8 @@ export interface Env {
   GATEWAY_CACHE_HOOK_URL: string                 // full URL, e.g. "https://gateway.reckon402.com/hooks/cache-invalidate"
   GATEWAY_CACHE_HOOK_TOKEN?: string              // bearer token (secret); empty skips cache-invalidate
   ATTESTATION_FEEDBACK_URI_PREFIX: string        // produces feedbackURI = <prefix><paymentId>
+
+  // Admin endpoints (GET /admin/receipts, /admin/attestations).
+  // Set via `wrangler secret put ADMIN_TOKEN`. If unset, admin routes return 403.
+  ADMIN_TOKEN?: string
 }

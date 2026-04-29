@@ -3,8 +3,11 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { baseSepolia } from 'viem/chains'
 import type { D1Database } from '@cloudflare/workers-types'
 import { reputation } from '@reckon402/erc-8004-client'
+import { makeLogger } from '@reckon402/logger'
 import { resolveAgentId } from './agent-resolver.js'
 import { invalidateGatewayCache } from './cache-invalidate.js'
+
+const log = makeLogger('attestation')
 
 /**
  * L4b₁ — ERC-8004 settlement-attestation write (DXb rail).
@@ -56,7 +59,7 @@ export async function maybeWriteAttestation(
   // Guard 2: chainId parse.
   const chainId = Number(env.ERC8004_CHAIN_ID)
   if (!Number.isFinite(chainId) || !Number.isInteger(chainId) || chainId <= 0) {
-    console.error('maybeWriteAttestation_config: ERC8004_CHAIN_ID invalid', {
+    log.error('config_invalid_chain_id', {
       raw: env.ERC8004_CHAIN_ID,
     })
     return
@@ -119,7 +122,7 @@ export async function maybeWriteAttestation(
     })
   } catch (err) {
     const detail = truncate((err as Error).message ?? String(err), 500)
-    console.error('maybeWriteAttestation_giveFeedback_failed', detail)
+    log.error('giveFeedback_failed', detail)
     await env.DB
       .prepare(
         `INSERT OR IGNORE INTO attestations (
@@ -155,7 +158,7 @@ export async function maybeWriteAttestation(
       `wait_receipt_timeout: ${(err as Error).message ?? String(err)}`,
       500,
     )
-    console.error('maybeWriteAttestation_receipt_timeout', { tx, detail })
+    log.error('attestation_receipt_timeout', { tx, detail })
     await env.DB
       .prepare(
         `INSERT OR IGNORE INTO attestations (
@@ -181,7 +184,7 @@ export async function maybeWriteAttestation(
 
   if (receipt.status !== 'success') {
     const detail = `reverted_at_block_${receipt.blockNumber}`
-    console.error('maybeWriteAttestation_reverted', { tx, detail })
+    log.error('attestation_reverted', { tx, detail })
     await env.DB
       .prepare(
         `INSERT OR IGNORE INTO attestations (

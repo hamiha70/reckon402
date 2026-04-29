@@ -1,0 +1,14 @@
+{
+  "name": "@reckon402/logger",
+  "version": "0.1.0",
+  "description": "Structured log utility for Reckon402 Cloudflare Workers",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "echo \"no tests for logger\" && exit 0"
+  },
+  "devDependencies": {}
+}

@@ -36,6 +36,10 @@
 
 set -euo pipefail
 
+# Resolve the integration-tests directory so node module resolution finds
+# the local node_modules/viem (pnpm does not hoist it to the workspace root).
+SCRIPT_DIR_INT_TESTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 BACKEND="static"
 GATEWAY_URL="https://gateway.reckon402.com"
 ENS_NAME="seller.reckon402-test.eth"
@@ -77,7 +81,7 @@ RESOLVER_ADDR="0x0000000000000000000000000000000000000001"  # placeholder sender
 
 export ENS_NAME RECORD_KEY CALLER_ADDR
 
-CALL_DATA_JSON=$(node --input-type=module <<'NODEEOF'
+CALL_DATA_JSON=$(cd "$SCRIPT_DIR_INT_TESTS" && node --input-type=module <<'NODEEOF'
 import { encodeAbiParameters } from 'viem'
 
 const ENS_NAME = process.env.ENS_NAME
@@ -150,7 +154,7 @@ echo "[resolve-l4a] Response data: ${RESPONSE_DATA:0:40}…"
 
 # ─── Step 3+4+5: decode response, check freshness, extract value ─────────────
 
-DECODE_RESULT=$(node --input-type=module <<NODEEOF
+DECODE_RESULT=$(cd "$SCRIPT_DIR_INT_TESTS" && node --input-type=module <<NODEEOF
 import { decodeAbiParameters } from 'viem'
 
 const responseData = '${RESPONSE_DATA}'

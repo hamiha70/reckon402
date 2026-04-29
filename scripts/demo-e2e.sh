@@ -88,7 +88,7 @@ bash "$INTEGRATION_DIR/resolve-l4a.sh" \
 RESOLVE_EXIT=$?
 set -e
 BEFORE_AMOUNT=$(grep -oE '"value":"[0-9]+"' "$BEFORE_JSON" | head -1 \
-  | sed -E 's/.*"([0-9]+)".*/\1' || echo "UNKNOWN")
+  | sed -E 's/.*"([0-9]+)".*/\1/' || echo "UNKNOWN")
 if [ "$BEFORE_AMOUNT" = "UNKNOWN" ]; then
   warn "Could not parse x402.amount from gateway; proceeding with UNKNOWN baseline"
 else
@@ -109,9 +109,9 @@ step "3/8" "Sign PaymentPayload via @reckon402/buyer-sdk"
 PAYMENT_SIG=$(node "$INTEGRATION_DIR/buyer-sign-l3.mjs" \
   2> "$ARTIFACT_DIR/c1-buyer-sign.stderr")
 PAYMENT_ID=$(grep "paymentId=" "$ARTIFACT_DIR/c1-buyer-sign.stderr" \
-  | sed -E 's/.*paymentId=([0-9a-fx]+).*/\1' | head -1)
+  | sed -E 's/.*paymentId=([0-9a-fx]+).*/\1/' | head -1)
 NONCE=$(grep "nonce=" "$ARTIFACT_DIR/c1-buyer-sign.stderr" \
-  | head -1 | sed -E 's/.*nonce=([0-9a-fx]+).*/\1')
+  | head -1 | sed -E 's/.*nonce=([0-9a-fx]+).*/\1/')
 echo "$PAYMENT_SIG" > "$ARTIFACT_DIR/c1-payment-signature.b64"
 echo "$PAYMENT_ID" > "$ARTIFACT_DIR/c1-paymentId.txt"
 [ -n "$PAYMENT_ID" ] || die "Could not parse paymentId from buyer-sdk"
@@ -193,7 +193,7 @@ bash "$INTEGRATION_DIR/resolve-l4a.sh" \
   --key x402.amount 2>&1 | tee "$AFTER_JSON"
 set -e
 AFTER_AMOUNT=$(grep -oE '"value":"[0-9]+"' "$AFTER_JSON" | head -1 \
-  | sed -E 's/.*"([0-9]+)".*/\1' || echo "UNKNOWN")
+  | sed -E 's/.*"([0-9]+)".*/\1/' || echo "UNKNOWN")
 info "  x402.amount AFTER = $AFTER_AMOUNT"
 
 if [[ "$BEFORE_AMOUNT" =~ ^[0-9]+$ ]] && [[ "$AFTER_AMOUNT" =~ ^[0-9]+$ ]]; then

@@ -712,6 +712,94 @@ before producing any implementation. Do not rely on pre-training
 knowledge alone for ENS — the docs cover breaking changes and current
 API conventions that differ from older patterns.
 
+## L4b1 ERC-8004 attestation writes (v1, locked)
+
+Shipped 2026-04-29. All gates passed. First live `NewFeedback` event
+emitted from the Reckon402 facilitator to Base Sepolia's
+ReputationRegistry. Closed read↔write loop proven: the post-
+attestation gateway reputation read returned the first-tier discount
+price (`95000` vs base `100000`).
+
+**Canonical reproducible tag: `L4b1-erc8004-writes-green`** (pushed;
+verified from fresh clone with `git clone --recurse-submodules`).
+
+### Deployed state
+
+| Item | Value |
+| ---- | ----- |
+| Facilitator flag-off version ID | `99039af0-0357-45a4-a7fe-9f6044f8a531` |
+| Facilitator flag-on version ID  | `b02d55e6-4c8e-4663-bf58-84f001ab30c1` |
+| Facilitator worker URL | `https://facilitator.reckon402.com` |
+| D1 migration applied | `workers/facilitator/migrations/0002_l4b_writes.sql` (adds `attestations.failure_detail`) |
+| `ENABLE_ERC8004_WRITES` shipped as | `"true"` |
+| `SELLER_AGENT_IDS` wrangler var | `{"0xd53ffac42496d73b3faf946786688a8454f57b1f":"1"}` |
+| New wrangler secrets | `GATEWAY_CACHE_HOOK_TOKEN` (shared value with gateway worker from L4a2) |
+| Spec | `specs/07-l4b-erc8004-writes.md` |
+| Framing locks | `specs/06-actor-act-matrix.md` (D1–D14) |
+| Deploy runbook | `tools/deploy/deploy-l4b.md` |
+| Secrets runbook | `tools/deploy/secrets-l4b.md` |
+| Smoke script | `tools/integration-tests/full-flow-l4b.sh` + `just fullflow-l4b` |
+
+### First live attestation
+
+| Field | Value |
+| ----- | ----- |
+| paymentId | `0x9735e05eca7a3219438f3a4a103ef86e4b9419860f8b7c6ce0274ac2462f5ce3` |
+| Settlement tx (transferWithAuthorization) | `0xce89c9c68ce24ffe32015db6ec5c9458c97998464aa5af6300b0e3b599667b5b` |
+| Attestation tx (giveFeedback) | `0xf3fd14044152cb9a15912b030c9209a69ce7aa5687c32937f4c07ce142ab61e2` |
+| Basescan (attestation) | https://sepolia.basescan.org/tx/0xf3fd14044152cb9a15912b030c9209a69ce7aa5687c32937f4c07ce142ab61e2 |
+| On-chain `NewFeedback` event | `agentId=1`, `clientAddress=0x0A0228…c455` (facilitator EOA per D3), `tag1="payment"`, `tag2="x402-settlement"`, feedbackURI encodes the paymentId per `ATTESTATION_FEEDBACK_URI_PREFIX` |
+| Gas used | 198_444 (~$0.00005 at Base Sepolia fees) |
+
+### Smoke + regression outcomes
+
+- `full-flow-l3.sh` (post-flag-off deploy): PASS — L3 regression holds.
+- `replay-l3.sh` (post-flag-off deploy): PASS — idempotency preserved.
+- `full-flow-l4b.sh` → live settlement + live attestation landed in
+  both the `attestations` table (row present) and `receipts.td_erc8004_tx`
+  column.
+- Gateway cache invalidated: `resolve-l4a.sh --backend erc8004 --key
+  x402.amount` returns `value=95000` (first-tier discount, count=1).
+- Forge: 39/39 green from fresh clone (unchanged from L4a2).
+- Vitest: 240 passed + 3 skipped via `pnpm -r run test` from fresh
+  clone. Net +16 on the facilitator worker
+  (63 → 79: +7 agent-resolver + +9 attestation tests). No regressions
+  elsewhere.
+
+### Behavioural notes / deviations from the design pack
+
+- **Trigger is inline `ctx.waitUntil`, not a Cron Trigger watcher.**
+  The design-pack `02_facilitator.md` §10.1 Option A (polling
+  `eth_getLogs` for Splitter `Distributed` events) is superseded.
+  Rationale locked in `specs/06-actor-act-matrix.md` D6: the
+  facilitator submits `distribute()` itself, so the settlement
+  signal is already in-process. No `watcher_state` D1 table exists.
+- **Facilitator, not buyer, signs `giveFeedback`.** Locked in
+  D3: the DXb rail records facilitator-observed settlement
+  attestations (tags `("payment","x402-settlement")`,
+  `clientAddress=facilitator`), not DXa buyer-satisfaction reviews.
+  Buyer EOAs never appear in Reckon402-written reputation records
+  (automatic pseudonymity). DXa permanently not shipped (D13).
+- **Receipt JSON does not yet surface `td_erc8004_tx`.** The D1
+  column is populated correctly; surfacing it in the Receipt shape
+  is a v1.5 polish item on `receipt-builder.ts`. Not demo-blocking.
+- **`SELLER_AGENT_IDS` is a JSON-encoded map, not a single env
+  var.** Resolution seam lives in `src/treasury/agent-resolver.ts`;
+  swapping to per-merchant ENS `x402.agent_id` text-record reads
+  is a drop-in change inside that function (v1.5).
+
+### Known forward-compat / L4b2 carryover
+
+- Lambda signing wrapper + KH skill + recipes (L4b2, independent of
+  L4b1). Lambda ships unchanged per `04_signing_wrapper.md`.
+- ENS-driven agent resolution (Q-07-1, v1.5).
+- Per-merchant `x402.attestation` ENS opt-in (Q-07-2, v1.5 —
+  the hackathon uses the master `ENABLE_ERC8004_WRITES` boolean).
+- Deterministic feedbackHash canonicalization (Q-07-3, v1.5).
+- Retry reconciler for failed attestation writes (Q-07-5, v1.5 —
+  the `failure_detail` column is in place; the sweep logic is not).
+- Receipt JSON exposing `td_erc8004_tx` (v1.5 polish).
+
 ## L4b framing lock (2026-04-29)
 
 Actor/act/signer/broadcaster/gas-payer matrix is locked in

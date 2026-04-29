@@ -30,3 +30,9 @@ it implements:
 The numbering is intentionally sparse to allow late-arriving
 mid-sequence specs (e.g. an unforeseen middleware contract) to slot
 in without renumbering downstream files.
+
+Cross-cutting specs (not tied to a single layer):
+
+- `06-actor-act-matrix.md` — actor / act / signer / broadcaster /
+  gas-payer matrix. Any new layer that adds an on-chain or
+  off-chain act cross-checks against this doc before implementing.

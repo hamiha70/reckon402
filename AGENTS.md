@@ -712,6 +712,54 @@ before producing any implementation. Do not rely on pre-training
 knowledge alone for ENS — the docs cover breaking changes and current
 API conventions that differ from older patterns.
 
+## L4b framing lock (2026-04-29)
+
+Actor/act/signer/broadcaster/gas-payer matrix is locked in
+`specs/06-actor-act-matrix.md`. L4b1 (ERC-8004 settlement-attestation
+write) implements **DXb — facilitator-observed settlement**, not DXa
+(buyer satisfaction). Summary of the load-bearing decisions:
+
+- **Facilitator signs AND broadcasts `giveFeedback`** with
+  `FACILITATOR_PK`. The `clientAddress` recorded on-chain is
+  intentionally the facilitator EOA. Tags are pinned to
+  `("payment", "x402-settlement")`. Buyer EOAs never appear in
+  Reckon402-written reputation records (automatic pseudonymity).
+- **Trigger is inline `ctx.waitUntil(...)` in
+  `workers/facilitator/src/settle.ts`**, not a cron-driven event
+  watcher. The facilitator submits `distribute()` itself, so it
+  already has the settlement signal in-process. The spec-pack's
+  `02_facilitator.md` §10.1 Cron watcher is superseded by this
+  decision; no `watcher_state` D1 table is created.
+- **Lambda signing wrapper (`04_signing_wrapper.md`) ships unchanged
+  — single endpoint, EIP-3009 scope only.** D3's "facilitator signs
+  attestations" resolves the question of a second endpoint to "no".
+  §4.6 "no arbitrary digest path" discipline is preserved.
+- **DXa (buyer satisfaction attestations) is not shipped**, not even
+  as an optional API. Rationale: shipping DXa side-by-side with DXb
+  forces downstream consumers to weight two signals, which creates
+  either a sybil surface (high weight) or an under-weighted
+  irrelevance (low weight). The ReputationRegistry slot stays open
+  for another primitive to fill with its own tag family.
+- **Gas for attestations is paid by the facilitator** from the
+  EIP-3009 fee slot. Same funding source as `transferWithAuthorization`
+  and `distribute()`. Per-write cost at Base is ~$0.0002 (~2% of a
+  0.01 USDC settlement). Per-settlement writes are hackathon- and
+  production-economic at Base gas levels. Batching is a v1.5 path
+  (conditional on gas shifting; also unlocks buyer privacy).
+- **ValidationRegistry** writes are blocked upstream (`null` address
+  at the pinned commit across every supported chain). Library
+  surfaces throw `VALIDATION_NOT_DEPLOYED`. Revisit when upstream
+  ships.
+- **Reckon402 is a facilitator, not an agent platform.** D9 Path A is
+  locked for the hackathon — sellers register their own agents in
+  IdentityRegistry; Reckon402 does not operate an identity factory or
+  tokenize agent revenue streams. Path B (platform direction) is a
+  post-hackathon roadmap slot.
+
+Any new layer that adds an on-chain or off-chain act cross-checks
+against `specs/06-actor-act-matrix.md` before committing to an
+implementation.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

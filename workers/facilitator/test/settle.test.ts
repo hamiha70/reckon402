@@ -30,6 +30,7 @@ vi.mock('viem', async (importActual) => {
       waitForTransactionReceipt: waitForReceiptMock,
       getBlock: getBlockMock,
       readContract: readContractMock,
+      getTransactionCount: vi.fn().mockResolvedValue(5),
     }),
     createWalletClient: () => ({
       writeContract: writeContractMock,

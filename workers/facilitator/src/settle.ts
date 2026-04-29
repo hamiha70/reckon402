@@ -61,7 +61,7 @@ function makeClients(env: SettleEnv) {
  */
 export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise<SettleOutcome> {
   const { authorization, signature, paymentId } = input
-  const { publicClient, walletClient } = makeClients(env)
+  const { account, publicClient, walletClient } = makeClients(env)
 
   // Deadline pre-check — cheap guard before spending gas.
   const nowSec = Math.floor(Date.now() / 1000)
@@ -72,6 +72,15 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
       failureDetail: `now=${nowSec} >= validBefore=${authorization.validBefore}`,
     }
   }
+
+  // Pre-fetch nonce once to avoid a read-after-write race on distributed RPC
+  // providers (e.g. Alchemy load-balancers). Without this, the second
+  // writeContract call (distribute) can read a stale nonce that equals the
+  // transfer nonce and be rejected as "replacement transaction underpriced".
+  const baseNonce = await publicClient.getTransactionCount({
+    address: account.address,
+    blockTag: 'pending',
+  })
 
   let transferTx: Hex
   try {
@@ -89,6 +98,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
         authorization.nonce as Hex,
         v, r, s,
       ],
+      nonce: baseNonce,
     })
   } catch (err) {
     return {
@@ -161,6 +171,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
       functionName: 'distribute',
       args: [paymentId, BigInt(authorization.value)],
       gas: 300_000n,
+      nonce: baseNonce + 1,
     })
   } catch (err) {
     return {

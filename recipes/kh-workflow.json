@@ -1,0 +1,69 @@
+{
+  "name": "Reckon402 ResearchAgent",
+  "description": "Three sequential x402 paid calls to agent.reckon402.com/research demonstrating ERC-8004 reputation growth and tier-based discount pricing. Each call triggers a settlement attestation write; the gateway reads updated reputation on the next call.",
+  "trigger": {
+    "type": "manual",
+    "id": "demo_trigger"
+  },
+  "nodes": [
+    {
+      "id": "call_1",
+      "type": "reckon402-buyer",
+      "description": "First research call — no prior reputation, base price (0.01 USDC)",
+      "config": {
+        "merchant_url": "https://agent.reckon402.com",
+        "path": "/research?q=alpha+agent+commerce",
+        "amount_usdc": 0.01,
+        "network": "base-sepolia",
+        "signing_wrapper_url": "https://signing.reckon402.com/sign",
+        "auth_secret": "${SIGNING_WRAPPER_API_KEY}",
+        "wait_for_state": "RECONCILED"
+      }
+    },
+    {
+      "id": "call_2",
+      "type": "reckon402-buyer",
+      "description": "Second call — 1 prior attestation → gateway returns 5% discount",
+      "depends_on": ["call_1"],
+      "config": {
+        "merchant_url": "https://agent.reckon402.com",
+        "path": "/research?q=beta+reputation+growth",
+        "amount_usdc": null,
+        "network": "base-sepolia",
+        "signing_wrapper_url": "https://signing.reckon402.com/sign",
+        "auth_secret": "${SIGNING_WRAPPER_API_KEY}",
+        "wait_for_state": "RECONCILED"
+      }
+    },
+    {
+      "id": "call_3",
+      "type": "reckon402-buyer",
+      "description": "Third call — 2 prior attestations → gateway returns 10% discount",
+      "depends_on": ["call_2"],
+      "config": {
+        "merchant_url": "https://agent.reckon402.com",
+        "path": "/research?q=gamma+trust+loop",
+        "amount_usdc": null,
+        "network": "base-sepolia",
+        "signing_wrapper_url": "https://signing.reckon402.com/sign",
+        "auth_secret": "${SIGNING_WRAPPER_API_KEY}",
+        "wait_for_state": "RECONCILED"
+      }
+    },
+    {
+      "id": "summarize",
+      "type": "noop",
+      "depends_on": ["call_3"],
+      "config": {
+        "log": "Three calls completed. Reputation grew from real paid delivery. Pricing dropped 0% → 5% → 10% discount. Demo complete."
+      }
+    }
+  ],
+  "_reckon402_notes": {
+    "signing_wrapper": "https://signing.reckon402.com/sign",
+    "kms_eoa": "0x46bbb05aca9ea24118b8a57c8d3f317503384305",
+    "attestation_registry": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+    "facilitator": "https://facilitator.reckon402.com",
+    "docs": "https://github.com/hamiha70/reckon402/blob/main/recipes/kh-workflow.json"
+  }
+}

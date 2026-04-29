@@ -1,0 +1,17 @@
+{
+  "name": "@reckon402/kh-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@reckon402/buyer-sdk": "workspace:*",
+    "@reckon402/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

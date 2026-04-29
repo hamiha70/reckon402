@@ -1,0 +1,10 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["kms:Sign", "kms:GetPublicKey"],
+      "Resource": "arn:aws:kms:eu-central-1:975170806362:key/5a0350e0-d502-4579-8d45-d31c843a5f3f"
+    }
+  ]
+}

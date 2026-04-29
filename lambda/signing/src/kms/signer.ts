@@ -15,10 +15,10 @@ function encodeRsv(r: bigint, s: bigint, v: 27 | 28): Hex {
   return `0x${rHex}${sHex}${vHex}` as Hex;
 }
 
-function recoverV(digest: Hex, r: bigint, s: bigint, expected: Hex): 27 | 28 {
+async function recoverV(digest: Hex, r: bigint, s: bigint, expected: Hex): Promise<27 | 28> {
   for (const v of [27, 28] as const) {
     const sig = encodeRsv(r, s, v);
-    const recovered = recoverAddress({ hash: digest, signature: sig });
+    const recovered = await recoverAddress({ hash: digest, signature: sig });
     if (recovered.toLowerCase() === expected.toLowerCase()) return v;
   }
   throw new Error("V_RECOVERY_FAILED: neither v=27 nor v=28 recovers the expected EOA");
@@ -62,7 +62,7 @@ export class KmsSigner {
 
     const { r, s: rawS } = parseDerSignature(Buffer.from(out.Signature));
     const s = normalizeLowS(rawS);
-    const v = recoverV(digest, r, s, eoa);
+    const v = await recoverV(digest, r, s, eoa);
 
     return encodeRsv(r, s, v);
   }

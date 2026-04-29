@@ -152,13 +152,30 @@ function makeEnv(db: ReturnType<typeof makeFakeDb>): Env {
     SPLITTER_ADDRESS: SPLITTER,
     FACILITATOR_PK: ('0x' + '00'.repeat(32)),
     BASE_SEPOLIA_RPC_PRIMARY: 'https://unused.local',
+    // L4b₁ env (disabled for settle-route tests — covered by attestation.test.ts)
+    ENABLE_ERC8004_WRITES: 'false',
+    ERC8004_CHAIN_ID: '84532',
+    SELLER_AGENT_IDS: '{}',
+    GATEWAY_CACHE_HOOK_URL: 'https://unused.local/hooks/cache-invalidate',
+    ATTESTATION_FEEDBACK_URI_PREFIX: 'https://unused.local/x402/receipt/',
   }
 }
+
+/**
+ * No-op ExecutionContext stub for tests. The real `ctx.waitUntil` extends
+ * a background-task budget in the CF Workers runtime; in tests we just
+ * need a function that swallows the promise so the settle handler's
+ * attestation-hook call doesn't throw a "no executionCtx" error.
+ */
+const noopCtx = {
+  waitUntil: (_p: Promise<unknown>) => {},
+  passThroughOnException: () => {},
+} as unknown as ExecutionContext
 
 function makeApp(env: Env) {
   const app = new Hono<{ Bindings: Env }>()
   app.post('/x402/settle', settleHandler)
-  return { fetch: (req: Request) => app.fetch(req, env) }
+  return { fetch: (req: Request) => app.fetch(req, env, noopCtx) }
 }
 
 function settleReq() {

@@ -22,6 +22,16 @@ export const SPLITTER_ABI = [
     outputs: [{ type: 'address' }],
   },
   {
+    type: 'function',
+    name: 'getRecipient',
+    stateMutability: 'view',
+    inputs: [{ name: 'slot', type: 'uint8' }],
+    outputs: [
+      { name: 'recipient', type: 'address' },
+      { name: 'bps',       type: 'uint16'  },
+    ],
+  },
+  {
     type: 'event',
     name: 'Distributed',
     inputs: [

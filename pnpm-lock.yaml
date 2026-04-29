@@ -190,6 +190,9 @@ importers:
       '@reckon402/buyer-sdk':
         specifier: workspace:*
         version: link:../../packages/buyer-sdk
+      '@reckon402/erc-8004-client':
+        specifier: workspace:*
+        version: link:../../packages/erc-8004-client
       '@reckon402/types':
         specifier: workspace:*
         version: link:../../packages/types

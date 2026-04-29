@@ -4,6 +4,7 @@ import type { PaymentPayload, PaymentRequirements } from '@reckon402/types'
 import { computePaymentId } from './payment-id.js'
 import { settleOnChain } from './settle.js'
 import { buildSettleResponse, type ReceiptRow } from './receipt-builder.js'
+import { maybeWriteAttestation } from './treasury/attestation.js'
 
 /**
  * POST /x402/settle — design pack 02_facilitator.md §4.2.
@@ -179,6 +180,32 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
         `distributeTx=${outcome.distributeTx}`,
       )
       .run()
+
+    // L4b₁ — ERC-8004 settlement-attestation write (DXb rail).
+    // Fire-and-forget in background; never blocks the payment response.
+    // See specs/07-l4b-erc8004-writes.md §6.
+    c.executionCtx.waitUntil(
+      maybeWriteAttestation(
+        {
+          DB: c.env.DB,
+          FACILITATOR_PK: c.env.FACILITATOR_PK,
+          BASE_SEPOLIA_RPC_PRIMARY: c.env.BASE_SEPOLIA_RPC_PRIMARY,
+          SPLITTER_ADDRESS: c.env.SPLITTER_ADDRESS,
+          ENABLE_ERC8004_WRITES: c.env.ENABLE_ERC8004_WRITES,
+          ERC8004_CHAIN_ID: c.env.ERC8004_CHAIN_ID,
+          SELLER_AGENT_IDS: c.env.SELLER_AGENT_IDS,
+          GATEWAY_CACHE_HOOK_URL: c.env.GATEWAY_CACHE_HOOK_URL,
+          GATEWAY_CACHE_HOOK_TOKEN: c.env.GATEWAY_CACHE_HOOK_TOKEN,
+          ATTESTATION_FEEDBACK_URI_PREFIX: c.env.ATTESTATION_FEEDBACK_URI_PREFIX,
+        },
+        {
+          paymentId,
+          transferTx: outcome.transferTx,
+          distributeTx: outcome.distributeTx,
+          authValue: auth.value,
+        },
+      ).catch((err) => console.error('maybeWriteAttestation_unhandled', err)),
+    )
   } else {
     await c.env.DB
       .prepare(

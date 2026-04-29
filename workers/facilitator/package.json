@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@reckon402/buyer-sdk": "workspace:*",
+    "@reckon402/erc-8004-client": "workspace:*",
     "@reckon402/types": "workspace:*",
     "hono": "^4.12.0",
     "viem": "^2.0.0"

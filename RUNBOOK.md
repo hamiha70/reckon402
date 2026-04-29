@@ -26,6 +26,9 @@ inline copy until it earns its own .md under the appropriate
 | Run all L0 smoke probes | inline below (§ Smoke tests) | inline |
 | Run a single probe | inline below (§ Smoke tests) | inline |
 | Verify the KMS signer end-to-end | inline below (§ KMS / signing) | inline |
+| Deploy L3 (Splitter + facilitator + agent swap) | [`tools/deploy/deploy-l3.md`](./tools/deploy/deploy-l3.md) | recipe |
+| Deploy L4b₁ (ERC-8004 attestation writes) | [`tools/deploy/deploy-l4b.md`](./tools/deploy/deploy-l4b.md) | recipe |
+| L4b₁ secrets inventory | [`tools/deploy/secrets-l4b.md`](./tools/deploy/secrets-l4b.md) | recipe |
 | Cut a layer-checkpoint tag | inline below (§ Layer checkpoints) | inline |
 
 ## Bootstrap

@@ -30,6 +30,12 @@ fullflow-l3:
 replay-l3:
     {{secrets}} bash -c 'cd tools/integration-tests && bash replay-l3.sh'
 
+# Run the L4b1 full-flow smoke — live settlement + ERC-8004 attestation + gateway cache-invalidate.
+# Exits 0 when the settle path is green AND the attestation tx lands AND the
+# subsequent reputation read reflects the new count.
+fullflow-l4b:
+    {{secrets}} bash -c 'cd tools/integration-tests && bash full-flow-l4b.sh'
+
 # Seed an EOA with ETH on Base Sepolia. Usage: just seed <kind> <amount>
 # kind: deployer | facilitator    amount: e.g. 0.1
 seed kind amount:

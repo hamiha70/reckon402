@@ -34,7 +34,9 @@ surface.
 - **`workers/facilitator/src/treasury/` package** — three files:
   `attestation.ts` (maybeWriteAttestation + guards),
   `cache-invalidate.ts` (gateway hook caller), and `agent-resolver.ts`
-  (demo-scoped wallet → agentId lookup).
+  (wallet → agentId lookup; the seam between the hackathon's JSON-
+  encoded map and v1.5's ENS text-record read — same call signature,
+  single implementation swap).
 - **D1 migration 0002** adding `failure_detail` column to the existing
   `attestations` table (for diagnostics on failed writes). The
   `attestations` table itself and `receipts.td_erc8004_tx` column
@@ -60,6 +62,11 @@ surface.
 - No per-merchant ENS-driven opt-in lookup. The hackathon uses a
   boolean env var; per-merchant opt-in via `x402.attestation = "on"`
   ENS text record is a v1.5 evolution, flagged below.
+- No multi-Splitter routing — one facilitator deployment is bound
+  to one Splitter via `SPLITTER_ADDRESS`, which inherits the L3
+  one-Splitter-per-seller topology. The seller-wallet-to-agentId
+  map is multi-entry to support a single facilitator serving
+  multiple Splitters when that topology arrives.
 - No batching. Per-settlement writes at ~$0.0002/write on Base are
   economic (D11).
 
@@ -147,7 +154,7 @@ A second attempt against the same paymentId is a no-op.
 |-----|---------|---------|
 | `ENABLE_ERC8004_WRITES` | `"false"` | Master switch. Staging ships `"false"` until smoke passes; production flip is a deploy commit. |
 | `ERC8004_CHAIN_ID` | `"84532"` | Pinned Base Sepolia chainId for the demo. L4c (mainnet) revisits. |
-| `SELLER_AGENT_ID` | `"1"` | Demo-scoped pinned agentId. Matches `gateway/migrations/seed_l4a2.sql` mapping for `seller.reckon402-test.eth`. **Hackathon constraint** — multi-seller resolution is v1.5 via ENS `x402.agent_id` text record. |
+| `SELLER_AGENT_IDS` | `'{"0xd53f...":"1"}'` | JSON-encoded `{sellerWallet: agentId}` map, lowercased addresses. Single-entry for the demo; multi-entry when a single facilitator fronts multiple Splitters. v1.5 swaps this for a per-merchant ENS `x402.agent_id` text-record read inside `resolveAgentId()` without changing callers. |
 | `GATEWAY_CACHE_HOOK_URL` | `"https://gateway.reckon402.com/hooks/cache-invalidate"` | L4a2 gateway's cache-invalidate endpoint. |
 | `ATTESTATION_FEEDBACK_URI_PREFIX` | `"https://facilitator.reckon402.com/x402/receipt/"` | Produces `feedbackURI` per ERC-8004 arg: `<prefix><paymentId>`. |
 
@@ -163,6 +170,41 @@ the attestation?** We do. No separate RPC binding.
 
 ---
 
+## 4.3 Agent resolution seam (`resolveAgentId`)
+
+A small function in `workers/facilitator/src/treasury/agent-resolver.ts`
+is the sole contact point between the facilitator and "how do we know
+this seller's agentId?" Signature:
+
+```ts
+export interface AgentResolverEnv {
+  SPLITTER_ADDRESS: string
+  BASE_SEPOLIA_RPC_PRIMARY: string
+  SELLER_AGENT_IDS: string
+}
+
+/**
+ * Resolve the seller agentId for the payment. Returns null when the
+ * seller is not attestable (not in the agent-id map, or the map is
+ * malformed). Null is a *silent skip* at the call site; never throws
+ * on config issues.
+ *
+ * L4b₁ implementation: read Splitter.getRecipient(0) to get the seller
+ * EOA (slot 0 is the seller by L3 Splitter convention), then look it
+ * up in SELLER_AGENT_IDS (lowercased). v1.5 replaces the map lookup
+ * with a per-merchant ENS `x402.agent_id` text-record read on the
+ * seller's name — same return shape, no caller changes.
+ */
+export async function resolveAgentId(env: AgentResolverEnv): Promise<bigint | null>
+```
+
+This is the **only** function that has to change when the topology
+evolves from "single-seller JSON map" → "multi-seller JSON map" →
+"ENS-driven per-merchant resolution." Test the function in
+isolation; spy on it in the attestation-write tests.
+
+---
+
 ## 5. `maybeWriteAttestation` contract
 
 Located at `workers/facilitator/src/treasury/attestation.ts`.
@@ -174,9 +216,10 @@ export interface AttestationEnv {
   DB: D1Database
   FACILITATOR_PK: string
   BASE_SEPOLIA_RPC_PRIMARY: string
+  SPLITTER_ADDRESS: string
   ENABLE_ERC8004_WRITES: string
   ERC8004_CHAIN_ID: string
-  SELLER_AGENT_ID: string
+  SELLER_AGENT_IDS: string
   GATEWAY_CACHE_HOOK_URL: string
   GATEWAY_CACHE_HOOK_TOKEN?: string
   ATTESTATION_FEEDBACK_URI_PREFIX: string
@@ -206,9 +249,11 @@ Guards (in order, fail-fast return):
 1. **`ENABLE_ERC8004_WRITES !== "true"`** → return. Keeps the code
    path cold in dev/staging until the flag flips. Matches L4a2
    reads-flag discipline.
-2. **`SELLER_AGENT_ID` parse fails** → log `CONFIG_ERROR`, return.
-3. **`ERC8004_CHAIN_ID` parse fails or unsupported** → log
+2. **`ERC8004_CHAIN_ID` parse fails or unsupported** → log
    `CONFIG_ERROR`, return.
+3. **`resolveAgentId(env)` returns null** → return silently. The
+   seller isn't attestable in this deployment (not in the map, or
+   the map is malformed). Never blocks a payment.
 4. **Idempotency:** `SELECT 1 FROM attestations WHERE payment_id = ?1
    AND agent_id = ?2` returns a row → return. No write.
 5. **Happy path:**
@@ -236,7 +281,7 @@ commit `0463311`:
 |-----|-------|
 | `chainId` | `Number(env.ERC8004_CHAIN_ID)` |
 | `walletClient` | viem wallet client backed by `FACILITATOR_PK` |
-| `agentId` | `BigInt(env.SELLER_AGENT_ID)` |
+| `agentId` | return value of `resolveAgentId(env)` |
 | `value` | `1n` |
 | `valueDecimals` | `0` |
 | `tag1` | `"payment"` |
@@ -247,12 +292,13 @@ commit `0463311`:
 
 ### 5.4 Gateway cache-invalidate body
 
-POST to `GATEWAY_CACHE_HOOK_URL` with:
+POST to `GATEWAY_CACHE_HOOK_URL` with the agentId returned by
+`resolveAgentId(env)`:
 
 ```json
 {
   "chainId": 84532,
-  "agentId": "1",
+  "agentId": "<agentId-from-resolveAgentId>",
   "keys": ["reputation.getClients", "reputation.getSummary"]
 }
 ```
@@ -315,12 +361,20 @@ cache-invalidate covers every guard:
 | # | Case | Asserts |
 |---|------|---------|
 | 1 | `ENABLE_ERC8004_WRITES = "false"` | No D1 query; no giveFeedback call; no fetch |
-| 2 | Malformed `SELLER_AGENT_ID` | No giveFeedback call; error logged (captured via `vi.spyOn(console, 'error')`) |
+| 2 | `resolveAgentId` returns null (seller not in map) | No giveFeedback call; no fetch; no error thrown |
 | 3 | Idempotency — row already exists | No giveFeedback call; no fetch |
 | 4 | Happy path | giveFeedback called with EXACT args per §5.3; INSERT INTO attestations with correct columns; UPDATE receipts SET td_erc8004_tx; fetch called with correct body + bearer |
 | 5 | giveFeedback throws (revert / RPC) | INSERT INTO attestations with `reputation_tx='FAILED'` and `failure_detail` populated; NO UPDATE to receipts; NO fetch to cache-invalidate |
 | 6 | Cache-invalidate fetch fails | attestation row still written; error logged; function resolves (does not throw) |
 | 7 | Missing `GATEWAY_CACHE_HOOK_TOKEN` | Skip cache-invalidate silently; attestation row still written |
+
+Additionally a small suite in `workers/facilitator/test/agent-resolver.test.ts`
+covers resolveAgentId itself:
+
+- Splitter.getRecipient(0) read returns a wallet present in the map → correct agentId.
+- Wallet not in map → null.
+- Malformed JSON in `SELLER_AGENT_IDS` → null + error logged (no throw).
+- Address-case independence: map keys lowercased, input uppercased → match.
 
 Mocks: the viem `walletClient.writeContract` is mocked at the module
 level (same pattern as `workers/facilitator/test/settle.test.ts`
@@ -388,11 +442,11 @@ AFTER_COUNT=$(curl -s "$GATEWAY/lookup/seller.reckon402-test.eth/x402.amount?bac
 
 ## 9. Open questions
 
-**Q-07-1 — Multi-seller resolution.** The hackathon pins
-`SELLER_AGENT_ID` per deployment. Production needs a per-payment
-seller → agentId lookup. The cleanest path is ENS
-`x402.agent_id` text record on the merchant's name, read via the
-existing gateway. Deferred to v1.5.
+**Q-07-1 — ENS-driven agent resolution.** The hackathon uses a
+JSON-encoded `SELLER_AGENT_IDS` map as the resolution backend. The
+seam lives in `resolveAgentId()`; swapping it to a per-merchant
+ENS `x402.agent_id` text-record read is a drop-in replacement that
+does not touch any caller. Deferred to v1.5.
 
 **Q-07-2 — Opt-in signal.** The hackathon uses a single boolean
 env flag (`ENABLE_ERC8004_WRITES`). Production should read

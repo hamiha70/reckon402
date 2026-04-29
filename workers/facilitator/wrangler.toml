@@ -19,3 +19,19 @@ NETWORK                  = "eip155:84532"
 USDC_ADDRESS             = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 # SPLITTER_ADDRESS set at deploy time via `wrangler secret put` or `[env.dev.vars]`
 # BASE_SEPOLIA_RPC_PRIMARY + BASE_SEPOLIA_RPC_FALLBACK + FACILITATOR_PK via secrets
+
+# L4b₁ ERC-8004 attestation writes — see specs/07-l4b-erc8004-writes.md §4.
+# Ship with the master flag OFF; a separate deploy commit flips it to "true"
+# after staging smoke passes (mirrors the L4a2 ENABLE_ERC8004_READS pattern).
+ENABLE_ERC8004_WRITES           = "false"
+ERC8004_CHAIN_ID                = "84532"
+# SELLER_AGENT_IDS: JSON-encoded `{sellerWallet: agentId}` map (lowercased
+# addresses). The facilitator resolves the seller via Splitter.getRecipient(0)
+# and looks it up in this map. Single-entry today; multi-entry when a single
+# facilitator serves multiple Splitters (v1.5). The ENS-per-merchant path
+# replaces this map inside resolveAgentId() without changing callers.
+SELLER_AGENT_IDS                = "{\"0xd53ffac42496d73b3faf946786688a8454f57b1f\":\"1\"}"
+GATEWAY_CACHE_HOOK_URL          = "https://gateway.reckon402.com/hooks/cache-invalidate"
+ATTESTATION_FEEDBACK_URI_PREFIX = "https://facilitator.reckon402.com/x402/receipt/"
+# GATEWAY_CACHE_HOOK_TOKEN via `wrangler secret put` (shared value with
+# the gateway worker's secret of the same name)

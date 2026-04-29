@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // vi.mock() factory bodies are hoisted to the top of the file — any
 // outer variable they reference must be declared via vi.hoisted() so
@@ -210,6 +210,9 @@ describe('maybeWriteAttestation — guard short-circuits', () => {
 })
 
 describe('maybeWriteAttestation — happy path', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
   it('calls giveFeedback with exact args, persists success row, invalidates cache', async () => {
     const db = makeFakeDb()
     resolveAgentIdSpy.mockResolvedValue(1n)
@@ -219,7 +222,9 @@ describe('maybeWriteAttestation — happy path', () => {
       new Response('{}', { status: 200 }),
     )
 
-    await maybeWriteAttestation(baseEnv(db), INPUT)
+    const p = maybeWriteAttestation(baseEnv(db), INPUT)
+    await vi.runAllTimersAsync()
+    await p
 
     // ARGUMENT-ASSERTION DISCIPLINE — per feedback_testing memory:
     // enforcement interfaces MUST be called with exact args, not just "any".
@@ -275,13 +280,18 @@ describe('maybeWriteAttestation — happy path', () => {
 })
 
 describe('maybeWriteAttestation — failure paths', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
   it('giveFeedback throws → FAILED row with failure_detail; no receipts update; no fetch', async () => {
     const db = makeFakeDb()
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     resolveAgentIdSpy.mockResolvedValue(1n)
     giveFeedbackSpy.mockRejectedValue(new Error('gas estimation failed: execution reverted'))
 
-    await maybeWriteAttestation(baseEnv(db), INPUT)
+    const p = maybeWriteAttestation(baseEnv(db), INPUT)
+    await vi.runAllTimersAsync()
+    await p
 
     const row = db.attestations.get(`${PAYMENT_ID}:1`)
     expect(row).toBeDefined()
@@ -301,7 +311,9 @@ describe('maybeWriteAttestation — failure paths', () => {
     giveFeedbackSpy.mockResolvedValue(ATT_TX)
     waitForTransactionReceiptSpy.mockResolvedValue({ status: 'reverted', blockNumber: 42n })
 
-    await maybeWriteAttestation(baseEnv(db), INPUT)
+    const p = maybeWriteAttestation(baseEnv(db), INPUT)
+    await vi.runAllTimersAsync()
+    await p
 
     const row = db.attestations.get(`${PAYMENT_ID}:1`)
     expect(row?.reputation_tx).toBe('FAILED')
@@ -318,7 +330,10 @@ describe('maybeWriteAttestation — failure paths', () => {
     waitForTransactionReceiptSpy.mockResolvedValue({ status: 'success', blockNumber: 100n })
     ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network error'))
 
-    await expect(maybeWriteAttestation(baseEnv(db), INPUT)).resolves.toBeUndefined()
+    const p = maybeWriteAttestation(baseEnv(db), INPUT)
+    await vi.runAllTimersAsync()
+    const result = await p
+    expect(result).toBeUndefined()
 
     // Attestation row still written successfully.
     const row = db.attestations.get(`${PAYMENT_ID}:1`)
@@ -336,7 +351,9 @@ describe('maybeWriteAttestation — failure paths', () => {
     const env = baseEnv(db)
     delete (env as { GATEWAY_CACHE_HOOK_TOKEN?: string }).GATEWAY_CACHE_HOOK_TOKEN
 
-    await maybeWriteAttestation(env, INPUT)
+    const p = maybeWriteAttestation(env, INPUT)
+    await vi.runAllTimersAsync()
+    await p
 
     const row = db.attestations.get(`${PAYMENT_ID}:1`)
     expect(row?.reputation_tx).toBe(ATT_TX)

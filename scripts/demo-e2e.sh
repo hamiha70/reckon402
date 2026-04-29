@@ -150,7 +150,7 @@ info "  Basescan: https://sepolia.basescan.org/tx/$TX_HASH"
 # ──────────────────────────────────────────────────────────────────────────────
 
 step "5/8" "Verify ERC-8004 attestation written (poll receipt for td_erc8004_tx)"
-MAX_WAIT=60
+MAX_WAIT=90
 WAITED=0
 RECEIPT_JSON="$ARTIFACT_DIR/c2-receipt.json"
 TD_TX=""
@@ -158,7 +158,7 @@ while [ "$WAITED" -lt "$MAX_WAIT" ]; do
   curl -s -o "$RECEIPT_JSON" \
     "$FACILITATOR_URL/x402/receipt/$PAYMENT_ID" || true
   TD_TX=$(python3 -c \
-    'import sys,json; d=json.load(open(sys.argv[1])); print(d.get("tdErc8004Tx") or d.get("td_erc8004_tx") or "")' \
+    'import sys,json; d=json.load(open(sys.argv[1])); r=d.get("receipt",{}); print(r.get("tdErc8004Tx") or r.get("td_erc8004_tx") or d.get("tdErc8004Tx") or d.get("td_erc8004_tx") or "")' \
     "$RECEIPT_JSON" 2>/dev/null || echo "")
   if [ -n "$TD_TX" ] && [ "$TD_TX" != "null" ] && [ "$TD_TX" != "FAILED" ]; then
     break

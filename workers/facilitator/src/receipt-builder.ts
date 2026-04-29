@@ -26,6 +26,7 @@ export interface ReceiptRow {
   retry_count: number
   last_retry_at: number | null
   reconcile_notes: string | null
+  td_erc8004_tx: string | null
   failure_reason: string | null
   failure_detail: string | null
 }
@@ -70,6 +71,7 @@ export function buildSettleResponse(row: ReceiptRow): FacilitatorSettleResponse 
       blockNumber: row.block_number,
       retryCount: row.retry_count,
       reconcileNotes: row.reconcile_notes,
+      tdErc8004Tx: row.td_erc8004_tx ?? null,
     },
   }
 }

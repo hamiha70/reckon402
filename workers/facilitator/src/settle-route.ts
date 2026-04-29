@@ -145,17 +145,37 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
     return c.json(buildSettleResponse(refetched), status)
   }
 
-  // Run the two-tx settle.
-  const outcome = await settleOnChain(
-    {
-      FACILITATOR_PK: c.env.FACILITATOR_PK,
-      USDC_ADDRESS: c.env.USDC_ADDRESS,
-      SPLITTER_ADDRESS: c.env.SPLITTER_ADDRESS,
-      BASE_SEPOLIA_RPC_PRIMARY: c.env.BASE_SEPOLIA_RPC_PRIMARY,
-      BASE_SEPOLIA_RPC_FALLBACK: c.env.BASE_SEPOLIA_RPC_FALLBACK,
-    },
-    { authorization: auth, signature: sig, paymentId },
-  )
+  // Run the two-tx settle. Wrap in try-catch: an uncaught throw here would
+  // leave the receipt stuck in PENDING_CONFIRMATION and return a raw 500.
+  let outcome: Awaited<ReturnType<typeof settleOnChain>>
+  try {
+    outcome = await settleOnChain(
+      {
+        FACILITATOR_PK: c.env.FACILITATOR_PK,
+        USDC_ADDRESS: c.env.USDC_ADDRESS,
+        SPLITTER_ADDRESS: c.env.SPLITTER_ADDRESS,
+        BASE_SEPOLIA_RPC_PRIMARY: c.env.BASE_SEPOLIA_RPC_PRIMARY,
+        BASE_SEPOLIA_RPC_FALLBACK: c.env.BASE_SEPOLIA_RPC_FALLBACK,
+      },
+      { authorization: auth, signature: sig, paymentId },
+    )
+  } catch (err) {
+    const detail = `settleOnChain_unhandled_throw: ${(err as Error).message ?? String(err)}`
+    console.error(`[settle] ERROR paymentId=${paymentId} ${detail}`)
+    await c.env.DB
+      .prepare(
+        `UPDATE receipts SET state = 'FAILED', failure_reason = 'OTHER', failure_detail = ?2 WHERE payment_id = ?1`,
+      )
+      .bind(paymentId, detail)
+      .run()
+    return c.json({
+      success: false,
+      transaction: '',
+      network: c.env.NETWORK,
+      errorReason: 'OTHER',
+      paymentId,
+    }, 502)
+  }
 
   if (outcome.success) {
     await c.env.DB

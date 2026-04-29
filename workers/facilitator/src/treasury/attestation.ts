@@ -95,6 +95,14 @@ export async function maybeWriteAttestation(
   const publicClient = createPublicClient({ chain: baseSepolia, transport })
   const walletClient = createWalletClient({ account, chain: baseSepolia, transport })
 
+  // Allow the distribute tx to propagate through all Alchemy nodes before
+  // fetching the nonce for the attestation write.  Without this delay the
+  // auto-nonce fetch returns the distribute nonce (still pending) and the
+  // attestation is rejected as "replacement transaction underpriced".
+  // 3s is sufficient: Base Sepolia blocks are ~2s, and distribute is already
+  // confirmed by the time ctx.waitUntil fires (settle confirmed before return).
+  await new Promise(r => setTimeout(r, 3000))
+
   let tx: Hex
   try {
     tx = await reputation.giveFeedback({

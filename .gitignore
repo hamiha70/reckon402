@@ -37,6 +37,7 @@ tools/smoke-tests/results-*.local.md
 # Integration-test run artifacts (timestamped iteration logs; not committed)
 tools/integration-tests/run-*.log
 tools/integration-tests/run-*/
+tools/integration-tests/run-l4b-*.json
 tools/integration-tests/results-*-2026-*.md
 tools/integration-tests/wrangler-tail-*.log
 

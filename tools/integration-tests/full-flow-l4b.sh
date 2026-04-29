@@ -56,7 +56,10 @@ bash "$SCRIPT_DIR/full-flow-l3.sh" 2>&1 | tee -a "$RUN_LOG"
 # Pick up the paymentId + tx hash from the latest full-flow artefact.
 # (full-flow-l3.sh writes results-full-flow-l3-$STAMP.md but we don't share
 # STAMP; read the newest artifact dir instead.)
-LATEST_ARTIFACT=$(ls -1dt "$SCRIPT_DIR"/run-full-flow-l3-* 2>/dev/null | head -1)
+# -type d filters out the sibling .log file; ls -1dt with trailing slash also
+# works but `find ... -maxdepth 1 -type d` is more explicit.
+LATEST_ARTIFACT=$(find "$SCRIPT_DIR" -maxdepth 1 -type d -name 'run-full-flow-l3-*' -printf '%T@ %p\n' 2>/dev/null \
+  | sort -rn | head -1 | cut -d' ' -f2-)
 if [ -z "$LATEST_ARTIFACT" ] || [ ! -d "$LATEST_ARTIFACT" ]; then
   echo "  FAIL: could not locate full-flow-l3 artifact directory" | tee -a "$RUN_LOG"
   exit 1

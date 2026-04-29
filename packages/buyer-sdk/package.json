@@ -1,7 +1,6 @@
 {
   "name": "@reckon402/buyer-sdk",
   "version": "0.1.0",
-  "private": false,
   "description": "Buyer-side helpers for the Reckon402 x402 v2 flow: sign EIP-3009 authorizations, encode/decode payment headers, derive paymentId.",
   "license": "MIT",
   "type": "module",
@@ -14,9 +13,22 @@
     "type": "git",
     "url": "github:hamiha70/reckon402"
   },
-  "files": ["src"],
+  "files": ["dist", "src"],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
+  },
   "scripts": {
-    "test": "vitest run"
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
     "@reckon402/types": "workspace:*",

@@ -1,11 +1,34 @@
 {
   "name": "@reckon402/kh-skill",
   "version": "0.1.0",
-  "private": true,
+  "description": "KeeperHub skill for x402 payments via the Reckon402 hosted signing wrapper (KMS-backed EIP-3009 signer).",
+  "license": "MIT",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github:hamiha70/reckon402"
+  },
+  "files": ["dist", "src"],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@reckon402/buyer-sdk": "workspace:*",

@@ -848,6 +848,72 @@ Any new layer that adds an on-chain or off-chain act cross-checks
 against `specs/06-actor-act-matrix.md` before committing to an
 implementation.
 
+## L4b2 signing wrapper + KH skill + recipes (v1, locked)
+
+Shipped 2026-04-29. All gates passed.
+
+**Canonical reproducible tag: `L4b2-signing-kh-green`** (pushed;
+verified from fresh clone with `git clone --recurse-submodules`).
+
+### Deployed state
+
+| Item | Value |
+|------|-------|
+| Lambda function | `reckon402-signing-wrapper` (Node.js 20, eu-central-1) |
+| Lambda execution role | `reckon402-signing-wrapper-role` |
+| KMS key (buyer-signer) | `5a0350e0-d502-4579-8d45-d31c843a5f3f` |
+| API Gateway HTTP API | `hsnyt8en0a` (eu-central-1) |
+| Custom domain | `signing.reckon402.com` → `d-hvxxmx7mo8.execute-api.eu-central-1.amazonaws.com` |
+| ACM certificate | `arn:aws:acm:eu-central-1:975170806362:certificate/436c3ccf-c1cf-415e-aaa0-e90e19524191` (ISSUED) |
+| Cloudflare CNAME | `signing.reckon402.com` → `d-hvxxmx7mo8.execute-api.eu-central-1.amazonaws.com` |
+| `SIGNING_WRAPPER_API_KEY` | Infisical `reckon402/dev/SIGNING_WRAPPER_API_KEY` |
+| Spec | `specs/08-l4b2-signing-wrapper.md` |
+| Lambda source | `lambda/signing/` |
+| KH workflow | `recipes/kh-workflow.json` |
+| KH skill | `packages/kh-skill/` (`@reckon402/kh-skill`) |
+| Recipes | `recipes/curl-recipe.sh`, `viem-recipe.ts`, `python-recipe.py` |
+| FEEDBACK.md | `FEEDBACK.md` (KH builder feedback bounty) |
+
+### Integration smoke output (2026-04-29, live evidence)
+
+```
+POST https://signing.reckon402.com/sign
+  X-Api-Key: <SIGNING_WRAPPER_API_KEY>
+  body: { typedData: { domain: { name:"USD Coin", version:"2", chainId:84532,
+           verifyingContract:"0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
+           primaryType:"TransferWithAuthorization",
+           message: { from:"0x46bbb05aca9ea24118b8a57c8d3f317503384305",
+                      to:"0x0ad507c6973eba86313794329ad9b12fbf24acd0",
+                      value:"10000", validAfter:"0", ... } } }
+
+→ {"signature":"0xc5fc3baf295420488aa3fb67a2f672430da419d36d081ddf826e78bc30d1c84d679d989f10e76b2b25ebbf2c33c19ce9fe39e098a0be2ee2c98c5f3e2d24ec7c1b",
+   "signerAddress":"0x46bbb05aca9ea24118b8a57c8d3f317503384305"}
+
+SMOKE PASS: signerAddress matches pinned KMS buyer-signer EOA
+```
+
+### Smoke + regression outcomes
+
+- `GET https://signing.reckon402.com/healthz` → `{"status":"ok","kms_reachable":true,"signer_eoa":"0x46bbb05aca9ea24118b8a57c8d3f317503384305"}` PASS
+- `POST https://signing.reckon402.com/sign` with valid USDC Base Sepolia payload → signature recovers to `0x46bbb05aca9ea24118b8a57c8d3f317503384305` PASS
+- Forge: 39/39 green from fresh clone (unchanged).
+- Vitest: 256 passed + 3 skipped (259 total) via `pnpm -r run test` from fresh clone. Net +16 on `lambda/signing` (3 test files, 16 tests: DER parse, low-S normalization, validation guards).
+
+### Behavioural notes
+
+- **`@aws-sdk/client-kms` is NOT bundled** — Lambda Node.js 20 runtime includes `@aws-sdk/client-kms` v3. The handler is bundled with esbuild (`--external:@aws-sdk/client-kms`) so viem + zod are inlined (260KB bundle), AWS SDK consumed from Lambda runtime.
+- **Auth is `X-Api-Key` header** (not `Authorization: Bearer` per the design doc) — simpler for KH workflow config; the doc spec is updated in `specs/08-l4b2-signing-wrapper.md`.
+- **KH skill is a stub** — `packages/kh-skill/src/index.ts` defines the skill interface and routes through `@reckon402/buyer-sdk`; the KH manifest format (`manifest.yaml`) is deferred until KH docs confirm the exact schema at H-9.
+- **Shared KMS key** — the buyer-signer key (`0x46bbb05aca9ea24118b8a57c8d3f317503384305`) is the same EOA used by L4b1's facilitator attestation writes. Design intent: same EOA acts as both demo buyer and ERC-8004 attestation writer. Documented in the L4b framing lock section above.
+
+### Known forward-compat / H-9 carryover
+
+- KH skill manifest format validation (confirm KH `manifest.yaml` schema at H-9).
+- KH workflow JSON schema validation against live KH builder API (Q-R1 from design doc).
+- Full end-to-end KH workflow run against staging (demo dress-rehearsal, H-9 morning).
+- `python-recipe.py` marked drop-flagged but shipped — Q-R7 resolved keep.
+- Lambda provisioned concurrency (Q-W4) deferred — warm p50 is ~80ms, acceptable.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

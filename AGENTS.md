@@ -914,6 +914,50 @@ SMOKE PASS: signerAddress matches pinned KMS buyer-signer EOA
 - `python-recipe.py` marked drop-flagged but shipped — Q-R7 resolved keep.
 - Lambda provisioned concurrency (Q-W4) deferred — warm p50 is ~80ms, acceptable.
 
+## Demo Infrastructure (2026-04-29)
+
+Shipped at tag `demo-infra-green`.
+
+| Item | Value |
+|------|-------|
+| Demo dashboard URL | `https://demo.reckon402.com` (CF Pages — see note below) |
+| CF Pages project name | `reckon402-demo` (to be created — see `demo/DEPLOY.md`) |
+| Dashboard source | `demo/index.html` (vanilla HTML + Tailwind CDN; no build step) |
+| Demo e2e script | `scripts/demo-e2e.sh` |
+| KH platform runbook | `tools/deploy/kh-platform-runbook.md` |
+| KH workflow URL | _TODO: paste after manual publish at app.keeperhub.com_ |
+
+### CF Pages deploy status
+
+The CF API token in Infisical lacks `Pages:Edit` scope. The first deploy is a
+manual step — follow `demo/DEPLOY.md`. Once the project exists, add:
+
+```
+just deploy-demo   # npx wrangler pages deploy demo/ --project-name reckon402-demo
+```
+
+Update the table above with the Pages project URL once it is created.
+
+### Running the demo script
+
+```bash
+# Requires: Infisical secrets BUYER_DEMO_1_PK, SPLITTER_ADDRESS, BASE_SEPOLIA_RPC_PRIMARY
+infisical run --env dev --domain https://secrets.intentralabs.com -- \
+  bash -c 'bash scripts/demo-e2e.sh'
+```
+
+Testnet-specific env var defaults (no override needed for standard testnet run):
+- `AGENT_URL=https://agent.reckon402.com`
+- `FACILITATOR_URL=https://facilitator.reckon402.com`
+- `GATEWAY_URL=https://gateway.reckon402.com`
+- `SELLER_NAME=seller.reckon402-test.eth`
+
+### KH workflow
+
+`recipes/kh-workflow.json` is the importable workflow definition.
+See `tools/deploy/kh-platform-runbook.md` for import steps. Once published,
+update the KH workflow URL row in the table above.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reckon402 — Agent commerce with memory.</title>
+  <meta name="description" content="Agent commerce with memory: pay, deliver, earn ERC-8004 reputation, get a better next price." />
+  <meta property="og:title" content="Reckon402 — Agent commerce with memory." />
+  <meta property="og:description" content="The first adoption-friendly x402 facilitator that closes the ERC-8004 trust loop." />
+  <meta property="og:type" content="website" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0B1426',
+            'navy-light': '#1A2440',
+            'accent': '#22D67B',
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+            mono: ['JetBrains Mono', 'Fira Mono', 'Courier New', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body { background-color: #0B1426; }
+    .dot-grid {
+      background-image: radial-gradient(circle, #1A2440 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .status-dot::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: #6b7280;
+      vertical-align: middle;
+    }
+    .status-dot.checking::before { background: #f59e0b; animation: pulse 1.5s infinite; }
+    .status-dot.up::before { background: #22D67B; }
+    .status-dot.down::before { background: #ef4444; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  </style>
+</head>
+<body class="text-white font-sans">
+
+  <!-- ── Hero ───────────────────────────────────────────────────────────── -->
+  <section class="dot-grid min-h-screen flex flex-col items-center justify-center px-6 py-24 text-center">
+    <div class="max-w-3xl mx-auto">
+      <div class="inline-block border border-accent/30 text-accent text-xs font-mono px-3 py-1 rounded-full mb-6 tracking-wider">
+        ETHGlobal OpenAgents 2026
+      </div>
+      <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-2">
+        Reckon<span class="text-accent">402</span>
+      </h1>
+      <!-- TODO-HEADLINE: one-sentence pitch (pending F analysis) -->
+      <p class="text-2xl sm:text-3xl font-semibold text-gray-300 mt-3 mb-4">
+        Every agent payment, reckoned.
+      </p>
+      <p class="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed mb-10">
+        Reckon402 is the trust and settlement layer for AI agent commerce.
+        Agents that pay reliably build on-chain reputation — and the ecosystem
+        rewards them for it.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="https://demo.reckon402.com"
+           class="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-accent text-navy font-semibold hover:bg-accent/90 transition-colors">
+          See the demo →
+        </a>
+        <a href="https://github.com/hamiha70/reckon402"
+           class="inline-flex items-center justify-center px-6 py-3 rounded-lg border border-gray-600 text-gray-200 font-semibold hover:border-accent hover:text-accent transition-colors">
+          Read the docs →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Problem ─────────────────────────────────────────────────────────── -->
+  <section class="px-6 py-20 bg-navy-light/40">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-2xl font-bold text-gray-100 mb-6">The Problem</h2>
+      <p class="text-gray-400 text-lg leading-relaxed">
+        AI agents can already pay for services autonomously using x402. But every
+        payment starts from zero — there's no memory, no trust, no history.
+        Reckon402 changes this.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── How it works ────────────────────────────────────────────────────── -->
+  <section class="px-6 py-20">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-100 mb-12 text-center">How It Works</h2>
+
+      <!-- Flow Diagram (SVG) -->
+      <div class="overflow-x-auto mb-14">
+        <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg"
+             class="w-full max-w-3xl mx-auto" style="min-width:520px">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#4b5563"/>
+            </marker>
+            <marker id="arrow-accent" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#22D67B"/>
+            </marker>
+          </defs>
+
+          <!-- Buyer agent box -->
+          <rect x="10" y="100" width="140" height="44" rx="8" fill="#1A2440" stroke="#22D67B" stroke-width="1.5"/>
+          <text x="80" y="117" text-anchor="middle" fill="#22D67B" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">Buyer Agent</text>
+          <text x="80" y="133" text-anchor="middle" fill="#9ca3af" font-family="JetBrains Mono,monospace" font-size="9">Signs EIP-3009</text>
+
+          <!-- Arrow Buyer → 402 response -->
+          <line x1="150" y1="122" x2="220" y2="122" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <text x="185" y="115" text-anchor="middle" fill="#6b7280" font-size="9" font-family="Inter,sans-serif">x402 402</text>
+
+          <!-- 402 response box -->
+          <rect x="220" y="100" width="130" height="44" rx="8" fill="#1A2440" stroke="#374151" stroke-width="1.5"/>
+          <text x="285" y="117" text-anchor="middle" fill="#d1d5db" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">Reckon402</text>
+          <text x="285" y="133" text-anchor="middle" fill="#9ca3af" font-family="JetBrains Mono,monospace" font-size="9">Facilitator</text>
+
+          <!-- Arrow Facilitator → Splitter -->
+          <line x1="350" y1="122" x2="420" y2="122" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <text x="385" y="115" text-anchor="middle" fill="#6b7280" font-size="9" font-family="Inter,sans-serif">distribute()</text>
+
+          <!-- Splitter box -->
+          <rect x="420" y="100" width="120" height="44" rx="8" fill="#1A2440" stroke="#374151" stroke-width="1.5"/>
+          <text x="480" y="117" text-anchor="middle" fill="#d1d5db" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">Splitter</text>
+          <text x="480" y="133" text-anchor="middle" fill="#9ca3af" font-family="JetBrains Mono,monospace" font-size="9">Base Sepolia</text>
+
+          <!-- Arrow Splitter → ERC-8004 -->
+          <line x1="540" y1="122" x2="610" y2="122" stroke="#22D67B" stroke-width="1.5" marker-end="url(#arrow-accent)"/>
+          <text x="575" y="115" text-anchor="middle" fill="#22D67B" font-size="9" font-family="Inter,sans-serif">attest</text>
+
+          <!-- ERC-8004 box -->
+          <rect x="610" y="100" width="130" height="44" rx="8" fill="#1A2440" stroke="#22D67B" stroke-width="1.5"/>
+          <text x="675" y="117" text-anchor="middle" fill="#22D67B" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">ERC-8004</text>
+          <text x="675" y="133" text-anchor="middle" fill="#9ca3af" font-family="JetBrains Mono,monospace" font-size="9">Reputation</text>
+
+          <!-- Feedback arc: ERC-8004 → Buyer (loop back) -->
+          <path d="M 675 100 Q 675 30 380 30 Q 85 30 80 100"
+                fill="none" stroke="#22D67B" stroke-width="1.5" stroke-dasharray="5,3"
+                marker-end="url(#arrow-accent)"/>
+          <text x="380" y="22" text-anchor="middle" fill="#22D67B" font-size="10" font-family="Inter,sans-serif">price discount on next call</text>
+
+          <!-- Seller delivers arrow -->
+          <line x1="80" y1="144" x2="80" y2="195" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <!-- Seller box -->
+          <rect x="20" y="195" width="120" height="44" rx="8" fill="#1A2440" stroke="#374151" stroke-width="1.5"/>
+          <text x="80" y="212" text-anchor="middle" fill="#d1d5db" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">Seller Agent</text>
+          <text x="80" y="228" text-anchor="middle" fill="#9ca3af" font-family="JetBrains Mono,monospace" font-size="9">delivers service</text>
+
+          <!-- Gateway box -->
+          <rect x="310" y="195" width="120" height="44" rx="8" fill="#1A2440" stroke="#374151" stroke-width="1.5"/>
+          <text x="370" y="212" text-anchor="middle" fill="#d1d5db" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">CCIP-Read</text>
+          <text x="370" y="228" text-anchor="middle" fill="#9ca3af" font-family="JetBrains Mono,monospace" font-size="9">Gateway</text>
+
+          <!-- ERC-8004 → Gateway read -->
+          <line x1="610" y1="144" x2="430" y2="195" stroke="#22D67B" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-accent)"/>
+          <text x="540" y="185" text-anchor="middle" fill="#22D67B" font-size="9" font-family="Inter,sans-serif">reads rep</text>
+        </svg>
+      </div>
+
+      <!-- Three steps -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="bg-navy-light/50 border border-gray-800 rounded-xl p-6">
+          <div class="text-3xl font-bold text-accent mb-3">01</div>
+          <h3 class="font-bold text-white text-lg mb-2">Pay</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Buyer agent resolves merchant ENS name, receives x402 payment
+            request, signs EIP-3009 authorization. No wallet popup. No
+            human in the loop.
+          </p>
+        </div>
+        <div class="bg-navy-light/50 border border-gray-800 rounded-xl p-6">
+          <div class="text-3xl font-bold text-accent mb-3">02</div>
+          <h3 class="font-bold text-white text-lg mb-2">Settle</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Reckon402 Facilitator validates authorization, submits on-chain
+            settlement, distributes funds via Splitter, confirms in D1.
+          </p>
+        </div>
+        <div class="bg-navy-light/50 border border-gray-800 rounded-xl p-6">
+          <div class="text-3xl font-bold text-accent mb-3">03</div>
+          <h3 class="font-bold text-white text-lg mb-2">Earn Trust</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Facilitator writes ERC-8004 attestation proving delivery.
+            Reputation grows. Gateway adjusts price on next resolution.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Packages ────────────────────────────────────────────────────────── -->
+  <section class="px-6 py-20 bg-navy-light/40">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-100 mb-10 text-center">Packages</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+        <!-- buyer-sdk -->
+        <div class="bg-[#0d1a2e] border border-gray-800 rounded-xl p-6 hover:border-accent/50 transition-colors">
+          <div class="flex items-start justify-between mb-3">
+            <span class="font-mono text-accent text-sm font-semibold">@reckon402/buyer-sdk</span>
+            <a href="https://www.npmjs.com/package/@reckon402/buyer-sdk"
+               target="_blank"
+               class="text-xs text-gray-500 hover:text-accent transition-colors">npm ↗</a>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">
+            Drop-in x402 buyer flow — resolve, sign, pay in 3 lines.
+          </p>
+          <div class="bg-navy rounded-lg px-4 py-2 font-mono text-xs text-gray-300">
+            npm i @reckon402/buyer-sdk
+          </div>
+        </div>
+
+        <!-- middleware-hono -->
+        <div class="bg-[#0d1a2e] border border-gray-800 rounded-xl p-6 hover:border-accent/50 transition-colors">
+          <div class="flex items-start justify-between mb-3">
+            <span class="font-mono text-accent text-sm font-semibold">@reckon402/middleware-hono</span>
+            <a href="https://www.npmjs.com/package/@reckon402/middleware-hono"
+               target="_blank"
+               class="text-xs text-gray-500 hover:text-accent transition-colors">npm ↗</a>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">
+            Hono middleware: add x402 paywall to any route.
+          </p>
+          <div class="bg-navy rounded-lg px-4 py-2 font-mono text-xs text-gray-300">
+            npm i @reckon402/middleware-hono
+          </div>
+        </div>
+
+        <!-- erc-8004-client -->
+        <div class="bg-[#0d1a2e] border border-gray-800 rounded-xl p-6 hover:border-accent/50 transition-colors">
+          <div class="flex items-start justify-between mb-3">
+            <span class="font-mono text-accent text-sm font-semibold">@reckon402/erc-8004-client</span>
+            <a href="https://www.npmjs.com/package/@reckon402/erc-8004-client"
+               target="_blank"
+               class="text-xs text-gray-500 hover:text-accent transition-colors">npm ↗</a>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">
+            Read and write ERC-8004 agent reputation on Base.
+          </p>
+          <div class="bg-navy rounded-lg px-4 py-2 font-mono text-xs text-gray-300">
+            npm i @reckon402/erc-8004-client
+          </div>
+        </div>
+
+        <!-- kh-skill -->
+        <div class="bg-[#0d1a2e] border border-gray-800 rounded-xl p-6 hover:border-accent/50 transition-colors">
+          <div class="flex items-start justify-between mb-3">
+            <span class="font-mono text-accent text-sm font-semibold">@reckon402/kh-skill</span>
+            <a href="https://www.npmjs.com/package/@reckon402/kh-skill"
+               target="_blank"
+               class="text-xs text-gray-500 hover:text-accent transition-colors">npm ↗</a>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">
+            KeeperHub skill for x402 payments via hosted signer.
+          </p>
+          <div class="bg-navy rounded-lg px-4 py-2 font-mono text-xs text-gray-300">
+            npm i @reckon402/kh-skill
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Live Network ─────────────────────────────────────────────────────── -->
+  <section class="px-6 py-20">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-100 mb-10 text-center">Live Network</h2>
+      <div class="space-y-3" id="endpoints-list">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Novelty Claim ───────────────────────────────────────────────────── -->
+  <section class="px-6 py-16 bg-navy-light/40">
+    <div class="max-w-2xl mx-auto text-center">
+      <p class="text-gray-400 text-sm leading-relaxed">
+        Reckon402 is the first x402 facilitator to close the ERC-8004 reputation
+        loop: every settlement writes provable on-chain proof of delivery, and
+        every resolution reads it. As of April 2026, no other facilitator has
+        shipped this.
+        <a href="https://github.com/hamiha70/reckon402/blob/main/AGENTS.md"
+           target="_blank"
+           class="text-accent hover:underline ml-1">See evidence →</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
+  <footer class="px-6 py-10 border-t border-gray-800">
+    <div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <span class="font-semibold text-gray-400">Reckon402</span>
+      <div class="flex gap-6">
+        <a href="https://github.com/hamiha70/reckon402" target="_blank"
+           class="hover:text-accent transition-colors">GitHub</a>
+        <a href="https://www.npmjs.com/org/reckon402" target="_blank"
+           class="hover:text-accent transition-colors">npm packages</a>
+        <a href="https://ethglobal.com/events/openagents" target="_blank"
+           class="hover:text-accent transition-colors">ETHGlobal OpenAgents 2026</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ── Live Network status badges ──────────────────────────────────────────
+    const ENDPOINTS = [
+      { label: 'Facilitator',      url: 'https://facilitator.reckon402.com/healthz',  display: 'facilitator.reckon402.com' },
+      { label: 'CCIP-Read Gateway',url: 'https://gateway.reckon402.com',              display: 'gateway.reckon402.com' },
+      { label: 'Demo Seller Agent',url: 'https://agent.reckon402.com/health',         display: 'agent.reckon402.com' },
+      { label: 'Signing Wrapper',  url: 'https://signing.reckon402.com/healthz',      display: 'signing.reckon402.com' },
+      { label: 'Live Dashboard',   url: 'https://demo.reckon402.com',                 display: 'demo.reckon402.com' },
+    ]
+
+    const list = document.getElementById('endpoints-list')
+
+    async function checkEndpoint(ep) {
+      const div = document.getElementById(`ep-${ep.label.replace(/\s/g,'_')}`)
+      if (!div) return
+      const dot = div.querySelector('.status-dot')
+      try {
+        const res = await fetch(ep.url, { signal: AbortSignal.timeout(5000) })
+        dot.className = 'status-dot ' + (res.ok ? 'up' : 'down')
+      } catch {
+        dot.className = 'status-dot down'
+      }
+    }
+
+    ENDPOINTS.forEach(ep => {
+      const id = `ep-${ep.label.replace(/\s/g,'_')}`
+      const div = document.createElement('div')
+      div.id = id
+      div.className = 'flex items-center justify-between bg-[#0d1a2e] border border-gray-800 rounded-lg px-5 py-4'
+      div.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="status-dot checking"></span>
+          <span class="font-semibold text-gray-200 text-sm">${ep.label}</span>
+        </div>
+        <span class="font-mono text-xs text-gray-500">${ep.display}</span>
+      `
+      list.appendChild(div)
+      checkEndpoint(ep)
+    })
+  </script>
+
+</body>
+</html>

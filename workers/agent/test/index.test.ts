@@ -69,7 +69,7 @@ describe('GET /research', () => {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ))
-
+  
     const payload = {
       x402Version: 2,
       accepted: {
@@ -115,6 +115,11 @@ describe('GET /research', () => {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ))
+      // third call: public RPC probe for chain-health response
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ jsonrpc: '2.0', id: 1, result: '0xc350f0' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ))
 
     const payload = {
       x402Version: 2,
@@ -140,7 +145,7 @@ describe('GET /research', () => {
       },
     }
 
-    await fetchApp('/research?q=test', {
+    const res = await fetchApp('/research?q=test', {
       headers: { 'payment-signature': btoa(JSON.stringify(payload)) },
     })
 
@@ -149,12 +154,25 @@ describe('GET /research', () => {
     const urls = calls.map(([u]) => u)
     expect(urls).toContain(`${TEST_ENV.FACILITATOR_URL}/verify`)
     expect(urls).toContain(`${TEST_ENV.FACILITATOR_URL}/settle`)
-    // Wire-compat invariant: body shape is the canonical wrapper.
-    for (const [, init] of calls) {
+    // Wire-compat invariant: only facilitator calls carry the canonical x402 wrapper.
+    const facilitatorCalls = calls.filter(([u]) => (u as string).startsWith(TEST_ENV.FACILITATOR_URL))
+    for (const [, init] of facilitatorCalls) {
       const body = JSON.parse(init.body as string)
       expect(body.x402Version).toBe(2)
       expect(body.paymentPayload).toBeDefined()
       expect(body.paymentRequirements).toBeDefined()
     }
+
+    // Chain-health response shape
+    const body = await res.json() as {
+      query: string
+      result: { chain: string; latestBlock: number; summary: string }
+      meta: { paymentId: string | null; paidAt: string }
+    }
+    expect(body.query).toBe('test')
+    expect(body.result.chain).toBe('Base Sepolia')
+    expect(body.result.latestBlock).toBe(0xc350f0)
+    expect(body.result.summary).toContain('Base Sepolia is healthy')
+    expect(body.meta).toHaveProperty('paidAt')
   })
 })

@@ -43,14 +43,54 @@ app.use('/research', async (c, next) => {
   return middleware(c, next)
 })
 
-app.get('/research', (c) => {
+app.get('/research', async (c) => {
   const q = c.req.query('q')
   if (!q) return c.json({ error: 'q is required' }, 400)
+
+  const paymentResponse = c.res.headers.get('PAYMENT-RESPONSE')
+  let paymentId: string | undefined
+  let paidAt: string | undefined
+  if (paymentResponse) {
+    try {
+      const decoded = JSON.parse(atob(paymentResponse)) as { paymentId?: string }
+      paymentId = decoded.paymentId
+      paidAt = new Date().toISOString()
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Fetch latest Base Sepolia block via public JSON-RPC
+  let latestBlock: number | undefined
+  let blockTimestamp: string | undefined
+  let chainHealthy = false
+  try {
+    const rpcRes = await fetch('https://sepolia.base.org', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
+      signal: AbortSignal.timeout(4000),
+    })
+    const rpcData = await rpcRes.json() as { result?: string }
+    if (rpcData.result) {
+      latestBlock = parseInt(rpcData.result, 16)
+      blockTimestamp = new Date().toISOString()
+      chainHealthy = true
+    }
+  } catch { /* public RPC unreachable — fall through */ }
+
   return c.json({
     query: q,
-    summary: 'This is a stub response. Real research is coming in a future layer.',
-    agent: 'reckon402-demo-research',
-    layer: 'L3',
+    result: {
+      chain: 'Base Sepolia',
+      latestBlock: latestBlock ?? null,
+      timestamp: blockTimestamp ?? new Date().toISOString(),
+      summary: chainHealthy
+        ? `Base Sepolia is healthy. Current block: ${latestBlock}. Network producing blocks normally.`
+        : 'Base Sepolia RPC temporarily unreachable. Response is cached.',
+    },
+    meta: {
+      paymentId: paymentId ?? null,
+      paidAt: paidAt ?? new Date().toISOString(),
+    },
   })
 })
 

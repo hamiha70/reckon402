@@ -958,6 +958,74 @@ Testnet-specific env var defaults (no override needed for standard testnet run):
 See `tools/deploy/kh-platform-runbook.md` for import steps. Once published,
 update the KH workflow URL row in the table above.
 
+## Landing Page + Packages (2026-04-29)
+
+### reckon402.com CF Pages
+
+| Item | Value |
+|------|-------|
+| CF Pages project name | `reckon402-landing` (to be created — see `landing/DEPLOY.md`) |
+| Source directory | `landing/` |
+| Landing page | `landing/index.html` (vanilla HTML + Tailwind CDN; no build step) |
+| Deploy runbook | `landing/DEPLOY.md` |
+| Last deploy | _TODO: paste after first manual deploy_ |
+| Custom domain | `reckon402.com` |
+
+The CF API token in Infisical may lack `Pages:Edit` scope. The first deploy
+is a manual step — follow `landing/DEPLOY.md`. Once the project exists, add:
+
+```
+just deploy-landing   # npx wrangler pages deploy landing/ --project-name reckon402-landing
+```
+
+**TODO-HEADLINE:** The hero headline in `landing/index.html` is currently
+`"Every agent payment, reckoned."` (placeholder). Replace with the final
+one-sentence pitch once the F analysis is complete.
+
+### npm package publish-readiness (as of 2026-04-29)
+
+| Package | Status | Notes |
+|---------|--------|-------|
+| `@reckon402/buyer-sdk` | ready | `publishConfig`, `build`, `prepublishOnly` all set |
+| `@reckon402/erc-8004-client` | ready | `publishConfig`, `build`, `prepublishOnly` all set |
+| `@reckon402/middleware-hono` | ready | `publishConfig`, `build`, `prepublishOnly` all set |
+| `@reckon402/kh-skill` | ready | `publishConfig`, `build` set; `prepublishOnly` build-only (no test suite yet) |
+| `@reckon402/types` | NOT ready | workspace-only today; no `publishConfig` or `build` script; add before H-9 |
+
+All four public packages have:
+- `"publishConfig": {"access": "public"}` — with dist entry-points
+- `"build"` script: `tsc -p tsconfig.build.json`
+- `"prepublishOnly"` script (build + test for packages with test suites)
+- `tsconfig.build.json` (`dist/`, NodeNext module mode, declarations)
+- `"files": ["dist", "src"]` — test files and source maps excluded (no test/ in files)
+
+Publish runbook: `tools/deploy/npm-publish-runbook.md`
+
+**Do NOT publish during L2–L4 build commits.** Optional H-9 polish step.
+
+### Seller agent response (2026-04-29)
+
+`workers/agent/src/index.ts` `/research` handler upgraded from canned stub to
+live chain-health response: fetches `eth_blockNumber` from the public Base Sepolia
+RPC (`https://sepolia.base.org`) and returns:
+
+```json
+{
+  "query": "<buyer's query string>",
+  "result": {
+    "chain": "Base Sepolia",
+    "latestBlock": 12345678,
+    "timestamp": "2026-04-29T12:34:56Z",
+    "summary": "Base Sepolia is healthy. Current block: 12345678. Network producing blocks normally."
+  },
+  "meta": { "paymentId": "0x...", "paidAt": "2026-04-29T..." }
+}
+```
+
+Graceful fallback if RPC is unreachable (AbortSignal.timeout 4s): returns
+`latestBlock: null` with a `"temporarily unreachable"` summary. Tests updated;
+9/9 green.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

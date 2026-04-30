@@ -12,9 +12,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "github:hamiha70"
+    "url": "github:hamiha70/reckon402"
   },
   "files": ["src"],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "test": "vitest run"
   },

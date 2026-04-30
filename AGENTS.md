@@ -1026,6 +1026,202 @@ Graceful fallback if RPC is unreachable (AbortSignal.timeout 4s): returns
 `latestBlock: null` with a `"temporarily unreachable"` summary. Tests updated;
 9/9 green.
 
+## L4c SplitterFactory + per-payment resolution
+
+Spec source: `specs/08a-l4c-factory-refactor.md`. Lifts the single-
+`SPLITTER_ADDRESS`-per-facilitator constraint baked into L3/L4b₁. One
+facilitator serves N SellingAgents; each SellingAgent owns their own
+Splitter deployed via CREATE2 through a shared `SplitterFactory`.
+
+### Contracts
+
+- `contracts/src/SplitterFactory.sol` — CREATE2 factory.
+  `createSplitter(sellingAgent, recipients, bps, salt)` deploys a per-
+  SellingAgent Splitter, emits `SplitterCreated(sellingAgent, splitter,
+  salt, recipients, bps)`, and marks `isDeployed[splitter] = true`.
+  `predictAddress(salt, recipients, bps)` gives the deterministic
+  address for the onboarding script to pre-fill the `x402.splitter`
+  ENS record. No admin, no upgrade. SellingAgent MUST equal `recipients[0]`
+  (slot 0 = seller by L3 Splitter convention).
+- `contracts/test/SplitterFactory.t.sol` — 10/10 cases green (happy path,
+  duplicate-salt revert, input validation, bubbled Splitter reverts,
+  predictAddress round-trip, 256-case fuzz on salt).
+- `contracts/script/DeploySplitterFactory.s.sol` — Foundry deploy script.
+  Env: `SPLITTER_FACTORY_TOKEN` (USDC on Base Sepolia).
+
+### Facilitator worker
+
+- `workers/facilitator/src/treasury/splitter-resolver.ts` — per-payment
+  resolver. Reads `x402.splitter` + `x402.erc8004.agent_id` from the
+  gateway (parallel `Promise.all` fetch), validates the splitter came
+  from our factory via `SplitterFactory.isDeployed`, returns
+  `{splitter, agentId, ensName}` or `null` on any failure. Never throws.
+- `workers/facilitator/src/settle-route.ts` — when `ENABLE_L4C_FACTORY=
+  "true"`, runs splitter resolution BEFORE the SUBMITTED →
+  PENDING_CONFIRMATION claim. Missing/forged record transitions the
+  receipt to a new terminal state `SPLITTER_UNKNOWN` and returns HTTP
+  422 `{error: "splitter_unknown", ensName}`. No gas is spent in the
+  forged-record case. The resolved splitter is threaded into
+  `settleOnChain` as `input.splitter` (falls back to
+  `env.SPLITTER_ADDRESS` when the flag is off).
+- `workers/facilitator/src/settle.ts` — accepts `splitter` per-payment
+  via `SettleInput.splitter`; `env.SPLITTER_ADDRESS` is now a
+  deprecated fallback used only when the flag is off.
+- `workers/facilitator/src/treasury/attestation.ts` — L4c: when
+  `input.resolved` is present, `agentId` is taken verbatim from it
+  (gateway + factory validated) and the legacy JSON-map resolver is
+  NEVER consulted. L4b₁ legacy path is gated on
+  `USE_LEGACY_AGENT_RESOLVER="true"`.
+- `workers/facilitator/src/state-machine.ts` — `SPLITTER_UNKNOWN` added
+  as a terminal state with only `SUBMITTED → SPLITTER_UNKNOWN` allowed.
+  Not in the retry-reconciler's sweep scope.
+
+### Env + migration
+
+New `wrangler.toml [vars]`:
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `SPLITTER_FACTORY_ADDRESS` | `""` | v1 factory on Base Sepolia; populated at deploy time. |
+| `GATEWAY_BASE_URL` | `https://gateway.reckon402.com` | Base URL for `x402.splitter` + `x402.erc8004.agent_id` lookups. |
+| `ENABLE_L4C_FACTORY` | `"false"` | Master switch: `false`=legacy single-splitter; `true`=per-payment resolution. |
+| `USE_LEGACY_AGENT_RESOLVER` | `"true"` | Keeps L4b₁ JSON-map fallback live for regression; flip to `"false"` after smoke. |
+
+Deprecated (kept for flag-off regression only): `SPLITTER_ADDRESS`,
+`SELLER_AGENT_IDS`.
+
+Migration `workers/facilitator/migrations/0003_l4c_splitter_factory.sql`
+adds a `deployment_config` kv table; the factory address is written there
+once at deploy time for audit + cold-start logging.
+
+### Tests
+
+- Vitest: 97/97 green.
+  - `test/splitter-resolver.test.ts` — 10 cases (happy path; gateway 404
+    on each record; malformed splitter; agentId = "0" / non-numeric;
+    factory `isDeployed=false`; factory RPC throws; checksum
+    normalization; parallel fetch dispatch discipline). Every mock call
+    asserts full arg shapes per `feedback_testing.md`.
+  - `test/settle-route-factory.test.ts` — 6 cases (flag-off legacy;
+    flag-on resolver=null → 422 + SPLITTER_UNKNOWN + no tx; flag-on
+    missing ens → 400; flag-on happy path threads splitter into
+    `settleOnChain`; state-machine allowlist; L4b₁ regression shape).
+  - `test/attestation.test.ts` — L4c regression cases: `resolved.agentId`
+    used directly (legacy `resolveAgentId` never called); `resolved=null`
+    + `USE_LEGACY_AGENT_RESOLVER="false"` → silent skip.
+- Forge: 10/10 on `SplitterFactoryTest`.
+
+### Deployment
+
+Landing sequence (flag-gated):
+
+1. `forge test --match-contract SplitterFactory` — 10/10 green.
+2. `forge script DeploySplitterFactory.s.sol:DeploySplitterFactory
+   --rpc-url $BASE_SEPOLIA_RPC --broadcast` — capture factory address.
+3. Apply `0003_l4c_splitter_factory.sql` to
+   `reckon402-d1-facilitator-dev`; write factory address into
+   `deployment_config.splitter_factory_address`.
+4. Deploy worker with `ENABLE_L4C_FACTORY="false"` — regression via
+   `full-flow-l4b.sh` MUST pass.
+5. Flip `ENABLE_L4C_FACTORY="true"`, run L4c smoke
+   (`full-flow-l4c-factory.sh` — Spec 08B's integration harness);
+   verify 422 on forged-splitter path + 200 on happy path.
+6. Flip `USE_LEGACY_AGENT_RESOLVER="false"`; re-run smoke.
+7. Push annotated tag `L4c-factory-green`.
+
+## L4c Onboarding + signed writes + frontend (Spec 08B)
+
+### Scope shipped
+
+- `tools/onboard/` — Node CLI `tsx tools/onboard/src/cli.ts` (also
+  exposed as `just onboard <ens> <sellerEoa>`). Five step modules
+  (mint-subname / deploy-splitter / register-agent-id / set-ens-records
+  / seed-gateway) under `tools/onboard/src/steps/`.
+  Orchestrator composes them in `src/orchestrator.ts`.
+  Vitest: 24/24 green (one suite per step module + 5 orchestrator cases
+  with full-arg assertions per `feedback_testing.md`).
+- `gateway/src/ens/owner-lookup.ts` — `getEnsOwner(env, ensName)` reader
+  for `ENSRegistry.owner(namehash(ensName))` on Ethereum Sepolia with
+  60s D1-cached responses. Returns null on any failure (ACL denies by
+  default). 9/9 vitest green.
+- `gateway/src/routes/admin/` — `auth.ts` (signed-write digest +
+  signer recovery), `records.ts` (per-key ACL enforcement with
+  bootstrap-window exception), `bootstrap.ts` (Reckon402-signed batch
+  seed + `/gateway-seed` endpoint that upserts both `agent_id_index`
+  and `merchants.records`). ACL table in `gateway/src/lib/acl.ts`.
+  17/17 vitest cases covering spec §7.1 (signature mismatch, replay
+  guard via `UNIQUE(ens_name, nonce)`, bootstrap-window one-way door,
+  ACL deny/allow matrix).
+- `gateway/migrations/0003_l4c_signed_writes.sql` — adds
+  `record_updates`, `ens_owner_cache`, `onboard_progress` tables. No
+  changes to existing L4a₁/L4a₂ tables. Shared with onboard-orchestrator.
+- `workers/onboard-orchestrator/` — CF Worker exposing `POST /onboard`
+  (202 + `{onboardId}` immediately; runOnboard in `ctx.waitUntil`),
+  `GET /onboard/:id/status` (progress poll), `GET /healthz`. Static
+  assets for the frontend served via Workers Assets binding at
+  `apps/frontend/dist/`. 13/13 vitest cases covering the HTTP surface
+  + progress-store round-trip.
+- `apps/frontend/` — vanilla-TS single-page app with onboarding form +
+  dashboard (ENS/agentId/Splitter, static tier table, call log,
+  Option C terminal pane per `demo_narrative.md`). Served from
+  same-origin as orchestrator worker → no CORS. Polls every 3s.
+- `tools/integration-tests/full-flow-l4c-onboard.sh` — end-to-end smoke:
+  POST /onboard → status=succeeded → gateway records served → paid call
+  → post-attestation discount reflected in `x402.amount?backend=erc8004`.
+
+### ACL (per `ens_record_ownership_split.md`)
+
+| Key                         | Writer       |
+|-----------------------------|--------------|
+| `x402.splitter`             | Reckon402    |
+| `x402.facilitator`          | Reckon402    |
+| `x402.erc8004.registry`     | Reckon402    |
+| `x402.erc8004.agent_id`     | Reckon402    |
+| `x402.amount`               | SellingAgent |
+| `x402.pricing`              | SellingAgent |
+| `x402.endpoint`             | SellingAgent |
+| `x402.attestation`          | SellingAgent |
+| `x402.yield`                | SellingAgent |
+| `x402.scheme`/`.version`/`.asset` | SellingAgent |
+
+Bootstrap window: while `owner(namehash(ensName))` equals
+`RECKON402_ONBOARDING_EOA`, Reckon402 may also write SellingAgent keys.
+The final `setOwner(subnode, seller)` in step 5 of onboarding closes
+this window. Once closed, Reckon402 /admin/records calls for
+SellingAgent keys return 403.
+
+### Signed-write digest
+
+`digest = keccak256(abi.encode(chainId, ensName, key, value, nonce))`
+
+- `chainId` = Ethereum Sepolia (`11155111`). ENS ownership is on
+  Ethereum Sepolia; binding the digest to that chainId prevents
+  cross-chain replay.
+- `nonce` is a 32-byte random value. UNIQUE(ens_name, nonce) in
+  `record_updates` is the replay guard — second call with same tuple
+  returns 409.
+- Callers sign `digest` directly (no EIP-191 prefix) — this is a
+  programmatic signing path, not a wallet UX path.
+
+### Deployment checklist
+
+1. Apply `gateway/migrations/0003_l4c_signed_writes.sql` to
+   `reckon402-d1-gateway-dev`.
+2. Gateway `wrangler.toml [vars].RECKON402_ONBOARDING_EOA` — set to the
+   public address of the onboarding signer.
+3. `wrangler deploy --env production` on gateway (admin routes live).
+4. Orchestrator wrangler secrets (Infisical-piped):
+   `ETH_SEPOLIA_RPC_PRIMARY`, `BASE_SEPOLIA_RPC_PRIMARY`,
+   `ENS_FUNDER_PK`, `RECKON402_DEPLOYER_PK`, `RECKON402_ONBOARDING_PK`.
+5. Orchestrator `wrangler.toml [vars].SPLITTER_FACTORY_ADDRESS` +
+   `.RECKON402_ONBOARDING_EOA` — fill post-08A deploy.
+6. `wrangler deploy --env production` on onboard-orchestrator. Route
+   binds to `app.reckon402.com`.
+7. Smoke: `just onboard seller9.reckon402-test.eth 0x<sellerEoa>` runs
+   end-to-end locally against live Sepolia + Base Sepolia.
+8. Smoke: `just fullflow-l4c-onboard` runs the automated harness.
+9. Push tag `L4c-onboarding-green`.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

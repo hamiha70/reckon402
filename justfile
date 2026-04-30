@@ -45,3 +45,24 @@ seed kind amount:
 # kind: deployer | facilitator    amount: e.g. 0.1
 refund kind amount:
     {{secrets}} bash tools/scripts/refund.sh {{kind}} {{amount}}
+
+# L4c — onboard a fresh SellingAgent via the 5-step CLI. Runs ENS subname mint,
+# Splitter deploy, ERC-8004 agentId register, gateway record write, gateway
+# seed, and final ENS ownership transfer to the seller EOA.
+#
+# Usage: just onboard <ensName> <sellerEoa> [endpoint] [amount]
+#   ensName:   e.g. seller9.reckon402-test.eth
+#   sellerEoa: the SellingAgent's EOA on Base Sepolia (also becomes Splitter recipient[0])
+#   endpoint:  defaults to https://agent.reckon402.com/research
+#   amount:    atomic USDC, defaults to 100000 (0.10 USDC)
+onboard ensName sellerEoa endpoint='https://agent.reckon402.com/research' amount='100000':
+    {{secrets}} pnpm -C tools/onboard exec tsx src/cli.ts \
+      --name {{ensName}} \
+      --seller-eoa {{sellerEoa}} \
+      --endpoint {{endpoint}} \
+      --amount {{amount}}
+
+# L4c — live full-flow onboard + paid-call smoke. Assumes 08A factory deployed
+# and 08B orchestrator + gateway admin routes live.
+fullflow-l4c-onboard:
+    {{secrets}} bash -c 'cd tools/integration-tests && bash full-flow-l4c-onboard.sh'

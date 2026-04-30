@@ -14,8 +14,23 @@
     "type": "git",
     "url": "github:hamiha70/reckon402"
   },
-  "files": ["src"],
+  "files": ["dist", "src"],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "rm -rf dist && pnpm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
 }

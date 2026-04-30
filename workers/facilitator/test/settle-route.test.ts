@@ -158,6 +158,11 @@ function makeEnv(db: ReturnType<typeof makeFakeDb>): Env {
     SELLER_AGENT_IDS: '{}',
     GATEWAY_CACHE_HOOK_URL: 'https://unused.local/hooks/cache-invalidate',
     ATTESTATION_FEEDBACK_URI_PREFIX: 'https://unused.local/x402/receipt/',
+    // L4c flags OFF — these tests pin the L4b₁ regression path.
+    SPLITTER_FACTORY_ADDRESS: '',
+    GATEWAY_BASE_URL: 'https://unused.local',
+    ENABLE_L4C_FACTORY: 'false',
+    USE_LEGACY_AGENT_RESOLVER: 'true',
   }
 }
 

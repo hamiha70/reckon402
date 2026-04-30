@@ -21,7 +21,13 @@ const log = makeLogger('settle')
 export interface SettleEnv {
   FACILITATOR_PK: string
   USDC_ADDRESS: string
-  SPLITTER_ADDRESS: string
+  /**
+   * @deprecated L4c passes `splitter` per-payment via `SettleInput`.
+   *             Kept only so the L4b₁ regression path (ENABLE_L4C_FACTORY="false")
+   *             can continue to read the env singleton through
+   *             `input.splitter ?? env.SPLITTER_ADDRESS`.
+   */
+  SPLITTER_ADDRESS?: string
   BASE_SEPOLIA_RPC_PRIMARY: string
   BASE_SEPOLIA_RPC_FALLBACK?: string
 }
@@ -30,6 +36,13 @@ export interface SettleInput {
   authorization: EIP3009Authorization
   signature: Hex
   paymentId: Hex
+  /**
+   * L4c: per-payment Splitter address resolved from the SellingAgent's
+   * `x402.splitter` ENS record (after factory `isDeployed` validation).
+   * When omitted the handler falls back to `env.SPLITTER_ADDRESS`
+   * (L4b₁ regression path).
+   */
+  splitter?: Hex
 }
 
 export type SettleOutcome =
@@ -64,6 +77,14 @@ function makeClients(env: SettleEnv) {
  */
 export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise<SettleOutcome> {
   const { authorization, signature, paymentId } = input
+  const splitterAddress = (input.splitter ?? env.SPLITTER_ADDRESS) as Hex
+  if (!splitterAddress) {
+    return {
+      success: false,
+      failureReason: 'OTHER',
+      failureDetail: 'no_splitter_address: neither input.splitter nor env.SPLITTER_ADDRESS set',
+    }
+  }
   const { account, publicClient, walletClient } = makeClients(env)
 
   // Deadline pre-check — cheap guard before spending gas.
@@ -147,7 +168,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
       address: env.USDC_ADDRESS as Hex,
       abi: USDC_ABI,
       functionName: 'balanceOf',
-      args: [env.SPLITTER_ADDRESS as Hex],
+      args: [splitterAddress],
     }) as bigint
     if (bal >= expectedAmount) break
     if (Date.now() - pollStart > POLL_TIMEOUT_MS) {
@@ -167,7 +188,7 @@ export async function settleOnChain(env: SettleEnv, input: SettleInput): Promise
     // and see InsufficientBalance even after the balance poll passed.
     // 300_000 is conservative upper-bound for 8 recipients × ~30k each.
     distributeTx = await walletClient.writeContract({
-      address: env.SPLITTER_ADDRESS as Hex,
+      address: splitterAddress,
       abi: SPLITTER_ABI,
       functionName: 'distribute',
       args: [paymentId, BigInt(authorization.value)],

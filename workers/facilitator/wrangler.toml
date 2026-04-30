@@ -35,3 +35,18 @@ GATEWAY_CACHE_HOOK_URL          = "https://gateway.reckon402.com/hooks/cache-inv
 ATTESTATION_FEEDBACK_URI_PREFIX = "https://facilitator.reckon402.com/x402/receipt/"
 # GATEWAY_CACHE_HOOK_TOKEN via `wrangler secret put` (shared value with
 # the gateway worker's secret of the same name)
+
+# L4c SplitterFactory + per-payment splitter resolution —
+# see specs/08a-l4c-factory-refactor.md §5.
+# SPLITTER_FACTORY_ADDRESS is populated by `just deploy-splitter-factory`
+# after the contract lands on Base Sepolia; empty string here is the
+# "not yet deployed" sentinel (ENABLE_L4C_FACTORY stays "false" until then).
+SPLITTER_FACTORY_ADDRESS        = ""
+GATEWAY_BASE_URL                = "https://gateway.reckon402.com"
+# Ship with the L4c factory path OFF so the L4b₁ regression path still owns
+# `ENABLE_L4C_FACTORY="false"`. A follow-up deploy flips it to "true".
+ENABLE_L4C_FACTORY              = "false"
+# Keep the legacy JSON-map agent resolver live until L4c smoke completes;
+# the factory path passes agentId directly from `resolveSplitterForPayment`
+# without touching SELLER_AGENT_IDS.
+USE_LEGACY_AGENT_RESOLVER       = "true"

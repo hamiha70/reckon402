@@ -27,11 +27,22 @@ vi.mock('viem', async () => {
   }
 })
 
-// Mock the agent resolver — we're testing the attestation path, not
-// resolution (which has its own test file).
-vi.mock('../src/treasury/agent-resolver.js', () => ({
-  resolveAgentId: resolveAgentIdSpy,
-}))
+// Mock the agent resolver — attestation.ts calls
+// `resolveAgentIdForAttestation` (the real L4c facade) which in turn
+// delegates to the legacy `resolveAgentId` iff USE_LEGACY_AGENT_RESOLVER
+// is "true". Keep the real facade so the L4c case (where
+// `input.resolved` is provided) exercises the production short-circuit,
+// but spy on `resolveAgentId` so we can assert the legacy JSON-map
+// path is (or isn't) consulted per case.
+vi.mock('../src/treasury/agent-resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('../src/treasury/agent-resolver.js')>(
+    '../src/treasury/agent-resolver.js',
+  )
+  return {
+    ...actual,
+    resolveAgentId: resolveAgentIdSpy,
+  }
+})
 
 import { maybeWriteAttestation, type AttestationEnv, type AttestationInput } from '../src/treasury/attestation.js'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -146,6 +157,7 @@ function baseEnv(db: ReturnType<typeof makeFakeDb>, overrides: Partial<Attestati
     ENABLE_ERC8004_WRITES: 'true',
     ERC8004_CHAIN_ID: '84532',
     SELLER_AGENT_IDS: `{"${SELLER.toLowerCase()}":"1"}`,
+    USE_LEGACY_AGENT_RESOLVER: 'true',
     GATEWAY_CACHE_HOOK_URL: 'https://gw.local/hooks/cache-invalidate',
     GATEWAY_CACHE_HOOK_TOKEN: 'hooktoken',
     ATTESTATION_FEEDBACK_URI_PREFIX: 'https://f.local/x402/receipt/',
@@ -358,5 +370,78 @@ describe('maybeWriteAttestation — failure paths', () => {
     const row = db.attestations.get(`${PAYMENT_ID}:1`)
     expect(row?.reputation_tx).toBe(ATT_TX)
     expect(globalThis.fetch).not.toHaveBeenCalled()
+  })
+})
+
+// L4c regression (Spec 08A §7.4 case 10): when the caller threads
+// `input.resolved` (ENS + factory-validated Splitter + agentId), the
+// attestation path takes agentId verbatim from that object and the
+// legacy JSON-map resolver (`resolveAgentId`) is NEVER consulted. This
+// is the load-bearing multi-SellingAgent invariant — if this breaks,
+// the facilitator would silently fall back to the map's single entry
+// and attest every payment under one agentId.
+describe('maybeWriteAttestation — L4c resolved.agentId path', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('uses resolved.agentId directly; legacy resolveAgentId never called; giveFeedback gets the exact agentId', async () => {
+    const db = makeFakeDb()
+    giveFeedbackSpy.mockResolvedValue(ATT_TX)
+    waitForTransactionReceiptSpy.mockResolvedValue({ status: 'success', blockNumber: 777n })
+    ;(globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response('{}', { status: 200 }),
+    )
+
+    const resolvedAgentId = 42n
+    const inputWithResolved: AttestationInput = {
+      ...INPUT,
+      resolved: {
+        splitter: '0xABcdEFabCdEFABcDefaBCdEFabcDefAbCdefAbcD',
+        agentId: resolvedAgentId,
+        ensName: 'alice.reckon402.eth',
+      },
+    }
+
+    // Env has USE_LEGACY_AGENT_RESOLVER="false" to prove the fallback
+    // cannot kick in even if the spy were accidentally invoked.
+    const env = baseEnv(db, { USE_LEGACY_AGENT_RESOLVER: 'false' })
+    const p = maybeWriteAttestation(env, inputWithResolved)
+    await vi.runAllTimersAsync()
+    await p
+
+    // LOAD-BEARING: the legacy JSON-map resolver must NOT be consulted.
+    expect(resolveAgentIdSpy).not.toHaveBeenCalled()
+
+    // giveFeedback received the agentId straight from resolved, not from
+    // the SELLER_AGENT_IDS map (which would've returned 1n).
+    expect(giveFeedbackSpy).toHaveBeenCalledOnce()
+    const [gfArgs] = giveFeedbackSpy.mock.calls[0] as [{ agentId: bigint }]
+    expect(gfArgs.agentId).toBe(resolvedAgentId)
+
+    // Attestation row keyed under the resolved agentId, not the map's "1".
+    const row = db.attestations.get(`${PAYMENT_ID}:${Number(resolvedAgentId)}`)
+    expect(row).toBeDefined()
+    expect(row?.reputation_tx).toBe(ATT_TX)
+    // And nothing was keyed under the legacy map's agentId.
+    expect(db.attestations.get(`${PAYMENT_ID}:1`)).toBeUndefined()
+
+    // Cache-invalidate body carries the resolved agentId.
+    const [, opts] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(opts.body as string) as { agentId: string }
+    expect(body.agentId).toBe(resolvedAgentId.toString())
+  })
+
+  it('resolved=null + USE_LEGACY_AGENT_RESOLVER="false" → silent skip; no giveFeedback; no legacy call', async () => {
+    const db = makeFakeDb()
+    const env = baseEnv(db, { USE_LEGACY_AGENT_RESOLVER: 'false' })
+    const inputWithNull: AttestationInput = { ...INPUT, resolved: null }
+
+    const p = maybeWriteAttestation(env, inputWithNull)
+    await vi.runAllTimersAsync()
+    await p
+
+    expect(resolveAgentIdSpy).not.toHaveBeenCalled()
+    expect(giveFeedbackSpy).not.toHaveBeenCalled()
+    expect(db.calls.filter((c) => /INSERT|UPDATE/i.test(c.sql))).toHaveLength(0)
   })
 })

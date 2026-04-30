@@ -5,6 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { reputation } from '@reckon402/erc-8004-client'
 import { makeLogger } from '@reckon402/logger'
 import { resolveAgentId } from './agent-resolver.js'
+import type { ResolvedSplitter } from './splitter-resolver.js'
 import { invalidateGatewayCache } from './cache-invalidate.js'
 
 const log = makeLogger('attestation')
@@ -31,6 +32,8 @@ export interface AttestationEnv {
   ENABLE_ERC8004_WRITES: string
   ERC8004_CHAIN_ID: string
   SELLER_AGENT_IDS: string
+  /** L4c: "true" keeps legacy JSON-map resolver alive; "false" = factory-only. */
+  USE_LEGACY_AGENT_RESOLVER?: string
   GATEWAY_CACHE_HOOK_URL: string
   GATEWAY_CACHE_HOOK_TOKEN?: string
   ATTESTATION_FEEDBACK_URI_PREFIX: string
@@ -41,6 +44,13 @@ export interface AttestationInput {
   transferTx: `0x${string}`
   distributeTx: `0x${string}`
   authValue: string
+  /**
+   * L4c: caller (settle-route) threads the gateway-resolved
+   * `{splitter, agentId, ensName}` here. When present, the attestation
+   * path uses `resolved.agentId` directly and never consults
+   * SELLER_AGENT_IDS.
+   */
+  resolved?: ResolvedSplitter | null
 }
 
 const FEEDBACK_TAG_1 = 'payment'
@@ -66,11 +76,26 @@ export async function maybeWriteAttestation(
   }
 
   // Guard 3: agent resolution.
-  const agentId = await resolveAgentId({
-    SPLITTER_ADDRESS: env.SPLITTER_ADDRESS,
-    BASE_SEPOLIA_RPC_PRIMARY: env.BASE_SEPOLIA_RPC_PRIMARY,
-    SELLER_AGENT_IDS: env.SELLER_AGENT_IDS,
-  })
+  //
+  // L4c: if `input.resolved` is present we trust its agentId verbatim
+  // (already validated via gateway + factory `isDeployed`) and the
+  // legacy JSON-map resolver is NEVER consulted. L4b₁ legacy falls back
+  // to the JSON-map path iff USE_LEGACY_AGENT_RESOLVER="true". The
+  // decision is inlined here (rather than delegated to a facade in
+  // agent-resolver.ts) so module-level mocks of `resolveAgentId` take
+  // effect reliably under ESM — a cross-module call wouldn't.
+  let agentId: bigint | null
+  if (input.resolved) {
+    agentId = input.resolved.agentId
+  } else if (env.USE_LEGACY_AGENT_RESOLVER !== 'true') {
+    return
+  } else {
+    agentId = await resolveAgentId({
+      SPLITTER_ADDRESS: env.SPLITTER_ADDRESS,
+      BASE_SEPOLIA_RPC_PRIMARY: env.BASE_SEPOLIA_RPC_PRIMARY,
+      SELLER_AGENT_IDS: env.SELLER_AGENT_IDS,
+    })
+  }
   if (agentId === null) return
 
   // Guard 4: idempotency.

@@ -13,13 +13,19 @@ export type ReceiptState =
   | 'CONFIRMED'
   | 'RECONCILED'
   | 'FAILED'
+  // L4c: terminal rejection when the SellingAgent's Splitter cannot be
+  // resolved from the gateway (missing/forged `x402.splitter` record, or
+  // factory `isDeployed` check fails). Reached only from SUBMITTED, before
+  // any on-chain tx. Not in the reconciler's sweep scope.
+  | 'SPLITTER_UNKNOWN'
 
 const ALLOWED_TRANSITIONS: Record<ReceiptState, ReceiptState[]> = {
-  SUBMITTED: ['PENDING_CONFIRMATION', 'FAILED'],
+  SUBMITTED: ['PENDING_CONFIRMATION', 'FAILED', 'SPLITTER_UNKNOWN'],
   PENDING_CONFIRMATION: ['CONFIRMED', 'FAILED', 'PENDING_CONFIRMATION'], // self-loop on /reconcile indeterminate
   CONFIRMED: ['RECONCILED'],
   RECONCILED: [],
   FAILED: [],
+  SPLITTER_UNKNOWN: [],
 }
 
 export function assertTransition(from: ReceiptState, to: ReceiptState): void {
@@ -30,5 +36,5 @@ export function assertTransition(from: ReceiptState, to: ReceiptState): void {
 }
 
 export function isTerminal(state: ReceiptState): boolean {
-  return state === 'RECONCILED' || state === 'FAILED'
+  return state === 'RECONCILED' || state === 'FAILED' || state === 'SPLITTER_UNKNOWN'
 }

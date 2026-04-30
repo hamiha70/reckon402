@@ -6,6 +6,10 @@ import { computePaymentId } from './payment-id.js'
 import { settleOnChain } from './settle.js'
 import { buildSettleResponse, type ReceiptRow } from './receipt-builder.js'
 import { maybeWriteAttestation } from './treasury/attestation.js'
+import {
+  resolveSplitterForPayment,
+  type ResolvedSplitter,
+} from './treasury/splitter-resolver.js'
 
 const log = makeLogger('settle-route')
 
@@ -118,6 +122,56 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
       .run()
   }
 
+  // L4c — per-payment splitter resolution.
+  //
+  // When ENABLE_L4C_FACTORY="true", resolve the SellingAgent's Splitter via
+  // the gateway (x402.splitter) + factory `isDeployed` check. This runs
+  // BEFORE the SUBMITTED → PENDING_CONFIRMATION claim so that a missing /
+  // forged record transitions the row to SPLITTER_UNKNOWN (a terminal state
+  // allowed from SUBMITTED) without spending gas on the transferWithAuthorization.
+  //
+  // When ENABLE_L4C_FACTORY="false" (L4b₁ regression), skip resolution and
+  // fall through to the legacy path that reads env.SPLITTER_ADDRESS.
+  let resolved: ResolvedSplitter | null = null
+  if (c.env.ENABLE_L4C_FACTORY === 'true') {
+    const ensName = (paymentRequirements.extra as { ens?: unknown } | undefined)?.ens
+    if (typeof ensName !== 'string' || ensName.length === 0) {
+      log.warn('settle_missing_ens_for_l4c', { paymentId })
+      return c.json({
+        success: false,
+        transaction: '',
+        network: c.env.NETWORK,
+        errorReason: 'MISSING_ENS',
+        paymentId,
+      }, 400)
+    }
+
+    resolved = await resolveSplitterForPayment(
+      {
+        BASE_SEPOLIA_RPC_PRIMARY: c.env.BASE_SEPOLIA_RPC_PRIMARY,
+        SPLITTER_FACTORY_ADDRESS: c.env.SPLITTER_FACTORY_ADDRESS,
+        GATEWAY_BASE_URL: c.env.GATEWAY_BASE_URL,
+        ERC8004_CHAIN_ID: c.env.ERC8004_CHAIN_ID,
+      },
+      ensName,
+    )
+
+    if (!resolved) {
+      await c.env.DB
+        .prepare(
+          `UPDATE receipts SET state = 'SPLITTER_UNKNOWN' WHERE payment_id = ?1 AND state = 'SUBMITTED'`,
+        )
+        .bind(paymentId)
+        .run()
+      log.warn('settle_splitter_unknown', { paymentId, ensName })
+      return c.json({
+        error: 'splitter_unknown',
+        ensName,
+        paymentId,
+      }, 422)
+    }
+  }
+
   // Guarded SUBMITTED -> PENDING_CONFIRMATION transition. `changes === 0`
   // means another concurrent call claimed the row first; we re-read and
   // return current state without submitting a second tx.
@@ -160,7 +214,12 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
         BASE_SEPOLIA_RPC_PRIMARY: c.env.BASE_SEPOLIA_RPC_PRIMARY,
         BASE_SEPOLIA_RPC_FALLBACK: c.env.BASE_SEPOLIA_RPC_FALLBACK,
       },
-      { authorization: auth, signature: sig, paymentId },
+      {
+        authorization: auth,
+        signature: sig,
+        paymentId,
+        splitter: resolved?.splitter,
+      },
     )
   } catch (err) {
     const detail = `settleOnChain_unhandled_throw: ${(err as Error).message ?? String(err)}`
@@ -213,10 +272,11 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
           DB: c.env.DB,
           FACILITATOR_PK: c.env.FACILITATOR_PK,
           BASE_SEPOLIA_RPC_PRIMARY: c.env.BASE_SEPOLIA_RPC_PRIMARY,
-          SPLITTER_ADDRESS: c.env.SPLITTER_ADDRESS,
+          SPLITTER_ADDRESS: resolved?.splitter ?? c.env.SPLITTER_ADDRESS,
           ENABLE_ERC8004_WRITES: c.env.ENABLE_ERC8004_WRITES,
           ERC8004_CHAIN_ID: c.env.ERC8004_CHAIN_ID,
           SELLER_AGENT_IDS: c.env.SELLER_AGENT_IDS,
+          USE_LEGACY_AGENT_RESOLVER: c.env.USE_LEGACY_AGENT_RESOLVER,
           GATEWAY_CACHE_HOOK_URL: c.env.GATEWAY_CACHE_HOOK_URL,
           GATEWAY_CACHE_HOOK_TOKEN: c.env.GATEWAY_CACHE_HOOK_TOKEN,
           ATTESTATION_FEEDBACK_URI_PREFIX: c.env.ATTESTATION_FEEDBACK_URI_PREFIX,
@@ -226,6 +286,7 @@ export async function settleHandler(c: Context<{ Bindings: Env }>) {
           transferTx: outcome.transferTx,
           distributeTx: outcome.distributeTx,
           authValue: auth.value,
+          resolved,
         },
       ).catch((err) => log.error('attestation_unhandled', { paymentId, detail: (err as Error).message })),
     )

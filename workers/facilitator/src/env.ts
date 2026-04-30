@@ -34,6 +34,25 @@ export interface Env {
   GATEWAY_CACHE_HOOK_TOKEN?: string              // bearer token (secret); empty skips cache-invalidate
   ATTESTATION_FEEDBACK_URI_PREFIX: string        // produces feedbackURI = <prefix><paymentId>
 
+  // L4c SplitterFactory + per-payment splitter resolution.
+  // See specs/08a-l4c-factory-refactor.md §5.
+  //
+  // - SPLITTER_FACTORY_ADDRESS: v1 SplitterFactory on Base Sepolia. Written
+  //   to `deployment_config` via `just deploy-splitter-factory` and mirrored
+  //   into [vars] here so the worker doesn't need a D1 read on every
+  //   payment.
+  // - GATEWAY_BASE_URL: base URL of the Reckon402 gateway. The per-payment
+  //   splitter resolver fetches `x402.splitter` and `x402.erc8004.agent_id`
+  //   via `{GATEWAY_BASE_URL}/lookup/{ensName}/{key}?backend=static`.
+  // - ENABLE_L4C_FACTORY: master switch. "false" = legacy single-
+  //   SPLITTER_ADDRESS path (L4b₁). "true" = per-payment resolution.
+  // - USE_LEGACY_AGENT_RESOLVER: "true" keeps the L4b₁ JSON-map fallback
+  //   for regression tests; flip to "false" once L4c smoke is green.
+  SPLITTER_FACTORY_ADDRESS: string
+  GATEWAY_BASE_URL: string
+  ENABLE_L4C_FACTORY: string
+  USE_LEGACY_AGENT_RESOLVER: string
+
   // Admin endpoints (GET /admin/receipts, /admin/attestations).
   // Set via `wrangler secret put ADMIN_TOKEN`. If unset, admin routes return 403.
   ADMIN_TOKEN?: string

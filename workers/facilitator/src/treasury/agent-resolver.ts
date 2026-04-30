@@ -3,22 +3,26 @@ import { baseSepolia } from 'viem/chains'
 import { SPLITTER_ABI } from '../abi/splitter.js'
 
 /**
- * Resolves the ERC-8004 agentId for the seller served by this
- * facilitator's pinned Splitter. See specs/07-l4b-erc8004-writes.md
- * §4.3 for rationale.
+ * Resolves the ERC-8004 agentId for the SellingAgent served by this
+ * facilitator, for use on the attestation-write path.
  *
- * L4b₁ backend: read Splitter.getRecipient(0) to get the seller EOA
- * (slot 0 is seller by the L3 Splitter recipient convention —
- * specs/04-l3-our-facilitator.md §2.5), then look it up in the JSON-
- * encoded SELLER_AGENT_IDS map (lowercased addresses).
+ * This module is the L4b₁ legacy resolver. L4c bypasses it entirely:
+ * when `input.resolved` is present on the attestation path,
+ * `attestation.ts` reads `resolved.agentId` directly (already validated
+ * against the factory) and never consults this module. The legacy path
+ * here is only reached when `USE_LEGACY_AGENT_RESOLVER === "true"`.
+ *
+ * L4b₁ backend: read `Splitter.getRecipient(0)` for the facilitator-pinned
+ * Splitter to get the SellingAgent EOA, then look it up in the
+ * JSON-encoded `SELLER_AGENT_IDS` map. Single-SellingAgent-per-
+ * facilitator only. Kept behind the flag so L4b₁ regression fixtures
+ * stay green while L4c lands.
  *
  * Returns null on any resolution miss or config problem. Null is a
- * silent skip at the call site — never throws on config. This keeps
- * the attestation path from ever blocking a successful payment.
+ * silent skip at the call site — never throws on config. This keeps the
+ * attestation path from ever blocking a successful payment.
  *
- * v1.5 path: swap the map lookup for a per-merchant ENS
- * `x402.agent_id` text-record read inside this function. The return
- * shape and caller semantics stay the same.
+ * See specs/08a-l4c-factory-refactor.md §4.3 for rationale.
  */
 export interface AgentResolverEnv {
   SPLITTER_ADDRESS: string
@@ -27,7 +31,6 @@ export interface AgentResolverEnv {
 }
 
 export async function resolveAgentId(env: AgentResolverEnv): Promise<bigint | null> {
-  // Parse the JSON map first — if it's malformed, skip without a chain call.
   let map: Record<string, string>
   try {
     map = JSON.parse(env.SELLER_AGENT_IDS) as Record<string, string>
@@ -40,7 +43,6 @@ export async function resolveAgentId(env: AgentResolverEnv): Promise<bigint | nu
     return null
   }
 
-  // Read seller EOA from Splitter slot 0.
   let sellerWallet: Hex
   try {
     const publicClient = createPublicClient({
@@ -62,7 +64,7 @@ export async function resolveAgentId(env: AgentResolverEnv): Promise<bigint | nu
   const key = sellerWallet.toLowerCase()
   const value = map[key]
   if (value === undefined) {
-    // Seller not in map — not attestable in this deployment. Silent skip.
+    // SellingAgent not in map — not attestable in this deployment. Silent skip.
     return null
   }
 

@@ -1,0 +1,56 @@
+name                = "reckon402-onboard-orchestrator"
+main                = "src/index.ts"
+compatibility_date  = "2026-04-28"
+compatibility_flags = ["nodejs_compat"]
+
+account_id  = "0f38f8667bbcbe4f54eda13c8df009e0"
+workers_dev = false
+
+# Shares the gateway D1 so onboard_progress is readable by both the
+# orchestrator worker and (future) admin tools. Only onboard_progress is
+# written by this worker.
+[[d1_databases]]
+binding       = "DB"
+database_name = "reckon402-d1-gateway-dev"
+database_id   = "926ca731-4952-438e-a70c-f19722dc25b0"
+
+# Frontend static assets served from the same origin as the API. Workers
+# Assets requires `not_found_handling` to be set to 'single-page-application'
+# so the dashboard's /agent/:ensName client-route falls back to index.html.
+[assets]
+directory          = "../../apps/frontend/dist"
+binding            = "ASSETS"
+not_found_handling = "single-page-application"
+
+[vars]
+SPLITTER_FACTORY_ADDRESS = ""                   # deploy-time; fill after Spec 08A deploy
+RECKON402_ONBOARDING_EOA = ""                   # public address of onboarding signer
+GATEWAY_BASE_URL         = "https://gateway.reckon402.com"
+FACILITATOR_BASE_URL     = "https://facilitator.reckon402.com"
+CHAIN_ID_BASE_SEPOLIA    = "84532"
+
+# secrets (wrangler secret put, Infisical-piped):
+#   ETH_SEPOLIA_RPC_PRIMARY, BASE_SEPOLIA_RPC_PRIMARY,
+#   ENS_FUNDER_PK, RECKON402_DEPLOYER_PK, RECKON402_ONBOARDING_PK
+
+[env.production]
+[[env.production.d1_databases]]
+binding       = "DB"
+database_name = "reckon402-d1-gateway-dev"
+database_id   = "926ca731-4952-438e-a70c-f19722dc25b0"
+
+[env.production.assets]
+directory          = "../../apps/frontend/dist"
+binding            = "ASSETS"
+not_found_handling = "single-page-application"
+
+[env.production.vars]
+SPLITTER_FACTORY_ADDRESS = ""
+RECKON402_ONBOARDING_EOA = ""
+GATEWAY_BASE_URL         = "https://gateway.reckon402.com"
+FACILITATOR_BASE_URL     = "https://facilitator.reckon402.com"
+CHAIN_ID_BASE_SEPOLIA    = "84532"
+
+[[env.production.routes]]
+pattern       = "app.reckon402.com"
+custom_domain = true

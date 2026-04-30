@@ -1,0 +1,32 @@
+{
+  "name": "@reckon402/onboard",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Reckon402 L4c onboarding CLI — brings a SellingAgent from zero to fully-wired in 5 steps.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "bin": {
+    "reckon402-onboard": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./steps/mint-subname": "./src/steps/mint-subname.ts",
+    "./steps/deploy-splitter": "./src/steps/deploy-splitter.ts",
+    "./steps/register-agent-id": "./src/steps/register-agent-id.ts",
+    "./steps/set-ens-records": "./src/steps/set-ens-records.ts",
+    "./steps/seed-gateway": "./src/steps/seed-gateway.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reckon402/erc-8004-client": "workspace:*",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

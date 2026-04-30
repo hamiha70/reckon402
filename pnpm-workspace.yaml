@@ -9,3 +9,5 @@ packages:
   - "tools/sign"
   - "tools/funding"
   - "tools/integration-tests"
+  - "tools/onboard"
+  - "apps/frontend"

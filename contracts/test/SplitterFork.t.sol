@@ -95,14 +95,21 @@ contract SplitterForkTest is Test {
         assertEq(USDC.balanceOf(address(splitter)), amount);
         assertTrue(USDC.authorizationState(buyer, nonce), "authorization should be marked used");
 
+        // Snapshot recipient balances before distribute. Production seller/feeSink/treasury
+        // EOAs accumulate real USDC from L3/L4b settlements, so the test must assert on
+        // DELTAS rather than absolute balances.
+        uint256 sellerBefore   = USDC.balanceOf(seller);
+        uint256 feeSinkBefore  = USDC.balanceOf(feeSink);
+        uint256 treasuryBefore = USDC.balanceOf(treasury);
+
         // Facilitator calls Splitter.distribute.
         bytes32 paymentId = keccak256(abi.encode("fork-test", nonce));
         splitter.distribute(paymentId, amount);
 
-        assertEq(USDC.balanceOf(seller),   9_700); // 97% of 10_000
-        assertEq(USDC.balanceOf(feeSink),  200);
-        assertEq(USDC.balanceOf(treasury), 100);
-        assertEq(USDC.balanceOf(address(splitter)), 0);
+        assertEq(USDC.balanceOf(seller)   - sellerBefore,   9_700, "seller delta 97%");
+        assertEq(USDC.balanceOf(feeSink)  - feeSinkBefore,  200,   "feeSink delta 2%");
+        assertEq(USDC.balanceOf(treasury) - treasuryBefore, 100,   "treasury delta 1%");
+        assertEq(USDC.balanceOf(address(splitter)), 0, "no dust remaining");
     }
 
     function _forkEnabled() internal view returns (bool) {

@@ -18,10 +18,12 @@ Before publishing any package:
 ## Publish order (dependency-first)
 
 1. `@reckon402/types` — no @reckon402 deps; publish first
-2. `@reckon402/buyer-sdk` — depends on `@reckon402/types`
-3. `@reckon402/erc-8004-client` — no @reckon402 deps; can publish in parallel with step 2
-4. `@reckon402/middleware-hono` — depends on `@reckon402/types`, `@reckon402/buyer-sdk`
-5. `@reckon402/kh-skill` — depends on `@reckon402/types`, `@reckon402/buyer-sdk`
+2. `@reckon402/logger` — no @reckon402 deps; publish in parallel with step 1
+3. `@reckon402/buyer-sdk` — depends on `@reckon402/types`
+4. `@reckon402/erc-8004-client` — no @reckon402 deps; can publish in parallel with step 3
+5. `@reckon402/facilitator-client` — depends on `@reckon402/types`
+6. `@reckon402/middleware-hono` — depends on `@reckon402/types`, `@reckon402/buyer-sdk`
+7. `@reckon402/kh-skill` — depends on `@reckon402/types`, `@reckon402/buyer-sdk`
 
 ## Step 1 — Login (one-time per machine)
 
@@ -54,31 +56,20 @@ After publish, restore `"workspace:*"` and commit the final state.
 
 ## Step 3 — Clean dist + build + test (automated via prepublishOnly)
 
-`prepublishOnly` in each package runs `pnpm run build && pnpm run test` before
-the publish step, so manual execution is not required.
-
-**IMPORTANT — clean dist before publish for `@reckon402/buyer-sdk`.**
-The `dist/` directory may contain stale artifacts from prior `tsc` runs
-(compiled test files, a redundant `dist/src/` subtree). These land in the
-published tarball because `"files": ["dist", "src"]` picks up everything.
-Run the following before the publish step:
-
-```bash
-# Clean stale dist artifacts
-rm -rf packages/buyer-sdk/dist packages/kh-skill/dist
-
-# Verify clean build (prepublishOnly will also run this, but good to check early)
-cd packages/buyer-sdk && pnpm run build && cd ../..
-cd packages/kh-skill  && pnpm run build && cd ../..
-```
+`prepublishOnly` in each publishable package runs `rm -rf dist && pnpm run build
+&& pnpm run test` before the publish step — no manual cleanup required.
+The `rm -rf dist` step ensures stale artifacts from prior `tsc` runs do not
+land in the tarball.
 
 If you want to verify the builds manually without publishing:
 
 ```bash
-cd packages/buyer-sdk && pnpm run build
-cd packages/erc-8004-client && pnpm run build
-cd packages/middleware-hono && pnpm run build
-cd packages/kh-skill && pnpm run build
+pnpm --filter @reckon402/types run build
+pnpm --filter @reckon402/buyer-sdk run build
+pnpm --filter @reckon402/erc-8004-client run build
+pnpm --filter @reckon402/middleware-hono run build
+pnpm --filter @reckon402/facilitator-client run build
+pnpm --filter @reckon402/kh-skill run build
 ```
 
 ## Step 4 — Publish each package
@@ -93,19 +84,27 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   cd packages/types && npm publish --access public
   cd ../..
 
-  # 2. @reckon402/buyer-sdk
+  # 2. @reckon402/logger (parallel-safe with step 1)
+  cd packages/logger && npm publish --access public
+  cd ../..
+
+  # 3 (was 2). @reckon402/buyer-sdk
   cd packages/buyer-sdk && npm publish --access public
   cd ../..
 
-  # 3. @reckon402/erc-8004-client
+  # 4. @reckon402/erc-8004-client (parallel-safe with step 3)
   cd packages/erc-8004-client && npm publish --access public
   cd ../..
 
-  # 4. @reckon402/middleware-hono
+  # 4. @reckon402/facilitator-client
+  cd packages/facilitator-client && npm publish --access public
+  cd ../..
+
+  # 5. @reckon402/middleware-hono
   cd packages/middleware-hono && npm publish --access public
   cd ../..
 
-  # 5. @reckon402/kh-skill
+  # 6. @reckon402/kh-skill
   cd packages/kh-skill && npm publish --access public
   cd ../..
 
@@ -117,9 +116,12 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
 ## Step 5 — Verify on registry
 
 ```bash
+npm info @reckon402/types
+npm info @reckon402/logger
 npm info @reckon402/buyer-sdk
-npm info @reckon402/middleware-hono
+npm info @reckon402/facilitator-client
 npm info @reckon402/erc-8004-client
+npm info @reckon402/middleware-hono
 npm info @reckon402/kh-skill
 ```
 
@@ -132,26 +134,25 @@ git add packages/*/package.json
 git commit -m "chore(packages): restore workspace:* after npm publish"
 ```
 
-## npm package publish-readiness status (as of 2026-04-29)
+## npm package publish-readiness status (as of 2026-04-30)
 
-| Package | `name` | `version` | `description` | `main` (dist) | `types` (dist) | `repository` | `license` | `publishConfig` | `prepublishOnly` | workspace:* resolved |
-|---------|--------|-----------|---------------|---------------|----------------|--------------|-----------|-----------------|-----------------|----------------------|
-| `@reckon402/buyer-sdk` | ✓ | 0.1.0 | ✓ | ✓ | ✓ | ✓ | MIT | ✓ | ✓ | manual (see §2) |
-| `@reckon402/erc-8004-client` | ✓ | 0.1.0 | ✓ | ✓ | ✓ | ✓ | MIT | ✓ | ✓ | n/a (no @reckon402 deps) |
-| `@reckon402/middleware-hono` | ✓ | 0.1.0 | ✓ | ✓ | ✓ | ✓ | MIT | ✓ | ✓ | manual (see §2) |
-| `@reckon402/kh-skill` | ✓ | 0.1.0 | ✓ | ✓ | ✓ | ✓ | MIT | ✓ | build-only¹ | manual (see §2) |
+Dry-run (`pnpm publish --dry-run --no-git-checks`) exits 0 for all packages below.
+
+| Package | `license` | `publishConfig` | `prepublishOnly` (rm-rf+build+test) | `hono` peer | dry-run |
+|---------|-----------|-----------------|-------------------------------------|-------------|---------|
+| `@reckon402/types` | MIT | ✓ public | ✓ (build only, no tests) | n/a | ✓ 11 files |
+| `@reckon402/logger` | MIT | ✓ public | ✓ (test: echo exit 0) | n/a | ✓ 3 files |
+| `@reckon402/buyer-sdk` | MIT | ✓ public | ✓ 13 tests | n/a | ✓ 14 files |
+| `@reckon402/facilitator-client` | MIT | ✓ public | ✓ 12 tests | n/a | ✓ 11 files |
+| `@reckon402/erc-8004-client` | MIT | ✓ public | ✓ (existing) | n/a | ✓ (prior audit) |
+| `@reckon402/middleware-hono` | MIT | ✓ public | ✓ 15 tests | ✓ peerDep ^4.0.0 | ✓ 8 files |
+| `@reckon402/kh-skill` | MIT | ✓ public | build-only¹ | n/a | ✓ (prior audit) |
 
 ¹ `@reckon402/kh-skill` has no test suite yet (KH manifest format not final).
-`prepublishOnly` runs `pnpm run build` only.
 
 ## Open TODOs before publish
 
-- `@reckon402/types` needs to be checked for publishability separately (it is
-  workspace-only today; no `publishConfig` or `build` script). Add before H-9.
 - `@reckon402/kh-skill` manifest format: confirm `manifest.yaml` schema with KH
   docs before publishing. The KH skill contract is a stub.
-- `@reckon402/middleware-hono` peer dependency on `hono` should be declared as
-  `peerDependencies`, not `dependencies`, for cleaner consumer installs. Fix before publish.
-- Replace `"workspace:*"` for `@reckon402/types` across all dependent packages
-  (see Step 2 above). `pnpm publish` does this automatically with `pnpm publish --no-git-checks`
-  when using pnpm workspace publish — document this as an alternative to manual editing.
+- Replace `"workspace:*"` for all dependent packages (see Step 2 above).
+  `pnpm publish` does this automatically — document as an alternative to manual editing.

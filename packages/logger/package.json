@@ -2,10 +2,19 @@
   "name": "@reckon402/logger",
   "version": "0.1.0",
   "description": "Structured log utility for Reckon402 Cloudflare Workers",
+  "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github:hamiha70/reckon402"
+  },
+  "files": ["src"],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "echo \"no tests for logger\" && exit 0"

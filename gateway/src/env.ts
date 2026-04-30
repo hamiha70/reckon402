@@ -24,4 +24,9 @@ export interface Env {
   BASE_MAINNET_RPC: string
   CACHE_TTL_REPUTATION_S: string
   GATEWAY_CACHE_HOOK_TOKEN: string
+  // L4c additions:
+  // Reckon402 onboarding EOA — the address authorized to sign /admin/bootstrap
+  // and Reckon402-owned /admin/records writes. Set as a [vars] entry (not a
+  // secret) since it's the public address, not the private key.
+  RECKON402_ONBOARDING_EOA: string
 }

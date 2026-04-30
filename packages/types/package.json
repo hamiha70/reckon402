@@ -14,5 +14,8 @@
     "type": "git",
     "url": "github:hamiha70/reckon402"
   },
-  "files": ["src"]
+  "files": ["src"],
+  "publishConfig": {
+    "access": "public"
+  }
 }

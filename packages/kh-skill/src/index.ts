@@ -5,9 +5,10 @@
  * nodes into x402 buyer flows via the hosted signing wrapper at
  * https://signing.reckon402.com/sign.
  *
- * KeeperHub's in-sandbox Turnkey wallet cannot sign EIP-712 typed-data
- * destined for HTTP bodies directly. This skill routes signing through
- * the Reckon402 hosted KMS-backed signing wrapper.
+ * KeeperHub uses Para MPC wallets for in-platform key management. Those
+ * wallets are not designed to sign EIP-712 typed-data payloads destined
+ * for x402 HTTP headers directly. This skill routes signing through the
+ * Reckon402 hosted KMS-backed signing wrapper instead.
  *
  * Skill input schema:
  *   merchantUrl:  string  — HTTPS URL of the merchant endpoint
@@ -60,25 +61,20 @@ export async function handle(input: Reckon402SkillInput): Promise<Reckon402Skill
     throw new Error("SIGNING_WRAPPER_API_KEY env var not set");
   }
 
-  // Dynamic import to keep the skill package tree-shakeable and lightweight
-  const { reckon402 } = await import("@reckon402/buyer-sdk");
+  // TODO(buyer-sdk): replace with reckon402.pay() once the higher-level helper
+  // lands in @reckon402/buyer-sdk during the facilitator rework. The shim
+  // contract (input/output types, env vars, signing wrapper routing) is stable;
+  // only the internal orchestration changes.
+  //
+  // Current placeholder: validates inputs and delegates to buyer-sdk primitives
+  // once the pay() API is defined. Throws at runtime with a descriptive message
+  // so integration tests fail loudly rather than silently returning wrong data.
+  const _sdk = await import("@reckon402/buyer-sdk");
+  void _sdk; // imported for side-effect validation; pay() is pending buyer-sdk update
 
-  const result = await reckon402.pay({
-    merchantUrl,
-    path,
-    amount: amountUsdc.toFixed(6),
-    network,
-    signingClient: {
-      kind: "hosted",
-      url: signingWrapperUrl,
-      authToken: signingWrapperApiKey,
-    },
-    waitForState: "RECONCILED",
-  });
-
-  return {
-    receiptId: result.paymentId,
-    tx: result.transaction ?? "",
-    reputation: { count: 0 },  // populated post-L4b1 by reading ERC-8004 summary
-  };
+  throw new Error(
+    `@reckon402/kh-skill: reckon402.pay() is not yet implemented in @reckon402/buyer-sdk. ` +
+    `merchantUrl=${merchantUrl} path=${path} amount=${amountUsdc} network=${network} ` +
+    `signingWrapper=${signingWrapperUrl} — wire up buyer-sdk primitives here once pay() ships.`
+  );
 }

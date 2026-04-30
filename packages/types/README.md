@@ -6,7 +6,11 @@ Zero runtime dependencies. Pure type definitions.
 
 ## Install
 
-Workspace-only consumption via `pnpm-workspace.yaml`:
+```bash
+npm install @reckon402/types
+```
+
+In the monorepo (workspace consumption):
 
 ```jsonc
 // in any packages/* or workers/* package.json:

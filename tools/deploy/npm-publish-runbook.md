@@ -52,11 +52,27 @@ Example for `@reckon402/middleware-hono`:
 **Do NOT commit these replacements** — they are pre-publish-only edits.
 After publish, restore `"workspace:*"` and commit the final state.
 
-## Step 3 — Build + test (automated via prepublishOnly)
+## Step 3 — Clean dist + build + test (automated via prepublishOnly)
 
 `prepublishOnly` in each package runs `pnpm run build && pnpm run test` before
-the publish step, so manual execution is not required. If you want to verify
-the build manually:
+the publish step, so manual execution is not required.
+
+**IMPORTANT — clean dist before publish for `@reckon402/buyer-sdk`.**
+The `dist/` directory may contain stale artifacts from prior `tsc` runs
+(compiled test files, a redundant `dist/src/` subtree). These land in the
+published tarball because `"files": ["dist", "src"]` picks up everything.
+Run the following before the publish step:
+
+```bash
+# Clean stale dist artifacts
+rm -rf packages/buyer-sdk/dist packages/kh-skill/dist
+
+# Verify clean build (prepublishOnly will also run this, but good to check early)
+cd packages/buyer-sdk && pnpm run build && cd ../..
+cd packages/kh-skill  && pnpm run build && cd ../..
+```
+
+If you want to verify the builds manually without publishing:
 
 ```bash
 cd packages/buyer-sdk && pnpm run build

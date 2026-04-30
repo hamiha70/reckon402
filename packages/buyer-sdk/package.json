@@ -28,7 +28,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "prepublishOnly": "pnpm run build && pnpm run test"
+    "prepublishOnly": "rm -rf dist && pnpm run build && pnpm run test"
   },
   "dependencies": {
     "@reckon402/types": "workspace:*",

@@ -14,12 +14,22 @@
     "type": "git",
     "url": "github:hamiha70/reckon402"
   },
-  "files": ["src"],
+  "files": ["dist", "src"],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
   },
   "scripts": {
-    "test": "vitest run"
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "prepublishOnly": "rm -rf dist && pnpm run build && pnpm run test"
   },
   "dependencies": {
     "@reckon402/types": "workspace:*"

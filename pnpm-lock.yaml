@@ -131,10 +131,10 @@ importers:
       '@reckon402/types':
         specifier: workspace:*
         version: link:../types
+    devDependencies:
       hono:
         specifier: ^4.12.0
         version: 4.12.15
-    devDependencies:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3

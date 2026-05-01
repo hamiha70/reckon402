@@ -1,0 +1,13 @@
+name               = "reckon402-landing"
+main               = "index.js"
+compatibility_date = "2026-04-28"
+account_id         = "0f38f8667bbcbe4f54eda13c8df009e0"
+workers_dev        = false
+
+[[routes]]
+pattern       = "reckon402.com/*"
+zone_name     = "reckon402.com"
+
+[[routes]]
+pattern       = "www.reckon402.com/*"
+zone_name     = "reckon402.com"

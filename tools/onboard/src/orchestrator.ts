@@ -45,9 +45,12 @@ export async function runOnboard(
     env.BASE_SEPOLIA_RPC_PRIMARY,
     env.RECKON402_DEPLOYER_PK,
   )
+  // Identity registration uses the seller's key so the agentId is minted
+  // directly to the seller — no safeTransferFrom needed (the IdentityRegistry
+  // does not support standard ERC-721 transfers).
   const identityClients = (plugins.makeIdentityClients ?? makeRegisterAgentIdClients)(
     env.BASE_SEPOLIA_RPC_PRIMARY,
-    env.RECKON402_DEPLOYER_PK,
+    env.RECKON402_ONBOARDING_PK,
   )
   const deployerAddress = identityClients.wallet.account!.address as `0x${string}`
 

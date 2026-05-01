@@ -2,6 +2,16 @@ set dotenv-load := false
 
 secrets := "tools/with-secrets.sh"
 
+# Print a human-readable summary of key recipes
+help:
+    @echo "Reckon402 — key recipes:"
+    @echo "  just test-e2e          Run full end-to-end test (payment + attestation)"
+    @echo "  just test-payment      Run L3 payment settlement test only"
+    @echo "  just onboard <ens> <eoa>  Onboard a new SellingAgent (5 steps)"
+    @echo "  just balance           Check EOA balances"
+    @echo "  just tail-facilitator  Stream facilitator worker logs"
+    @echo "  just tail-agent        Stream agent worker logs"
+
 # Show available recipes
 default:
     @just --list
@@ -81,3 +91,8 @@ onboard ensName sellerEoa endpoint='https://agent.reckon402.com/research' amount
 # and 08B orchestrator + gateway admin routes live.
 fullflow-l4c-onboard:
     {{secrets}} bash tools/integration-tests/run-l4c-onboard.sh
+
+# Readable aliases
+test-e2e: fullflow-l4b
+test-payment: fullflow-l3
+test-onboard: fullflow-l4c-onboard

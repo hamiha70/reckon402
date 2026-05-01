@@ -41,7 +41,7 @@ ATTESTATION_FEEDBACK_URI_PREFIX = "https://facilitator.reckon402.com/x402/receip
 # SPLITTER_FACTORY_ADDRESS is populated by `just deploy-splitter-factory`
 # after the contract lands on Base Sepolia; empty string here is the
 # "not yet deployed" sentinel (ENABLE_L4C_FACTORY stays "false" until then).
-SPLITTER_FACTORY_ADDRESS        = ""
+SPLITTER_FACTORY_ADDRESS        = "0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
 GATEWAY_BASE_URL                = "https://gateway.reckon402.com"
 # Ship with the L4c factory path OFF so the L4b₁ regression path still owns
 # `ENABLE_L4C_FACTORY="false"`. A follow-up deploy flips it to "true".

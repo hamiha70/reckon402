@@ -44,6 +44,11 @@ tools/integration-tests/wrangler-tail-*.log
 # Funding tool run artifacts
 tools/funding/results-*.md
 
+# Provisioning / sign / smoke-test run artifacts
+tools/provisioning/results-*.md
+tools/sign/results-*.md
+tools/smoke-tests/results-*.md
+
 # tmp folder
 tmp/
 

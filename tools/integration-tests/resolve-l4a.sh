@@ -208,7 +208,7 @@ fi
 
 declare -A EXPECTED_VALUES
 EXPECTED_VALUES["seller.reckon402-test.eth|x402.facilitator"]="https://facilitator.reckon402.com"
-EXPECTED_VALUES["seller.reckon402-test.eth|x402.splitter"]="0x0ad507c6973eba86313794329ad9b12fbf24acd0"
+EXPECTED_VALUES["seller.reckon402-test.eth|x402.splitter"]="0x372c0b951035da05058b175a15b4fe7d29f1fc4c"
 EXPECTED_VALUES["search.reckon402-test.eth|x402.facilitator"]="https://facilitator.reckon402.com"
 
 LOOKUP_KEY="${ENS_NAME}|${RECORD_KEY}"

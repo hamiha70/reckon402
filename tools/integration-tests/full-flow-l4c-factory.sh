@@ -97,8 +97,8 @@ HAPPY_SPLITTER_VIA_GW=$(bash "$SCRIPT_DIR/resolve-l4a.sh" \
   --name "$SELLER_NAME" \
   --key x402.splitter 2>&1 \
   | tee "$ARTIFACT_DIR/gw-happy-splitter.txt" \
-  | grep -oE '"value":"0x[0-9a-fA-F]+"' | head -1 \
-  | sed -E 's/.*"(0x[0-9a-fA-F]+)".*/\1/' || true)
+  | grep -oE 'Decoded value: 0x[0-9a-fA-F]+' | head -1 \
+  | sed -E 's/Decoded value: (0x[0-9a-fA-F]+)/\1/' || true)
 echo "  gateway[$SELLER_NAME].x402.splitter = ${HAPPY_SPLITTER_VIA_GW:-NONE}" | tee -a "$RUN_LOG"
 if [ "${HAPPY_SPLITTER_VIA_GW,,}" != "${SELLER_SPLITTER_ADDRESS,,}" ]; then
   echo "  FAIL: gateway value for $SELLER_NAME x402.splitter does not match SELLER_SPLITTER_ADDRESS" | tee -a "$RUN_LOG"
@@ -114,8 +114,8 @@ FORGED_SPLITTER_VIA_GW=$(bash "$SCRIPT_DIR/resolve-l4a.sh" \
   --name "$FORGED_SELLER_NAME" \
   --key x402.splitter 2>&1 \
   | tee "$ARTIFACT_DIR/gw-forged-splitter.txt" \
-  | grep -oE '"value":"0x[0-9a-fA-F]+"' | head -1 \
-  | sed -E 's/.*"(0x[0-9a-fA-F]+)".*/\1/' || true)
+  | grep -oE 'Decoded value: 0x[0-9a-fA-F]+' | head -1 \
+  | sed -E 's/Decoded value: (0x[0-9a-fA-F]+)/\1/' || true)
 echo "  gateway[$FORGED_SELLER_NAME].x402.splitter = ${FORGED_SPLITTER_VIA_GW:-NONE}" | tee -a "$RUN_LOG"
 if [ "${FORGED_SPLITTER_VIA_GW,,}" != "${FORGED_SPLITTER_ADDRESS,,}" ]; then
   echo "  FAIL: gateway value for $FORGED_SELLER_NAME x402.splitter does not match FORGED_SPLITTER_ADDRESS" | tee -a "$RUN_LOG"

@@ -46,6 +46,16 @@ seed kind amount:
 refund kind amount:
     {{secrets}} bash tools/scripts/refund.sh {{kind}} {{amount}}
 
+# L4c — deploy the SplitterFactory contract to Base Sepolia (KMS-signed).
+# Writes deploy log to contracts/deploy-logs/splitter-factory-base-sepolia-<date>.md
+# and prints the factory address on stdout.
+deploy-splitter-factory:
+    {{secrets}} node tools/deploy/deploy-splitter-factory.mjs
+
+# L4c — run the full-flow factory smoke (happy path + forged-splitter negative).
+fullflow-l4c-factory:
+    {{secrets}} bash -c 'cd tools/integration-tests && bash full-flow-l4c-factory.sh'
+
 # L4c — onboard a fresh SellingAgent via the 5-step CLI. Runs ENS subname mint,
 # Splitter deploy, ERC-8004 agentId register, gateway record write, gateway
 # seed, and final ENS ownership transfer to the seller EOA.

@@ -133,14 +133,20 @@ async function main() {
   console.error(`[seed-factory-splitter] block: ${receipt.blockNumber}`);
   console.error(`[seed-factory-splitter] Basescan: https://sepolia.basescan.org/tx/${hash}`);
 
-  // Verify isDeployed
-  const deployed = await publicClient.readContract({
-    address: FACTORY_ADDRESS,
-    abi: FACTORY_ABI,
-    functionName: "isDeployed",
-    args: [splitterAddress],
-  });
-  if (!deployed) throw new Error(`isDeployed(${splitterAddress}) returned false — abort`);
+  // Verify isDeployed — poll with retries to allow RPC propagation
+  let deployed = false;
+  for (let i = 0; i < 5; i++) {
+    deployed = await publicClient.readContract({
+      address: FACTORY_ADDRESS,
+      abi: FACTORY_ABI,
+      functionName: "isDeployed",
+      args: [splitterAddress],
+    });
+    if (deployed) break;
+    console.error(`[seed-factory-splitter] isDeployed not yet true, waiting 3s (attempt ${i + 1}/5)...`);
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  if (!deployed) throw new Error(`isDeployed(${splitterAddress}) returned false after retries — abort`);
   console.error(`[seed-factory-splitter] isDeployed verified: true`);
 
   // Print the wrangler D1 command to update the gateway record.

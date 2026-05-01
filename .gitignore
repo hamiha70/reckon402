@@ -38,8 +38,11 @@ tools/smoke-tests/results-*.local.md
 tools/integration-tests/run-*.log
 tools/integration-tests/run-*/
 tools/integration-tests/run-l4b-*.json
-tools/integration-tests/results-*-2026-*.md
+tools/integration-tests/results-*.md
 tools/integration-tests/wrangler-tail-*.log
+
+# Funding tool run artifacts
+tools/funding/results-*.md
 
 # tmp folder
 tmp/

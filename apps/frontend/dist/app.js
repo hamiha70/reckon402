@@ -203,11 +203,11 @@ let dashboardTimer = null
 let activeEns = null
 
 function startDashboard(ens) {
+  stopDashboard()
   activeEns = ens
   $('#dashboard-ens').textContent = ens
   $('#terminal-url').textContent =
     `${new URL(CFG.GATEWAY_BASE).host}/records/${ens}?flat=true&backend=erc8004`
-  stopDashboard()
   renderTierTable('100000', 0)
   refreshDashboard()
   dashboardTimer = setInterval(refreshDashboard, CFG.POLL_MS)

@@ -102,6 +102,26 @@ app.post('/onboard', async (c) => {
   return c.json({ onboardId, ensName: name }, 202, CORS)
 })
 
+// Receipts proxy: forwards to facilitator /admin/receipts with server-side Bearer
+// auth so ADMIN_TOKEN stays secret (never sent to the browser).
+app.options('/receipts', (c) => new Response(null, { status: 204, headers: CORS }))
+app.get('/receipts', async (c) => {
+  const limit = c.req.query('limit') ?? '20'
+  const url = `${c.env.FACILITATOR_BASE_URL}/admin/receipts?limit=${encodeURIComponent(limit)}`
+  try {
+    const upstream = await fetch(url, {
+      headers: { Authorization: `Bearer ${c.env.FACILITATOR_ADMIN_TOKEN}` },
+    })
+    const body = await upstream.text()
+    return new Response(body, {
+      status: upstream.status,
+      headers: { ...CORS, 'Content-Type': upstream.headers.get('Content-Type') ?? 'application/json' },
+    })
+  } catch (err) {
+    return c.json({ error: 'receipts_fetch_failed', detail: (err as Error).message }, 502, CORS)
+  }
+})
+
 app.get('/onboard/:id/status', async (c) => {
   const id = c.req.param('id') ?? ''
   if (!/^[a-f0-9]{32}$/.test(id)) {

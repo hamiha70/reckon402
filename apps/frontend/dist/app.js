@@ -14,6 +14,8 @@ const CFG = {
   BASESCAN_ADDR:     'https://sepolia.basescan.org/address/',
   ETHERSCAN_TX:      'https://sepolia.etherscan.io/tx/',
   ETHERSCAN_ADDR:    'https://sepolia.etherscan.io/address/',
+  // Populated after KeeperHub workflow is published (Phase 3C)
+  KH_WORKFLOW_URL:   'https://app.keeperhub.run/workflow/reckon402-research',
 }
 
 const TIERS = [
@@ -23,10 +25,16 @@ const TIERS = [
   { min: 10, label: 'gold (15% off)',      discountBps: 1500, bgCls: 'bg-yellow-600', textCls: 'text-yellow-100' },
 ]
 
+// Hardcoded BPS split (matches SplitterFactory deploy args for demo SellingAgent)
+const SPLIT_DISPLAY = [
+  { label: '0xD53f… (seller)',    bps: 9700 },
+  { label: '0x0A02… (platform)',  bps: 200 },
+  { label: '0x66C2… (deployer)',  bps: 100 },
+]
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function $(sel) { return document.querySelector(sel) }
 function $$(sel) { return [...document.querySelectorAll(sel)] }
-function html(s) { return s }
 function trunc(addr, n = 6) {
   if (!addr || addr.length < 12) return addr ?? '—'
   return addr.slice(0, n + 2) + '…' + addr.slice(-4)
@@ -49,9 +57,13 @@ function priceAt(baseAmount, tier) {
   const n = BigInt(baseAmount)
   return ((n * BigInt(10_000 - tier.discountBps)) / 10_000n).toString()
 }
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
 
 // ─── Routing (hash-based) ─────────────────────────────────────────────────
-function activate(viewId, data) {
+function activate(viewId) {
   for (const v of $$('.view')) v.classList.remove('active')
   const el = $(`#${viewId}`)
   if (el) el.classList.add('active')
@@ -194,7 +206,7 @@ function startDashboard(ens) {
   activeEns = ens
   $('#dashboard-ens').textContent = ens
   $('#terminal-url').textContent =
-    `${new URL(CFG.GATEWAY_BASE).host}/lookup/${ens}/x402.amount?backend=erc8004`
+    `${new URL(CFG.GATEWAY_BASE).host}/records/${ens}?flat=true&backend=erc8004`
   stopDashboard()
   renderTierTable('100000', 0)
   refreshDashboard()
@@ -208,55 +220,54 @@ function stopDashboard() {
 async function refreshDashboard() {
   if (!activeEns) return
   try {
-    // Fetch records via the agent_id index proxy. The gateway's static
-    // backend exposes raw records via POST /lookup with CCIP-Read encoding,
-    // which is a lot for a vanilla frontend — we fall back to a helper
-    // endpoint (/records/:ensName) if available, otherwise just show "—".
-    //
-    // For the demo we rely on the facilitator's receipts admin endpoint
-    // filtered client-side by our known ENS name. The receipts don't carry
-    // the ENS name today, so we display all recent receipts when only one
-    // SellingAgent is onboarded (the demo case per demo_narrative.md).
-    const [amountRes, receiptsRes] = await Promise.all([
-      fetchAmount(activeEns),
+    const [recordsRes, receiptsRes] = await Promise.all([
+      fetchRecords(activeEns),
       fetchRecentReceipts(),
     ])
-    renderDashboardHeader(amountRes)
-    renderTerminalPane(amountRes)
+    renderDashboardHeader(recordsRes)
+    renderTerminalPane(recordsRes)
+    renderEnsRecords(recordsRes.allRecords)
     renderCallLog(receiptsRes)
 
-    // Trust count: use receipt count as proxy (each CONFIRMED receipt with
-    // td_erc8004_tx is an attestation).
-    const attestationCount = (receiptsRes ?? []).filter(r => r.td_erc8004_tx).length
+    // Trust count: receipts with tdErc8004Tx are confirmed attestations
+    const attestationCount = (receiptsRes ?? []).filter(r => r.tdErc8004Tx).length
     $('#trust-count').textContent = String(attestationCount)
     const tier = activeTier(attestationCount)
     const badge = $('#trust-badge')
     badge.className = `ml-auto px-3 py-1 rounded text-xs font-bold ${tier.bgCls} ${tier.textCls}`
     badge.textContent = tier.label
-    renderTierTable(amountRes.baseAmount ?? '100000', attestationCount)
+    renderTierTable(recordsRes.baseAmount ?? '100000', attestationCount)
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('dashboard refresh failed', err)
   }
 }
 
-async function fetchAmount(ens) {
+async function fetchRecords(ens) {
   try {
     const url = `${CFG.GATEWAY_BASE}/records/${encodeURIComponent(ens)}?flat=true&backend=erc8004`
     const res = await fetch(url)
-    if (!res.ok) return { baseAmount: null, currentAmount: null }
+    if (!res.ok) return { baseAmount: null, currentAmount: null, allRecords: {} }
     const body = await res.json()
     const records = body?.records ?? {}
     const amount = records['x402.amount'] ?? null
-    return { baseAmount: amount, currentAmount: amount }
+    return {
+      baseAmount: amount,
+      currentAmount: amount,
+      allRecords: records,
+      splitter:  records['x402.splitter'] ?? null,
+      agentId:   records['x402.erc8004.agent_id'] ?? null,
+      endpoint:  records['x402.endpoint'] ?? null,
+    }
   } catch {
-    return { baseAmount: null, currentAmount: null }
+    return { baseAmount: null, currentAmount: null, allRecords: {} }
   }
 }
 
+// Receipts are fetched via the orchestrator proxy (/receipts) which adds
+// server-side Bearer auth. The frontend never sees the ADMIN_TOKEN.
 async function fetchRecentReceipts() {
   try {
-    const res = await fetch(`${CFG.FACILITATOR_BASE}/admin/receipts?limit=20`)
+    const res = await fetch(`${CFG.ORCHESTRATOR_BASE}/receipts?limit=20`)
     if (!res.ok) return []
     const body = await res.json()
     return Array.isArray(body?.receipts) ? body.receipts : []
@@ -265,19 +276,49 @@ async function fetchRecentReceipts() {
   }
 }
 
-function renderDashboardHeader(amount) {
-  const price = amount.currentAmount ?? amount.baseAmount ?? null
+function renderDashboardHeader(r) {
+  const price = r.currentAmount ?? r.baseAmount ?? null
   $('#dash-current-price').textContent = price !== null ? fmtUsdc(price) : '—'
-  // splitter/agentId/owner show up when the orchestrator surfaces them via /agent/:ens
-  $('#dash-endpoint').textContent = '—'
-  $('#dash-splitter').textContent = '—'
-  $('#dash-agent-id').textContent = '—'
-  $('#dash-owner').textContent = '—'
+  $('#dash-endpoint').textContent = r.endpoint ?? '—'
+
+  const splitterEl = $('#dash-splitter')
+  if (r.splitter) {
+    splitterEl.innerHTML = `<a href="${CFG.BASESCAN_ADDR}${r.splitter}" target="_blank" class="text-blue-400 underline">${trunc(r.splitter)}</a>`
+  } else {
+    splitterEl.textContent = '—'
+  }
+
+  $('#dash-agent-id').textContent = r.agentId ?? '—'
+  $('#dash-owner').textContent = '—'  // not returned by flat-records; populated if needed
 }
 
-function renderTerminalPane(amount) {
-  const out = amount.currentAmount ?? amount.baseAmount ?? '100000'
-  $('#terminal-output').textContent = JSON.stringify({ value: out }, null, 2)
+function renderTerminalPane(r) {
+  const out = r.currentAmount ?? r.baseAmount ?? '100000'
+  const snippet = { records: { 'x402.amount': out } }
+  if (r.splitter) snippet.records['x402.splitter'] = r.splitter
+  if (r.agentId)  snippet.records['x402.erc8004.agent_id'] = r.agentId
+  $('#terminal-output').textContent = JSON.stringify(snippet, null, 2)
+}
+
+function renderEnsRecords(records) {
+  const tbody = $('#ens-records-table')
+  if (!tbody) return
+  tbody.innerHTML = ''
+  const entries = Object.entries(records ?? {})
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="2" class="text-gray-600 italic py-2 text-center text-xs">no records</td></tr>'
+    return
+  }
+  for (const [k, v] of entries) {
+    const tr = document.createElement('tr')
+    tr.className = 'border-t border-gray-800'
+    const is0x = typeof v === 'string' && v.startsWith('0x') && v.length >= 10
+    const valHtml = is0x
+      ? `<a href="${CFG.BASESCAN_ADDR}${v}" target="_blank" class="text-blue-400 underline font-mono text-xs">${trunc(v, 8)}</a>`
+      : `<span class="font-mono text-xs text-gray-200">${escapeHtml(v)}</span>`
+    tr.innerHTML = `<td class="py-1 text-xs text-gray-400 pr-4">${escapeHtml(k)}</td><td class="py-1">${valHtml}</td>`
+    tbody.appendChild(tr)
+  }
 }
 
 function renderTierTable(baseAmount, count) {
@@ -307,11 +348,16 @@ function renderCallLog(receipts) {
   for (const r of receipts) {
     const tr = document.createElement('tr')
     tr.className = 'border-t border-gray-800'
-    const settleLink = r.transaction ? `<a href="${CFG.BASESCAN_TX}${r.transaction}" target="_blank" class="text-blue-400 underline">${trunc(r.transaction, 8)}</a>` : '—'
-    const attestLink = r.td_erc8004_tx ? `<a href="${CFG.BASESCAN_TX}${r.td_erc8004_tx}" target="_blank" class="text-green-400 underline">${trunc(r.td_erc8004_tx, 8)}</a>` : '—'
+    // API returns camelCase: tx, tdErc8004Tx, paymentId, submittedAt
+    const settleLink = r.tx
+      ? `<a href="${CFG.BASESCAN_TX}${r.tx}" target="_blank" class="text-blue-400 underline">${trunc(r.tx, 8)}</a>`
+      : '—'
+    const attestLink = r.tdErc8004Tx
+      ? `<a href="${CFG.BASESCAN_TX}${r.tdErc8004Tx}" target="_blank" class="text-green-400 underline">${trunc(r.tdErc8004Tx, 8)}</a>`
+      : '—'
     tr.innerHTML = `
-      <td class="py-1 text-gray-400 text-xs">${fmtTs(r.submitted_at)}</td>
-      <td class="py-1 text-gray-300 text-xs">${trunc(r.paymentId ?? r.payment_id, 8)}</td>
+      <td class="py-1 text-gray-400 text-xs">${fmtTs(r.submittedAt)}</td>
+      <td class="py-1 text-gray-300 text-xs">${trunc(r.paymentId, 8)}</td>
       <td class="py-1 text-xs">${settleLink}</td>
       <td class="py-1 text-xs">${attestLink}</td>
     `
@@ -319,15 +365,9 @@ function renderCallLog(receipts) {
   }
 }
 
-// Run Test Call button — delegates to the same paid-call flow that full-flow-l4b
-// exercises. For the hackathon we open a new tab to the agent endpoint; a
-// browser-side buyer-sdk integration is Spec 08B Q-08B-1's forward-compat hook.
+// "Run Test Call" opens the KeeperHub workflow in a new tab.
 $('#run-call-btn')?.addEventListener('click', () => {
-  if (!activeEns) return
-  const msg = `To run a paid call against ${activeEns}, run this from your shell:\n\n` +
-    `bash tools/integration-tests/full-flow-l4b.sh --merchant ${activeEns}\n\n` +
-    `Settlement + attestation txs will appear in the call log below within ~15s.`
-  alert(msg)
+  window.open(CFG.KH_WORKFLOW_URL, '_blank')
 })
 
 // ─── Boot ─────────────────────────────────────────────────────────────────

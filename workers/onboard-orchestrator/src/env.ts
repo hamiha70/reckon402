@@ -27,6 +27,7 @@ export interface Env {
   ENS_FUNDER_PK:             string
   RECKON402_DEPLOYER_PK:     string
   RECKON402_ONBOARDING_PK:   string
+  FACILITATOR_ADMIN_TOKEN:   string  // proxied server-side for /receipts endpoint
 
   // Static assets binding (Workers Assets)
   ASSETS?: { fetch: (req: Request) => Promise<Response> }

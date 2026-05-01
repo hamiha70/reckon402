@@ -1,6 +1,9 @@
 {
   "name": "Reckon402 ResearchAgent",
   "description": "Three sequential x402 paid calls to agent.reckon402.com/research demonstrating ERC-8004 reputation growth and tier-based discount pricing. Each call triggers a settlement attestation write; the gateway reads updated reputation on the next call.",
+  "variables": {
+    "DEMO_SELLER_ENS": "seller9.reckon402-test.eth"
+  },
   "trigger": {
     "type": "manual",
     "id": "demo_trigger"
@@ -17,7 +20,8 @@
         "network": "base-sepolia",
         "signing_wrapper_url": "https://signing.reckon402.com/sign",
         "auth_secret": "${SIGNING_WRAPPER_API_KEY}",
-        "wait_for_state": "RECONCILED"
+        "wait_for_state": "RECONCILED",
+        "extra": { "ens": "${DEMO_SELLER_ENS}" }
       }
     },
     {
@@ -32,7 +36,8 @@
         "network": "base-sepolia",
         "signing_wrapper_url": "https://signing.reckon402.com/sign",
         "auth_secret": "${SIGNING_WRAPPER_API_KEY}",
-        "wait_for_state": "RECONCILED"
+        "wait_for_state": "RECONCILED",
+        "extra": { "ens": "${DEMO_SELLER_ENS}" }
       }
     },
     {
@@ -47,7 +52,8 @@
         "network": "base-sepolia",
         "signing_wrapper_url": "https://signing.reckon402.com/sign",
         "auth_secret": "${SIGNING_WRAPPER_API_KEY}",
-        "wait_for_state": "RECONCILED"
+        "wait_for_state": "RECONCILED",
+        "extra": { "ens": "${DEMO_SELLER_ENS}" }
       }
     },
     {

@@ -270,3 +270,63 @@ describe('withX402 — settle failure', () => {
     expect(((await res.json()) as { error: string }).error).toBe('tx_reverted')
   })
 })
+
+// ─────────────────── extra pass-through (IP-1 fix) ───────────────────
+//
+// When `extra` is provided to withX402, it must be merged into BOTH:
+//   1. The PAYMENT-REQUIRED 402 response (so the buyer includes ens in their signed payload)
+//   2. The requirements object passed to facilitator.verify() and facilitator.settle()
+//      (so the facilitator can resolve the splitter via ENS on the L4c path)
+//
+// Without this fix, ENABLE_L4C_FACTORY returns 400 MISSING_ENS on every settle.
+
+describe('withX402 — extra pass-through (L4c ENS)', () => {
+  const SELLER_ENS = 'seller9.reckon402-test.eth'
+
+  function makeAppWithExtra(facilitator: Facilitator) {
+    const app = new Hono()
+    app.use('/research', withX402({
+      amount: '10000',
+      network: NETWORK,
+      asset: USDC,
+      recipient: SPLITTER,
+      facilitator,
+      extra: { ens: SELLER_ENS },
+    }))
+    app.get('/research', (c) => c.json({ ok: true }))
+    return app
+  }
+
+  it('includes extra.ens in PAYMENT-REQUIRED response when no header present', async () => {
+    const res = await makeAppWithExtra(makeFacilitator({ isValid: true })).fetch(makeRequest())
+    expect(res.status).toBe(402)
+    const pr = res.headers.get('PAYMENT-REQUIRED')
+    expect(pr).not.toBeNull()
+    const decoded = JSON.parse(atob(pr!)) as { accepts: PaymentRequirements[] }
+    expect(decoded.accepts[0].extra).toMatchObject({ name: 'USDC', version: '2', ens: SELLER_ENS })
+  })
+
+  it('passes extra.ens to facilitator.verify via requirements', async () => {
+    const f = makeFacilitator({ isValid: false, invalidReason: 'x' })
+    await makeAppWithExtra(f).fetch(makeRequest('payment-signature', encodePayload(VALID_PAYLOAD)))
+    expect(f.verify).toHaveBeenCalledOnce()
+    const [, req] = (f.verify as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown, PaymentRequirements]
+    expect(req.extra).toMatchObject({ name: 'USDC', version: '2', ens: SELLER_ENS })
+  })
+
+  it('passes extra.ens to facilitator.settle via requirements', async () => {
+    const f = makeFacilitator({ isValid: true })
+    await makeAppWithExtra(f).fetch(makeRequest('payment-signature', encodePayload(VALID_PAYLOAD)))
+    expect(f.settle).toHaveBeenCalledOnce()
+    const [, req] = (f.settle as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown, PaymentRequirements]
+    expect(req.extra).toMatchObject({ name: 'USDC', version: '2', ens: SELLER_ENS })
+  })
+
+  it('does not add extra fields when extra is omitted', async () => {
+    const f = makeFacilitator({ isValid: false, invalidReason: 'x' })
+    await makeApp(f).fetch(makeRequest('payment-signature', encodePayload(VALID_PAYLOAD)))
+    const [, req] = (f.verify as ReturnType<typeof vi.fn>).mock.calls[0] as [unknown, PaymentRequirements]
+    expect(req.extra).toEqual({ name: 'USDC', version: '2' })
+    expect((req.extra as Record<string, string>).ens).toBeUndefined()
+  })
+})

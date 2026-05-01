@@ -53,7 +53,7 @@
           <span class="text-xs text-gray-400 block mb-1">SellingAgent EOA (the wallet that will own the agent)</span>
           <input name="sellerEoa" required pattern="0x[0-9a-fA-F]{40}"
             class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-100 font-mono text-sm"
-            placeholder="0x..." />
+            value="0xD53ffac42496d73B3Faf946786688a8454F57b1f" />
         </label>
 
         <label class="block">
@@ -69,6 +69,30 @@
             class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-100 font-mono text-sm"
             value="100000" />
         </label>
+
+        <!-- Revenue split (hardcoded, non-editable) -->
+        <div class="bg-gray-950 border border-gray-800 rounded p-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Revenue split (hardcoded)</div>
+          <div class="space-y-1 text-xs font-mono text-gray-400">
+            <div class="flex justify-between"><span>0xD53f… <span class="text-gray-600">(seller)</span></span><span class="text-green-300">97%</span></div>
+            <div class="flex justify-between"><span>0x0A02… <span class="text-gray-600">(platform)</span></span><span class="text-gray-300">2%</span></div>
+            <div class="flex justify-between"><span>0x66C2… <span class="text-gray-600">(deployer)</span></span><span class="text-gray-300">1%</span></div>
+          </div>
+        </div>
+
+        <!-- Discount tiers (hardcoded, non-editable) -->
+        <div class="bg-gray-950 border border-gray-800 rounded p-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Trust-based discount tiers</div>
+          <table class="w-full text-xs font-mono">
+            <thead><tr class="text-gray-600"><th class="text-left py-0.5">Attestations</th><th class="text-left py-0.5">Tier</th><th class="text-right py-0.5">Discount</th></tr></thead>
+            <tbody class="text-gray-400">
+              <tr><td>0+</td><td>base</td><td class="text-right">—</td></tr>
+              <tr><td>1+</td><td class="text-amber-300">bronze</td><td class="text-right text-green-300">-5%</td></tr>
+              <tr><td>3+</td><td class="text-gray-200">silver</td><td class="text-right text-green-300">-10%</td></tr>
+              <tr><td>10+</td><td class="text-yellow-300">gold</td><td class="text-right text-green-300">-15%</td></tr>
+            </tbody>
+          </table>
+        </div>
 
         <button type="submit"
           class="w-full bg-green-600 hover:bg-green-500 text-gray-950 font-bold py-3 rounded">
@@ -101,16 +125,33 @@
         <dl class="grid grid-cols-2 gap-3 text-sm">
           <dt class="text-gray-500">Current price</dt>
           <dd id="dash-current-price" class="font-mono text-green-300 font-bold">—</dd>
-          <dt class="text-gray-500">ENS Owner</dt>
-          <dd id="dash-owner" class="font-mono text-gray-200">—</dd>
           <dt class="text-gray-500">agentId</dt>
           <dd id="dash-agent-id" class="font-mono text-gray-200">—</dd>
           <dt class="text-gray-500">Splitter</dt>
           <dd id="dash-splitter" class="font-mono text-gray-200">—</dd>
           <dt class="text-gray-500">Endpoint</dt>
-          <dd id="dash-endpoint" class="font-mono text-gray-200">—</dd>
+          <dd id="dash-endpoint" class="font-mono text-gray-200 text-xs break-all">—</dd>
+          <dt class="text-gray-500">ENS Owner</dt>
+          <dd id="dash-owner" class="font-mono text-gray-200">—</dd>
         </dl>
       </div>
+
+      <!-- ENS Text Records panel (collapsible) -->
+      <details class="bg-gray-900 border border-gray-800 rounded-lg" open>
+        <summary class="p-4 cursor-pointer text-sm uppercase tracking-wider text-gray-500 select-none">
+          ENS Text Records (ENSIP-25)
+        </summary>
+        <div class="px-4 pb-4">
+          <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-gray-500 tracking-wider">
+              <tr><th class="text-left py-1">Key</th><th class="text-left py-1">Value</th></tr>
+            </thead>
+            <tbody id="ens-records-table" class="font-mono">
+              <tr><td colspan="2" class="text-gray-600 italic py-2 text-center text-xs">loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
         <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-3">Trust tier</h3>

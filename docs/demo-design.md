@@ -88,7 +88,12 @@ Click **[Deploy]**.
 
 After step 5 completes, auto-navigate to `#/agent/seller9.reckon402-test.eth`.
 
-> "60 seconds. ENS subname on Ethereum. Splitter lockbox on Base. ERC-8004 identity on Base. Twelve ENS text records written, signed, verified. The platform cannot turn this agent's records against it — the SellingAgent owns them."
+> "60 seconds. ENS subname on Ethereum. Splitter lockbox on Base. ERC-8004 identity on Base. Twelve ENS text records written, signed, verified. The platform provisioned it — but never owned it. The ENS name and agentId transferred to the seller's wallet at the end of onboarding. The platform cannot turn this agent's records against it."
+
+**Ownership model (why this is true):**
+- ENS subname: platform holds it only during steps 1–4 (bootstrap window), step 5 transfers to seller EOA
+- ERC-8004 agentId: seller's key calls `register()` directly → mints to seller as msg.sender, no transfer step
+- Splitter: CREATE2-deployed with seller EOA as primary recipient
 
 #### Step C — Agent dashboard
 

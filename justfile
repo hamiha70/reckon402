@@ -80,4 +80,4 @@ onboard ensName sellerEoa endpoint='https://agent.reckon402.com/research' amount
 # L4c — live full-flow onboard + paid-call smoke. Assumes 08A factory deployed
 # and 08B orchestrator + gateway admin routes live.
 fullflow-l4c-onboard:
-    {{secrets}} bash -c 'cd tools/integration-tests && bash full-flow-l4c-onboard.sh'
+    {{secrets}} env SELLER_DEMO_1_PK="$SELLER_PK" bash -c 'cd tools/integration-tests && bash full-flow-l4c-onboard.sh'

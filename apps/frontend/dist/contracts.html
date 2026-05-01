@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reckon402 — Smart Contracts</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace; }
+    .kw  { color: #c792ea; }
+    .ty  { color: #82aaff; }
+    .cm  { color: #546e7a; font-style: italic; }
+    .str { color: #c3e88d; }
+    .fn  { color: #82aaff; }
+    .num { color: #f78c6c; }
+    .ev  { color: #ffcb6b; }
+    .err { color: #f07178; }
+    pre  { tab-size: 4; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-4 md:p-8">
+
+  <header class="mb-8 border-b border-gray-800 pb-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-green-400">
+        Reckon402 — Smart Contracts
+      </h1>
+      <p class="text-gray-500 text-sm mt-1">
+        Ethereum Sepolia · Base Sepolia · Foundry + Solidity 0.8.24
+      </p>
+    </div>
+    <nav class="flex gap-3 text-sm">
+      <a href="https://app.reckon402.com" class="text-blue-400 hover:text-blue-300">← Back to app.reckon402.com</a>
+    </nav>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Section 1: Deployed Contracts                                       -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="mb-12">
+    <h2 class="text-sm uppercase tracking-wider text-gray-500 mb-4">1. Deployed Contracts</h2>
+    <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-xs uppercase text-gray-500 tracking-wider border-b border-gray-800">
+          <tr>
+            <th class="text-left px-4 py-3">Contract</th>
+            <th class="text-left px-4 py-3">Network</th>
+            <th class="text-left px-4 py-3">Address</th>
+            <th class="text-left px-4 py-3">Explorer</th>
+            <th class="text-left px-4 py-3">ABI</th>
+          </tr>
+        </thead>
+        <tbody class="font-mono divide-y divide-gray-800">
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-green-300 font-bold">Reckon402Resolver</td>
+            <td class="px-4 py-3 text-gray-400">Ethereum Sepolia</td>
+            <td class="px-4 py-3 text-gray-200 text-xs">0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.etherscan.io/address/0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">etherscan ↗</a>
+            </td>
+            <td class="px-4 py-3">
+              <a href="#abi-resolver" class="text-gray-500 hover:text-gray-300 text-xs">→ source</a>
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-green-300 font-bold">SplitterFactory</td>
+            <td class="px-4 py-3 text-gray-400">Base Sepolia</td>
+            <td class="px-4 py-3 text-gray-200 text-xs">0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.basescan.org/address/0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">basescan ↗</a>
+            </td>
+            <td class="px-4 py-3">
+              <a href="#abi-factory" class="text-gray-500 hover:text-gray-300 text-xs">→ source</a>
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-green-300 font-bold">IdentityRegistry <span class="text-gray-500 font-normal text-xs">(ERC-8004)</span></td>
+            <td class="px-4 py-3 text-gray-400">Base Sepolia</td>
+            <td class="px-4 py-3 text-gray-200 text-xs">0x8004A818BFB912233c491871b3d84c89A494BD9e</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">basescan ↗</a>
+            </td>
+            <td class="px-4 py-3 text-gray-600 text-xs">third-party</td>
+          </tr>
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-green-300 font-bold">ReputationRegistry <span class="text-gray-500 font-normal text-xs">(ERC-8004)</span></td>
+            <td class="px-4 py-3 text-gray-400">Base Sepolia</td>
+            <td class="px-4 py-3 text-gray-200 text-xs">0x8004B663056A597Dffe9eCcC1965A193B7388713</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.basescan.org/address/0x8004B663056A597Dffe9eCcC1965A193B7388713"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">basescan ↗</a>
+            </td>
+            <td class="px-4 py-3 text-gray-600 text-xs">third-party</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Section 2: Contract Source Code                                     -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="mb-12">
+    <h2 class="text-sm uppercase tracking-wider text-gray-500 mb-4">2. Contract Source Code</h2>
+
+    <!-- Reckon402Resolver -->
+    <div id="abi-resolver" class="mb-8">
+      <div class="flex items-center gap-3 mb-2">
+        <h3 class="text-green-400 font-bold">Reckon402Resolver.sol</h3>
+        <span class="text-xs text-gray-600">contracts/src/Reckon402Resolver.sol</span>
+        <a href="https://sepolia.etherscan.io/address/0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a"
+           target="_blank" class="text-blue-400 hover:text-blue-300 text-xs ml-auto">etherscan ↗</a>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
+        <pre class="p-4 text-xs leading-relaxed text-gray-300"><span class="cm">// SPDX-License-Identifier: MIT</span>
+<span class="kw">pragma solidity</span> <span class="num">0.8.24</span>;
+
+<span class="kw">import</span> <span class="str">{ IExtendedResolver }</span> <span class="kw">from</span> <span class="str">"./interfaces/IExtendedResolver.sol"</span>;
+<span class="kw">import</span> <span class="str">{ ERC165 }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/utils/introspection/ERC165.sol"</span>;
+<span class="kw">import</span> <span class="str">{ IERC165 }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/utils/introspection/IERC165.sol"</span>;
+<span class="kw">import</span> <span class="str">{ Ownable }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/access/Ownable.sol"</span>;
+<span class="kw">import</span> <span class="str">{ ECDSA }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/utils/cryptography/ECDSA.sol"</span>;
+
+<span class="cm">/// @title  Reckon402Resolver
+/// @notice ENSIP-10 wildcard resolver with EIP-3668 OffchainLookup (Pattern A).
+/// @dev    Pattern A: msg.sender is encoded into callData/extraData so the
+///         off-chain gateway can serve per-caller responses without HTTP auth.
+///         The resolver holds no funds and no settlement state. Ownable is used
+///         only for signer rotation and gateway URL updates.</span>
+<span class="kw">contract</span> <span class="ty">Reckon402Resolver</span> <span class="kw">is</span> <span class="ty">IExtendedResolver</span>, <span class="ty">ERC165</span>, <span class="ty">Ownable</span> {
+
+    <span class="cm">// ─── EIP-3668 error ────────────────────────────────────────────────────</span>
+
+    <span class="kw">error</span> <span class="err">OffchainLookup</span>(
+        <span class="ty">address</span> sender,
+        <span class="ty">string</span>[] urls,
+        <span class="ty">bytes</span> callData,
+        <span class="ty">bytes4</span> callbackFunction,
+        <span class="ty">bytes</span> extraData
+    );
+
+    <span class="cm">// ─── Custom errors ─────────────────────────────────────────────────────</span>
+
+    <span class="kw">error</span> <span class="err">UnauthorizedSigner</span>(<span class="ty">address</span> signer);
+    <span class="kw">error</span> <span class="err">StaleResponse</span>(<span class="ty">uint64</span> timestamp, <span class="ty">uint64</span> freshnessWindow);
+    <span class="kw">error</span> <span class="err">MalformedCallData</span>();
+
+    <span class="cm">// ─── State ─────────────────────────────────────────────────────────────</span>
+
+    <span class="cm">/// @notice Authorized signers (gateway hot keys).</span>
+    <span class="kw">mapping</span>(<span class="ty">address</span> signer =&gt; <span class="ty">bool</span> authorized) <span class="kw">public</span> signers;
+
+    <span class="cm">/// @notice Gateway URL list.</span>
+    <span class="ty">string</span>[] <span class="kw">public</span> gatewayUrls;
+
+    <span class="cm">/// @notice Responses older than this are rejected in the callback.</span>
+    <span class="ty">uint64</span> <span class="kw">public constant</span> FRESHNESS_WINDOW = <span class="num">300</span>;
+
+    <span class="cm">// ─── Events ────────────────────────────────────────────────────────────</span>
+
+    <span class="kw">event</span> <span class="ev">SignerAdded</span>(<span class="ty">address</span> <span class="kw">indexed</span> signer);
+    <span class="kw">event</span> <span class="ev">SignerRemoved</span>(<span class="ty">address</span> <span class="kw">indexed</span> signer);
+    <span class="kw">event</span> <span class="ev">GatewayUrlsUpdated</span>(<span class="ty">string</span>[] urls);
+
+    <span class="cm">// ─── Constructor ───────────────────────────────────────────────────────</span>
+
+    <span class="kw">constructor</span>(<span class="ty">string</span>[] <span class="kw">memory</span> _gatewayUrls, <span class="ty">address</span> _initialSigner)
+        <span class="fn">Ownable</span>(<span class="kw">msg.sender</span>)
+    {
+        gatewayUrls = _gatewayUrls;
+        signers[_initialSigner] = <span class="kw">true</span>;
+        <span class="kw">emit</span> <span class="ev">SignerAdded</span>(_initialSigner);
+    }
+
+    <span class="cm">// ─── Owner setters ─────────────────────────────────────────────────────</span>
+
+    <span class="kw">function</span> <span class="fn">addSigner</span>(<span class="ty">address</span> signer) <span class="kw">external onlyOwner</span> {
+        signers[signer] = <span class="kw">true</span>;
+        <span class="kw">emit</span> <span class="ev">SignerAdded</span>(signer);
+    }
+
+    <span class="kw">function</span> <span class="fn">removeSigner</span>(<span class="ty">address</span> signer) <span class="kw">external onlyOwner</span> {
+        <span class="kw">delete</span> signers[signer];
+        <span class="kw">emit</span> <span class="ev">SignerRemoved</span>(signer);
+    }
+
+    <span class="kw">function</span> <span class="fn">setGatewayUrls</span>(<span class="ty">string</span>[] <span class="kw">calldata</span> urls) <span class="kw">external onlyOwner</span> {
+        gatewayUrls = urls;
+        <span class="kw">emit</span> <span class="ev">GatewayUrlsUpdated</span>(urls);
+    }
+
+    <span class="cm">// ─── ENSIP-10 entry point ──────────────────────────────────────────────</span>
+
+    <span class="cm">/// @notice Wildcard resolver entry point. Always reverts with OffchainLookup.
+    /// @param  name DNS-encoded ENS name being resolved.
+    /// @param  data ABI-encoded resolver function call (e.g. text(bytes32,string)).</span>
+    <span class="kw">function</span> <span class="fn">resolve</span>(<span class="ty">bytes</span> <span class="kw">calldata</span> name, <span class="ty">bytes</span> <span class="kw">calldata</span> data)
+        <span class="kw">external view</span>
+        <span class="kw">returns</span> (<span class="ty">bytes</span> <span class="kw">memory</span>)
+    {
+        <span class="ty">bytes</span> <span class="kw">memory</span> payload = <span class="fn">abi.encode</span>(name, <span class="kw">msg.sender</span>, data);
+
+        <span class="kw">revert</span> <span class="err">OffchainLookup</span>(
+            <span class="fn">address</span>(<span class="kw">this</span>),
+            gatewayUrls,
+            payload,
+            <span class="kw">this</span>.<span class="fn">resolveCallback</span>.selector,
+            payload
+        );
+    }
+
+    <span class="cm">// ─── EIP-3668 callback ─────────────────────────────────────────────────</span>
+
+    <span class="cm">/// @notice EIP-3668 callback. Verifies signature freshness and signer
+    ///         authorization, then returns the gateway-supplied result bytes.
+    /// @param  response   ABI-encoded (bytes result, uint64 timestamp, bytes32 nonce, bytes sig).
+    /// @param  extraData  The extraData echoed from resolve(). Bound into the digest.</span>
+    <span class="kw">function</span> <span class="fn">resolveCallback</span>(<span class="ty">bytes</span> <span class="kw">calldata</span> response, <span class="ty">bytes</span> <span class="kw">calldata</span> extraData)
+        <span class="kw">external view</span>
+        <span class="kw">returns</span> (<span class="ty">bytes</span> <span class="kw">memory</span>)
+    {
+        (<span class="ty">bytes</span> <span class="kw">memory</span> result, <span class="ty">uint64</span> timestamp, <span class="ty">bytes32</span> nonce, <span class="ty">bytes</span> <span class="kw">memory</span> sig) =
+            <span class="fn">abi.decode</span>(response, (<span class="ty">bytes</span>, <span class="ty">uint64</span>, <span class="ty">bytes32</span>, <span class="ty">bytes</span>));
+
+        <span class="kw">if</span> (<span class="kw">block.timestamp</span> &gt; timestamp + FRESHNESS_WINDOW) {
+            <span class="kw">revert</span> <span class="err">StaleResponse</span>(timestamp, FRESHNESS_WINDOW);
+        }
+
+        <span class="ty">bytes32</span> digest = <span class="fn">keccak256</span>(<span class="fn">abi.encode</span>(result, timestamp, nonce, extraData));
+        <span class="ty">bytes32</span> ethDigest = <span class="fn">keccak256</span>(
+            <span class="fn">abi.encodePacked</span>(<span class="str">"\x19Ethereum Signed Message:\n32"</span>, digest)
+        );
+
+        <span class="ty">address</span> recovered = <span class="ty">ECDSA</span>.<span class="fn">recover</span>(ethDigest, sig);
+        <span class="kw">if</span> (!signers[recovered]) <span class="kw">revert</span> <span class="err">UnauthorizedSigner</span>(recovered);
+
+        <span class="kw">return</span> result;
+    }
+
+    <span class="cm">// ─── ERC-165 ───────────────────────────────────────────────────────────</span>
+
+    <span class="kw">function</span> <span class="fn">supportsInterface</span>(<span class="ty">bytes4</span> interfaceId)
+        <span class="kw">public view override</span>
+        <span class="kw">returns</span> (<span class="ty">bool</span>)
+    {
+        <span class="kw">return</span>
+            interfaceId == <span class="kw">type</span>(<span class="ty">IExtendedResolver</span>).interfaceId ||
+            <span class="kw">super</span>.<span class="fn">supportsInterface</span>(interfaceId);
+    }
+}</pre>
+      </div>
+    </div>
+
+    <!-- SplitterFactory -->
+    <div id="abi-factory" class="mb-8">
+      <div class="flex items-center gap-3 mb-2">
+        <h3 class="text-green-400 font-bold">SplitterFactory.sol</h3>
+        <span class="text-xs text-gray-600">contracts/src/SplitterFactory.sol</span>
+        <a href="https://sepolia.basescan.org/address/0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
+           target="_blank" class="text-blue-400 hover:text-blue-300 text-xs ml-auto">basescan ↗</a>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
+        <pre class="p-4 text-xs leading-relaxed text-gray-300"><span class="cm">// SPDX-License-Identifier: MIT</span>
+<span class="kw">pragma solidity</span> <span class="num">0.8.24</span>;
+
+<span class="kw">import</span> <span class="str">{ IERC20 }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/token/ERC20/IERC20.sol"</span>;
+<span class="kw">import</span> <span class="str">{ Splitter }</span> <span class="kw">from</span> <span class="str">"./Splitter.sol"</span>;
+
+<span class="cm">/// @title  Reckon402 SplitterFactory (v1)
+/// @notice Deploys per-SellingAgent Splitters via CREATE2.
+/// @dev    No admin, no upgrade. Salt is caller-chosen so the L4c onboarding
+///         script can pick addresses that are unique per (sellingAgentEns,
+///         chainId). The factory records every address it has deployed in
+///         `isDeployed`, which the facilitator reads at payment time to
+///         reject forged `x402.splitter` ENS records.</span>
+<span class="kw">contract</span> <span class="ty">SplitterFactory</span> {
+    <span class="ty">IERC20</span> <span class="kw">public immutable</span> token;
+
+    <span class="cm">/// @notice Addresses deployed by this factory.</span>
+    <span class="kw">mapping</span>(<span class="ty">address</span> =&gt; <span class="ty">bool</span>) <span class="kw">public</span> isDeployed;
+
+    <span class="kw">event</span> <span class="ev">SplitterCreated</span>(
+        <span class="ty">address</span> <span class="kw">indexed</span> sellingAgent,
+        <span class="ty">address</span> <span class="kw">indexed</span> splitter,
+        <span class="ty">bytes32</span> <span class="kw">indexed</span> salt,
+        <span class="ty">address</span>[] recipients,
+        <span class="ty">uint16</span>[] bps
+    );
+
+    <span class="kw">error</span> <span class="err">AlreadyDeployed</span>(<span class="ty">address</span> splitter);
+    <span class="kw">error</span> <span class="err">InvalidSellingAgent</span>();
+
+    <span class="kw">constructor</span>(<span class="ty">IERC20</span> _token) {
+        token = _token;
+    }
+
+    <span class="cm">/// @notice Deploy a new Splitter for `sellingAgent`.
+    /// @param  sellingAgent  MUST equal recipients[0].
+    /// @param  recipients    1–8 addresses; recipients[0] is the SellingAgent wallet.
+    /// @param  bps           BPS per recipient; must sum to 10_000.
+    /// @param  salt          keccak256(abi.encodePacked(sellingAgentEnsName)).
+    /// @return splitter      Deterministic deployed address.</span>
+    <span class="kw">function</span> <span class="fn">createSplitter</span>(
+        <span class="ty">address</span>          sellingAgent,
+        <span class="ty">address</span>[] <span class="kw">memory</span> recipients,
+        <span class="ty">uint16</span>[]  <span class="kw">memory</span> bps,
+        <span class="ty">bytes32</span>          salt
+    ) <span class="kw">external returns</span> (<span class="ty">address</span> splitter) {
+        <span class="kw">if</span> (recipients.length == <span class="num">0</span> || recipients[<span class="num">0</span>] != sellingAgent) {
+            <span class="kw">revert</span> <span class="err">InvalidSellingAgent</span>();
+        }
+
+        <span class="ty">address</span> predicted = <span class="fn">predictAddress</span>(salt, recipients, bps);
+        <span class="kw">if</span> (isDeployed[predicted]) <span class="kw">revert</span> <span class="err">AlreadyDeployed</span>(predicted);
+
+        splitter = <span class="fn">address</span>(<span class="kw">new</span> <span class="ty">Splitter</span>{salt: salt}(token, recipients, bps));
+        isDeployed[splitter] = <span class="kw">true</span>;
+
+        <span class="kw">emit</span> <span class="ev">SplitterCreated</span>(sellingAgent, splitter, salt, recipients, bps);
+    }
+
+    <span class="cm">/// @notice Compute the CREATE2 address for given salt + constructor args.</span>
+    <span class="kw">function</span> <span class="fn">predictAddress</span>(
+        <span class="ty">bytes32</span>          salt,
+        <span class="ty">address</span>[] <span class="kw">memory</span> recipients,
+        <span class="ty">uint16</span>[]  <span class="kw">memory</span> bps
+    ) <span class="kw">public view returns</span> (<span class="ty">address</span>) {
+        <span class="ty">bytes</span> <span class="kw">memory</span> creationCode = <span class="fn">abi.encodePacked</span>(
+            <span class="kw">type</span>(<span class="ty">Splitter</span>).creationCode,
+            <span class="fn">abi.encode</span>(token, recipients, bps)
+        );
+        <span class="ty">bytes32</span> hash = <span class="fn">keccak256</span>(
+            <span class="fn">abi.encodePacked</span>(
+                <span class="ty">bytes1</span>(<span class="num">0xff</span>),
+                <span class="fn">address</span>(<span class="kw">this</span>),
+                salt,
+                <span class="fn">keccak256</span>(creationCode)
+            )
+        );
+        <span class="kw">return</span> <span class="fn">address</span>(<span class="ty">uint160</span>(<span class="ty">uint256</span>(hash)));
+    }
+}</pre>
+      </div>
+    </div>
+
+    <!-- Splitter -->
+    <div id="abi-splitter" class="mb-8">
+      <div class="flex items-center gap-3 mb-2">
+        <h3 class="text-green-400 font-bold">Splitter.sol</h3>
+        <span class="text-xs text-gray-600">contracts/src/Splitter.sol</span>
+        <span class="text-xs text-gray-600 ml-auto">(deployed per-SellingAgent via SplitterFactory)</span>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
+        <pre class="p-4 text-xs leading-relaxed text-gray-300"><span class="cm">// SPDX-License-Identifier: MIT</span>
+<span class="kw">pragma solidity</span> <span class="num">0.8.24</span>;
+
+<span class="kw">import</span> <span class="str">{ IERC20 }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/token/ERC20/IERC20.sol"</span>;
+<span class="kw">import</span> <span class="str">{ SafeERC20 }</span> <span class="kw">from</span> <span class="str">"@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol"</span>;
+
+<span class="cm">/// @title  Reckon402 Splitter (v1)
+/// @notice Immutable BPS-based payment distributor for x402 settlements.
+/// @dev    No admin, no upgrade, no rescue. By construction, the operator
+///         cannot move user funds. Permissionless distribute(); replay
+///         protection on paymentId is enforced at the facilitator layer.</span>
+<span class="kw">contract</span> <span class="ty">Splitter</span> {
+    <span class="kw">using</span> <span class="ty">SafeERC20</span> <span class="kw">for</span> <span class="ty">IERC20</span>;
+
+    <span class="ty">IERC20</span> <span class="kw">public immutable</span> token;
+    <span class="ty">uint8</span>  <span class="kw">public immutable</span> totalRecipients;
+
+    <span class="ty">uint16</span> <span class="kw">public constant</span> BPS_DENOMINATOR = <span class="num">10_000</span>;
+    <span class="ty">uint8</span>  <span class="kw">public constant</span> MAX_RECIPIENTS  = <span class="num">8</span>;
+
+    <span class="cm">// Immutable recipient slots (gas-optimized; avoids dynamic array storage)</span>
+    <span class="ty">address</span> <span class="kw">private immutable</span> r0; <span class="ty">address</span> <span class="kw">private immutable</span> r1;
+    <span class="ty">address</span> <span class="kw">private immutable</span> r2; <span class="ty">address</span> <span class="kw">private immutable</span> r3;
+    <span class="ty">address</span> <span class="kw">private immutable</span> r4; <span class="ty">address</span> <span class="kw">private immutable</span> r5;
+    <span class="ty">address</span> <span class="kw">private immutable</span> r6; <span class="ty">address</span> <span class="kw">private immutable</span> r7;
+    <span class="ty">uint16</span>  <span class="kw">private immutable</span> b0; <span class="ty">uint16</span>  <span class="kw">private immutable</span> b1;
+    <span class="ty">uint16</span>  <span class="kw">private immutable</span> b2; <span class="ty">uint16</span>  <span class="kw">private immutable</span> b3;
+    <span class="ty">uint16</span>  <span class="kw">private immutable</span> b4; <span class="ty">uint16</span>  <span class="kw">private immutable</span> b5;
+    <span class="ty">uint16</span>  <span class="kw">private immutable</span> b6; <span class="ty">uint16</span>  <span class="kw">private immutable</span> b7;
+
+    <span class="kw">event</span> <span class="ev">Distributed</span>(
+        <span class="ty">bytes32</span> <span class="kw">indexed</span> paymentId, <span class="ty">uint8</span> <span class="kw">indexed</span> slot,
+        <span class="ty">address</span> <span class="kw">indexed</span> recipient, <span class="ty">uint16</span> bps, <span class="ty">uint256</span> amount
+    );
+    <span class="kw">event</span> <span class="ev">Deployed</span>(<span class="ty">address</span> <span class="kw">indexed</span> token, <span class="ty">uint8</span> totalRecipients, <span class="ty">address</span>[] recipients, <span class="ty">uint16</span>[] bps);
+
+    <span class="kw">error</span> <span class="err">InvalidRecipientCount</span>();
+    <span class="kw">error</span> <span class="err">InvalidBpsSum</span>(<span class="ty">uint256</span> actual);
+    <span class="kw">error</span> <span class="err">ZeroAddress</span>(<span class="ty">uint8</span> slot);
+    <span class="kw">error</span> <span class="err">InsufficientBalance</span>(<span class="ty">uint256</span> requested, <span class="ty">uint256</span> available);
+    <span class="kw">error</span> <span class="err">InvalidSlot</span>(<span class="ty">uint8</span> slot);
+
+    <span class="kw">constructor</span>(
+        <span class="ty">IERC20</span>           _token,
+        <span class="ty">address</span>[] <span class="kw">memory</span> _recipients,
+        <span class="ty">uint16</span>[]  <span class="kw">memory</span> _bps
+    ) {
+        <span class="ty">uint256</span> n = _recipients.length;
+        <span class="kw">if</span> (n == <span class="num">0</span> || n &gt; MAX_RECIPIENTS || n != _bps.length) {
+            <span class="kw">revert</span> <span class="err">InvalidRecipientCount</span>();
+        }
+        <span class="ty">uint256</span> sum;
+        <span class="kw">for</span> (<span class="ty">uint256</span> i = <span class="num">0</span>; i &lt; n; ++i) {
+            <span class="kw">if</span> (_recipients[i] == <span class="fn">address</span>(<span class="num">0</span>)) <span class="kw">revert</span> <span class="err">ZeroAddress</span>(<span class="ty">uint8</span>(i));
+            sum += _bps[i];
+        }
+        <span class="kw">if</span> (sum != BPS_DENOMINATOR) <span class="kw">revert</span> <span class="err">InvalidBpsSum</span>(sum);
+
+        token = _token; totalRecipients = <span class="ty">uint8</span>(n);
+        r0 = n &gt; <span class="num">0</span> ? _recipients[<span class="num">0</span>] : <span class="fn">address</span>(<span class="num">0</span>); r1 = n &gt; <span class="num">1</span> ? _recipients[<span class="num">1</span>] : <span class="fn">address</span>(<span class="num">0</span>);
+        r2 = n &gt; <span class="num">2</span> ? _recipients[<span class="num">2</span>] : <span class="fn">address</span>(<span class="num">0</span>); r3 = n &gt; <span class="num">3</span> ? _recipients[<span class="num">3</span>] : <span class="fn">address</span>(<span class="num">0</span>);
+        r4 = n &gt; <span class="num">4</span> ? _recipients[<span class="num">4</span>] : <span class="fn">address</span>(<span class="num">0</span>); r5 = n &gt; <span class="num">5</span> ? _recipients[<span class="num">5</span>] : <span class="fn">address</span>(<span class="num">0</span>);
+        r6 = n &gt; <span class="num">6</span> ? _recipients[<span class="num">6</span>] : <span class="fn">address</span>(<span class="num">0</span>); r7 = n &gt; <span class="num">7</span> ? _recipients[<span class="num">7</span>] : <span class="fn">address</span>(<span class="num">0</span>);
+        b0 = n &gt; <span class="num">0</span> ? _bps[<span class="num">0</span>] : <span class="num">0</span>; b1 = n &gt; <span class="num">1</span> ? _bps[<span class="num">1</span>] : <span class="num">0</span>;
+        b2 = n &gt; <span class="num">2</span> ? _bps[<span class="num">2</span>] : <span class="num">0</span>; b3 = n &gt; <span class="num">3</span> ? _bps[<span class="num">3</span>] : <span class="num">0</span>;
+        b4 = n &gt; <span class="num">4</span> ? _bps[<span class="num">4</span>] : <span class="num">0</span>; b5 = n &gt; <span class="num">5</span> ? _bps[<span class="num">5</span>] : <span class="num">0</span>;
+        b6 = n &gt; <span class="num">6</span> ? _bps[<span class="num">6</span>] : <span class="num">0</span>; b7 = n &gt; <span class="num">7</span> ? _bps[<span class="num">7</span>] : <span class="num">0</span>;
+
+        <span class="kw">emit</span> <span class="ev">Deployed</span>(<span class="fn">address</span>(_token), <span class="ty">uint8</span>(n), _recipients, _bps);
+    }
+
+    <span class="cm">/// @notice Distribute `amount` of token across the immutable recipient set by BPS.
+    /// @dev    Anyone can call. Splitter must hold &gt;= amount of token.
+    /// @param  paymentId Facilitator-assigned payment identifier (event-only).
+    /// @param  amount    Amount to distribute; must be &lt;= token balance of this contract.</span>
+    <span class="kw">function</span> <span class="fn">distribute</span>(<span class="ty">bytes32</span> paymentId, <span class="ty">uint256</span> amount) <span class="kw">external</span> {
+        <span class="ty">uint256</span> bal = token.<span class="fn">balanceOf</span>(<span class="fn">address</span>(<span class="kw">this</span>));
+        <span class="kw">if</span> (bal &lt; amount) <span class="kw">revert</span> <span class="err">InsufficientBalance</span>(amount, bal);
+
+        <span class="ty">uint8</span> n = totalRecipients;
+        <span class="kw">for</span> (<span class="ty">uint8</span> i = <span class="num">0</span>; i &lt; n; ++i) {
+            (<span class="ty">address</span> recipient, <span class="ty">uint16</span> bps) = <span class="fn">getRecipient</span>(i);
+            <span class="ty">uint256</span> share = (amount * bps) / BPS_DENOMINATOR;
+            <span class="kw">if</span> (share &gt; <span class="num">0</span>) {
+                token.<span class="fn">safeTransfer</span>(recipient, share);
+                <span class="kw">emit</span> <span class="ev">Distributed</span>(paymentId, i, recipient, bps, share);
+            }
+        }
+    }
+
+    <span class="kw">function</span> <span class="fn">getRecipient</span>(<span class="ty">uint8</span> slot) <span class="kw">public view returns</span> (<span class="ty">address</span> recipient, <span class="ty">uint16</span> bps) {
+        <span class="kw">if</span> (slot &gt;= totalRecipients) <span class="kw">revert</span> <span class="err">InvalidSlot</span>(slot);
+        <span class="kw">if</span> (slot == <span class="num">0</span>) <span class="kw">return</span> (r0, b0); <span class="kw">if</span> (slot == <span class="num">1</span>) <span class="kw">return</span> (r1, b1);
+        <span class="kw">if</span> (slot == <span class="num">2</span>) <span class="kw">return</span> (r2, b2); <span class="kw">if</span> (slot == <span class="num">3</span>) <span class="kw">return</span> (r3, b3);
+        <span class="kw">if</span> (slot == <span class="num">4</span>) <span class="kw">return</span> (r4, b4); <span class="kw">if</span> (slot == <span class="num">5</span>) <span class="kw">return</span> (r5, b5);
+        <span class="kw">if</span> (slot == <span class="num">6</span>) <span class="kw">return</span> (r6, b6);
+        <span class="kw">return</span> (r7, b7);
+    }
+
+    <span class="kw">function</span> <span class="fn">getAllRecipients</span>()
+        <span class="kw">external view</span>
+        <span class="kw">returns</span> (<span class="ty">address</span>[] <span class="kw">memory</span> recipients, <span class="ty">uint16</span>[] <span class="kw">memory</span> bps)
+    {
+        <span class="ty">uint8</span> n = totalRecipients;
+        recipients = <span class="kw">new</span> <span class="ty">address</span>[](n); bps = <span class="kw">new</span> <span class="ty">uint16</span>[](n);
+        <span class="kw">for</span> (<span class="ty">uint8</span> i = <span class="num">0</span>; i &lt; n; ++i) {
+            (recipients[i], bps[i]) = <span class="fn">getRecipient</span>(i);
+        }
+    }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Section 3: Key Transaction Evidence                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="mb-12">
+    <h2 class="text-sm uppercase tracking-wider text-gray-500 mb-4">3. Key Transaction Evidence</h2>
+    <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-xs uppercase text-gray-500 tracking-wider border-b border-gray-800">
+          <tr>
+            <th class="text-left px-4 py-3">Event</th>
+            <th class="text-left px-4 py-3">Tx Hash</th>
+            <th class="text-left px-4 py-3">Explorer</th>
+          </tr>
+        </thead>
+        <tbody class="font-mono divide-y divide-gray-800">
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-gray-200">First live ERC-8004 attestation</td>
+            <td class="px-4 py-3 text-gray-400 text-xs break-all">0xf3fd14044152cb9a15912b030c9209a69ce7aa5687c32937f4c07ce142ab61e2</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.basescan.org/tx/0xf3fd14044152cb9a15912b030c9209a69ce7aa5687c32937f4c07ce142ab61e2"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">basescan ↗</a>
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-gray-200">First full-flow settlement</td>
+            <td class="px-4 py-3 text-gray-400 text-xs break-all">0x5efd44aa122f807113ad036328c74589dd65c803ea30bed281acb32f852ea6e5</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.basescan.org/tx/0x5efd44aa122f807113ad036328c74589dd65c803ea30bed281acb32f852ea6e5"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">basescan ↗</a>
+            </td>
+          </tr>
+          <tr class="hover:bg-gray-800/40">
+            <td class="px-4 py-3 text-gray-200">SplitterFactory deploy (Splitter instance)</td>
+            <td class="px-4 py-3 text-gray-400 text-xs break-all">0xaa3cb87703c8320a7ece5b2d267d9101fd89199cf9c066fec9fde765b77af443</td>
+            <td class="px-4 py-3">
+              <a href="https://sepolia.basescan.org/tx/0xaa3cb87703c8320a7ece5b2d267d9101fd89199cf9c066fec9fde765b77af443"
+                 target="_blank" class="text-blue-400 hover:text-blue-300 text-xs">basescan ↗</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-gray-600 text-xs mt-3 font-mono">
+      As of submission: seller has accumulated <span class="text-green-400">20.22 USDC</span> across real settlements on Base Sepolia.
+      Live pricing: <span class="text-green-400">90000</span> base units (10% tier-2 discount from base 100000).
+    </p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- Section 4: ENS Integration                                          -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="mb-12">
+    <h2 class="text-sm uppercase tracking-wider text-gray-500 mb-4">4. ENS Integration</h2>
+    <div class="bg-gray-900 border border-gray-800 rounded-lg p-6 space-y-6">
+
+      <!-- Architecture diagram (text) -->
+      <div class="bg-gray-950 border border-gray-800 rounded p-4 font-mono text-xs text-gray-400 leading-relaxed">
+        <div class="text-green-400 mb-2">Resolution flow:</div>
+        <div>
+          <span class="text-amber-300">viem / wagmi client</span>
+          <span class="text-gray-600"> ─── ENS lookup ──→ </span>
+          <span class="text-blue-300">reckon402-test.eth</span>
+          <span class="text-gray-600"> (Ethereum Mainnet / Sepolia)</span>
+        </div>
+        <div class="ml-8 text-gray-600">↓ ENSIP-10 wildcard — resolver field points to:</div>
+        <div class="ml-8">
+          <span class="text-green-300">Reckon402Resolver</span>
+          <span class="text-gray-600"> @ 0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a (Ethereum Sepolia)</span>
+        </div>
+        <div class="ml-8 text-gray-600">↓ EIP-3668 OffchainLookup — reverts with gateway URL:</div>
+        <div class="ml-8">
+          <span class="text-blue-300">https://gateway.reckon402.com</span>
+          <span class="text-gray-600"> (Cloudflare Worker + ezccip.js)</span>
+        </div>
+        <div class="ml-8 text-gray-600">↓ Gateway reads caller's ERC-8004 reputation from:</div>
+        <div class="ml-8">
+          <span class="text-amber-300">ReputationRegistry</span>
+          <span class="text-gray-600"> @ 0x8004B663... (Base Sepolia)</span>
+          <span class="text-gray-600"> + D1 (off-chain ENS record store)</span>
+        </div>
+        <div class="ml-8 text-gray-600">↓ Returns signed x402.amount record (tier-adjusted price)</div>
+        <div class="ml-8">
+          <span class="text-green-300">Reckon402Resolver.resolveCallback()</span>
+          <span class="text-gray-600"> verifies ECDSA signature + freshness</span>
+        </div>
+        <div class="ml-8 text-gray-600">↓ Client receives ABI-encoded text record value</div>
+      </div>
+
+      <!-- Key properties -->
+      <div class="space-y-4 text-sm">
+        <div>
+          <div class="text-xs uppercase tracking-wider text-gray-500 mb-2">CCIP-Read Pattern A (msg.sender encoding)</div>
+          <p class="text-gray-300 text-xs leading-relaxed">
+            The resolver encodes <code class="text-green-300">msg.sender</code> into both <code class="text-green-300">callData</code> and <code class="text-green-300">extraData</code>.
+            This lets the off-chain gateway serve different prices to different BuyingAgent callers based on their
+            on-chain ERC-8004 reputation — without requiring HTTP authentication. The same ENS name returns a
+            different <code class="text-green-300">x402.amount</code> depending on who asks.
+          </p>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider text-gray-500 mb-2">ENSIP-25 Text Records — SellingAgent Sovereign ACL</div>
+          <div class="bg-gray-950 border border-gray-800 rounded p-3 text-xs font-mono">
+            <div class="text-gray-500 mb-2">SellingAgent-owned (requires subname owner EOA sig):</div>
+            <div class="text-green-300 ml-4">x402.amount · x402.pricing · x402.endpoint · x402.attestation · x402.yield</div>
+            <div class="text-gray-500 mt-2 mb-2">Reckon402-owned (requires platform onboarding EOA sig):</div>
+            <div class="text-amber-300 ml-4">x402.splitter · x402.facilitator · x402.erc8004.registry · x402.erc8004.agent_id</div>
+          </div>
+          <p class="text-gray-400 text-xs leading-relaxed mt-2">
+            Gateway verifies each write against <code class="text-gray-300">registry.owner(namehash)</code> and per-key ACL.
+            A SellingAgent's pricing and attestation opt-in are cryptographically theirs — Reckon402 cannot
+            front-run pricing or silently reroute payments.
+          </p>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-wider text-gray-500 mb-2">ERC-8004 ↔ ENS Binding (ENSIP-25)</div>
+          <p class="text-gray-300 text-xs leading-relaxed">
+            At onboarding, two ENSIP-25 text records are written linking the ENS subname to the SellingAgent's
+            ERC-8004 identity: <code class="text-green-300">erc8004.registry</code> (IdentityRegistry address on Base Sepolia) and
+            <code class="text-green-300">erc8004.agent_id</code> (numeric agentId in that registry). This creates the canonical
+            ENS ↔ ERC-8004 binding used by CCIP-Read Pattern A for per-caller reputation lookups.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="border-t border-gray-800 pt-4 flex items-center justify-between text-xs text-gray-600">
+    <span>Reckon402 — ETHGlobal OpenAgents 2026</span>
+    <a href="https://app.reckon402.com" class="text-blue-400 hover:text-blue-300">← Back to app.reckon402.com</a>
+  </footer>
+
+</body>
+</html>

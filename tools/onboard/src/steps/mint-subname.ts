@@ -83,8 +83,8 @@ export function makeMintSubnameClients(
 ): MintSubnameClients {
   const account = privateKeyToAccount(funderPk)
   return {
-    public: createPublicClient({ chain: sepolia, transport: http(rpcUrl, { timeout: 10_000 }) }) as PublicClient,
-    wallet: createWalletClient({ account, chain: sepolia, transport: http(rpcUrl, { timeout: 10_000 }) }),
+    public: createPublicClient({ chain: sepolia, transport: http(rpcUrl, { timeout: 60_000 }) }) as PublicClient,
+    wallet: createWalletClient({ account, chain: sepolia, transport: http(rpcUrl, { timeout: 60_000 }) }),
   }
 }
 

@@ -72,8 +72,8 @@ export function makeRegisterAgentIdClients(
 ): RegisterAgentIdClients {
   const account = privateKeyToAccount(deployerPk)
   return {
-    public: createPublicClient({ chain: baseSepolia, transport: http(rpcUrl, { timeout: 15_000 }) }) as PublicClient,
-    wallet: createWalletClient({ account, chain: baseSepolia, transport: http(rpcUrl, { timeout: 15_000 }) }),
+    public: createPublicClient({ chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }) as PublicClient,
+    wallet: createWalletClient({ account, chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }),
   }
 }
 

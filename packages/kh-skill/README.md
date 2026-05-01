@@ -1,5 +1,12 @@
 # `@reckon402/kh-skill`
 
+> **POST-HACKATHON STUB — not yet functional at runtime.**
+>
+> This package is a post-ETHGlobal OpenAgents 2026 deliverable. The interface
+> contract and KeeperHub skill schema are fully defined; the `handle()`
+> implementation throws at runtime until `@reckon402/buyer-sdk`'s `pay()`
+> helper ships. See [Current status](#current-status) below.
+
 KeeperHub skill for [Reckon402](https://github.com/hamiha70/reckon402) —
 exposes the x402 v2 buyer flow as a `reckon402-buyer` workflow node, backed
 by the hosted KMS signing wrapper at `signing.reckon402.com`.
@@ -7,6 +14,12 @@ by the hosted KMS signing wrapper at `signing.reckon402.com`.
 ## Current status
 
 **npm-installable; not yet natively executable inside KeeperHub.**
+
+> **Runtime stub:** `handle()` throws `"reckon402.pay() is not yet implemented"`
+> until `@reckon402/buyer-sdk` ships a `pay()` helper. The TypeScript interface
+> contract (`Reckon402SkillInput` / `Reckon402SkillOutput`), env var names, and
+> KeeperHub node schema are stable and will not change when the implementation
+> lands.
 
 KeeperHub's public custom node SDK is listed as "planned for future release"
 in their docs. Today's KH platform runs a fixed set of built-in node types

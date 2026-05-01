@@ -1,7 +1,8 @@
 {
   "name": "@reckon402/kh-skill",
   "version": "0.1.0",
-  "description": "KeeperHub skill for x402 payments via the Reckon402 hosted signing wrapper (KMS-backed EIP-3009 signer).",
+  "private": true,
+  "description": "KeeperHub skill for x402 payments via the Reckon402 hosted signing wrapper (KMS-backed EIP-3009 signer). POST-HACKATHON STUB: handle() throws at runtime until buyer-sdk pay() ships.",
   "license": "MIT",
   "type": "module",
   "main": "./src/index.ts",

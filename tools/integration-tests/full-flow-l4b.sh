@@ -45,7 +45,7 @@ BEFORE_RAW=$(bash "$SCRIPT_DIR/resolve-l4a.sh" \
   --gateway "$GATEWAY_URL" \
   --name "$SELLER_NAME" \
   --key x402.amount 2>&1 | tee "$BEFORE_JSON")
-BEFORE_AMOUNT=$(grep -oE '"value":"[0-9]+"' "$BEFORE_JSON" | head -1 | sed -E 's/.*"([0-9]+)".*/\1/' || echo "UNKNOWN")
+BEFORE_AMOUNT=$(grep -oE 'Decoded value: [0-9]+' "$BEFORE_JSON" | head -1 | grep -oE '[0-9]+$' || echo "UNKNOWN")
 echo "  x402.amount BEFORE = $BEFORE_AMOUNT"          | tee -a "$RUN_LOG"
 echo ""                                                | tee -a "$RUN_LOG"
 
@@ -107,7 +107,7 @@ bash "$SCRIPT_DIR/resolve-l4a.sh" \
   --gateway "$GATEWAY_URL" \
   --name "$SELLER_NAME" \
   --key x402.amount 2>&1 | tee "$AFTER_JSON" | tee -a "$RUN_LOG" || true
-AFTER_AMOUNT=$(grep -oE '"value":"[0-9]+"' "$AFTER_JSON" | head -1 | sed -E 's/.*"([0-9]+)".*/\1/' || echo "UNKNOWN")
+AFTER_AMOUNT=$(grep -oE 'Decoded value: [0-9]+' "$AFTER_JSON" | head -1 | grep -oE '[0-9]+$' || echo "UNKNOWN")
 echo "  x402.amount AFTER = $AFTER_AMOUNT"             | tee -a "$RUN_LOG"
 echo ""                                                 | tee -a "$RUN_LOG"
 

@@ -49,4 +49,4 @@ ENABLE_L4C_FACTORY              = "true"
 # Keep the legacy JSON-map agent resolver live until L4c smoke completes;
 # the factory path passes agentId directly from `resolveSplitterForPayment`
 # without touching SELLER_AGENT_IDS.
-USE_LEGACY_AGENT_RESOLVER       = "true"
+USE_LEGACY_AGENT_RESOLVER       = "false"

@@ -47,6 +47,7 @@ if [ -z "${SPLITTER_ADDRESS:-}" ]; then
   fi
   echo "  resolved SPLITTER_ADDRESS=$SPLITTER_ADDRESS (from gateway)" >&2
 fi
+export SPLITTER_ADDRESS
 
 echo "=== L3 full-flow integration test ===" | tee "$RUN_LOG"
 echo "Agent:       $AGENT_URL"               | tee -a "$RUN_LOG"

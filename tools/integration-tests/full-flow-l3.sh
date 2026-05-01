@@ -11,7 +11,10 @@
 #  5. The run log captures paymentId + nonce for the replay test.
 #
 # Requires (Infisical-hydrated):
-#   BUYER_DEMO_1_PK, SPLITTER_ADDRESS, BASE_SEPOLIA_RPC_PRIMARY
+#   BUYER_DEMO_1_PK, BASE_SEPOLIA_RPC_PRIMARY
+# Optional overrides:
+#   SELLER_ENS (default: seller.reckon402-test.eth)
+#   SPLITTER_ADDRESS (default: auto-resolved from gateway via SELLER_ENS)
 #
 # Usage:
 #   infisical run --env dev --domain https://secrets.intentralabs.com -- \
@@ -22,10 +25,28 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_URL="${AGENT_URL:-https://agent.reckon402.com}"
 FACILITATOR_URL="${FACILITATOR_URL:-https://facilitator.reckon402.com}"
+GATEWAY_URL="${GATEWAY_URL:-https://gateway.reckon402.com}"
+SELLER_ENS="${SELLER_ENS:-seller.reckon402-test.eth}"
 STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 RUN_LOG="$SCRIPT_DIR/run-full-flow-l3-$STAMP.log"
 ARTIFACT_DIR="$SCRIPT_DIR/run-full-flow-l3-$STAMP"
 mkdir -p "$ARTIFACT_DIR"
+
+# Resolve SPLITTER_ADDRESS from the gateway unless already set in the environment.
+# This keeps the test agent-agnostic: any agent whose splitter is registered in
+# the gateway will work — no hardcoded address needed.
+if [ -z "${SPLITTER_ADDRESS:-}" ]; then
+  SPLITTER_ADDRESS=$(curl -sS "$GATEWAY_URL/records/${SELLER_ENS}?flat=true&backend=static" \
+    | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>{
+        try { console.log(JSON.parse(d).records['x402.splitter'] ?? '') }
+        catch { console.log('') }
+      })")
+  if [ -z "$SPLITTER_ADDRESS" ]; then
+    echo "ERROR: could not resolve x402.splitter for $SELLER_ENS from $GATEWAY_URL" >&2
+    exit 1
+  fi
+  echo "  resolved SPLITTER_ADDRESS=$SPLITTER_ADDRESS (from gateway)" >&2
+fi
 
 echo "=== L3 full-flow integration test ===" | tee "$RUN_LOG"
 echo "Agent:       $AGENT_URL"               | tee -a "$RUN_LOG"
@@ -36,7 +57,6 @@ echo ""                                      | tee -a "$RUN_LOG"
 
 # ── Pre-flight ────────────────────────────────────────────────────────────
 : "${BUYER_DEMO_1_PK:?BUYER_DEMO_1_PK missing (hydrate via infisical run)}"
-: "${SPLITTER_ADDRESS:?SPLITTER_ADDRESS missing}"
 
 # ── Step 1: 402 gate ──────────────────────────────────────────────────────
 echo "[1/6] GET /research WITHOUT payment header -> expect 402" | tee -a "$RUN_LOG"

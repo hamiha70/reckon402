@@ -45,7 +45,7 @@ SPLITTER_FACTORY_ADDRESS        = "0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
 GATEWAY_BASE_URL                = "https://gateway.reckon402.com"
 # Ship with the L4c factory path OFF so the L4b₁ regression path still owns
 # `ENABLE_L4C_FACTORY="false"`. A follow-up deploy flips it to "true".
-ENABLE_L4C_FACTORY              = "false"
+ENABLE_L4C_FACTORY              = "true"
 # Keep the legacy JSON-map agent resolver live until L4c smoke completes;
 # the factory path passes agentId directly from `resolveSplitterForPayment`
 # without touching SELLER_AGENT_IDS.

@@ -1,231 +1,406 @@
 # Reckon402 — Implementation Plan: Demo Completion Sprint
 # ETHGlobal OpenAgents 2026 — 2 days remaining (2026-05-01 → 2026-05-03)
+#
+# REVISED after Opus 4.7 adversarial review + hands-on secrets/code audit.
+# Every defect below is verified against the live codebase and Infisical secrets.
 
-> **Purpose of this document:** Hand to Opus 4.7 for adversarial review before
-> implementation begins. Challenge: hidden dependencies, mis-ordered steps, scope
-> that will break the deploy sequence or the demo under time pressure.
->
-> **Revert point:** tag `design-locked-2026-05-01` (committed, pushed).
-> **Design doc:** `docs/demo-design.md` (full demo script, voiceover, site topology).
-> **Existing deploy runbook:** `tools/deploy/deploy-l4c-onboarding.md` (Steps 0-11,
-> very detailed — this plan references it rather than duplicating).
+> **Revert point:** tag `design-locked-2026-05-01` (commit bb3c7c5)  
+> **Design doc:** `docs/demo-design.md`  
+> **Existing deploy runbook:** `tools/deploy/deploy-l4c-onboarding.md`
 
 ---
 
-## Current state (what is live RIGHT NOW)
+## Verified secrets inventory (as of 2026-05-01)
 
-| Service | URL | Status |
-|---------|-----|--------|
-| Facilitator | `facilitator.reckon402.com` | LIVE, version `dc14eb8e` |
-| Gateway | `gateway.reckon402.com` | LIVE, version `3d9c120f` |
-| SellingAgent endpoint | `agent.reckon402.com` | LIVE |
-| EIP-3009 signer | `signing.reckon402.com` | LIVE |
-| Onboarding app | `app.reckon402.com` | **NOT DEPLOYED** |
-| Landing page | `reckon402.com` | **NOT DEPLOYED** |
-| Network monitor | `demo.reckon402.com` | **NOT DEPLOYED** |
+| Secret name | Status | EOA / value |
+|-------------|--------|-------------|
+| `X402COMMIT_FUNDER_PK` | ✓ EXISTS | `0x9AF7...` — owns `reckon402-test.eth` on ETH Sepolia; 3.9 ETH Sepolia + 2.5 ETH Base Sepolia |
+| `SELLER_PK` | ✓ EXISTS | `0xD53f...` — SellingAgent demo EOA; **0 ETH on both chains — must fund before Phase 1** |
+| `FACILITATOR_PK` | ✓ EXISTS | `0x0A02...` — 1 ETH Base Sepolia; usable as `RECKON402_DEPLOYER_PK` |
+| `ADMIN_TOKEN` | ✓ EXISTS (wrangler secret, 32 chars) | Bearer token for `/admin/receipts` — see IP-4 |
+| `ETH_SEPOLIA_RPC_PRIMARY` | ✓ EXISTS | length 58 |
+| `BASE_SEPOLIA_RPC_PRIMARY` | ✓ EXISTS | (from prior runs) |
+| `RECKON402_DEPLOYER_PK` | ✗ MISSING | Use `FACILITATOR_PK` — same EOA, plain hex, funded |
+| `RECKON402_ONBOARDING_PK` | ✗ MISSING | Use `SELLER_PK` — same EOA as the demo SellingAgent |
+| `ENS_FUNDER_PK` | ✗ MISSING | Use `X402COMMIT_FUNDER_PK` — confirmed ENS parent owner |
 
-All unit tests: 97/97 facilitator, 85/85 gateway, 24/24 onboard tools, 13/13
-orchestrator. All passing on `main` at tag `L4c-factory-green`.
-
-Gateway admin routes (`/admin/records`, `/admin/bootstrap`,
-`/admin/bootstrap/gateway-seed`) ARE in the live gateway code BUT:
-- D1 migration `0003_l4c_signed_writes.sql` has NOT been applied
-- `RECKON402_ONBOARDING_EOA` is empty string in gateway wrangler.toml
-- So all admin routes currently return 503 `onboarding_eoa_not_configured`
-
-SplitterFactory deployed: `0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7` (Base Sepolia, block 40932143).
+**Resolution:** All three missing secrets are aliases of existing keys. No new key generation needed. Phase 1 Step 0 registers them as aliases in Infisical.
 
 ---
 
-## What needs to happen before the video recording
+## Production defects on `main` that must be fixed before Phase 1
 
-### Non-negotiables (demo breaks without these)
-1. `app.reckon402.com` must serve the onboarding form and dashboard
-2. A live onboarding must succeed end-to-end (`just onboard seller9...`)
-3. "Run Test Call" triggers a real paid call visible in the dashboard
-4. Option C terminal pane shows `x402.amount` changing after attestations
+These exist in the live codebase today. The demo fails silently without them.
 
-### High-value additions (demo is significantly weaker without these)
-5. Dashboard shows agentId / splitter / ENS owner (currently `—`)
-6. ENS Text Records panel on dashboard (shows ENSIP-25 proof)
-7. `demo.reckon402.com` deployed (network portfolio view)
-8. `reckon402.com` deployed (landing page)
+### IP-1 — `extra.ens` never reaches the facilitator (PRODUCTION BLOCKER)
 
-### Nice-to-have (cut if time-pressured)
-9. BPS split display on onboard form
-10. KeeperHub workflow published (alternative to browser-native paid call)
-11. "Download KH workflow" button on dashboard
+**File:** `packages/middleware-hono/src/withX402.ts` lines 23–31 and 97–105
+
+The middleware hardcodes `extra: { name: 'USDC', version: '2' }` in both the
+402 response AND the `requirements` object passed to `facilitator.settle()`.
+It never reads the buyer's `payload.accepted.extra`.
+
+The facilitator's `settle-route.ts:137-147` requires `paymentRequirements.extra.ens`
+when `ENABLE_L4C_FACTORY="true"`, returning HTTP 400 `MISSING_ENS` otherwise.
+
+**Fix:** `withX402.ts` must accept an optional `extra` field in `X402Options`
+and merge it into both the 402 response and the `requirements` object.
+`agent/src/index.ts` must pass `extra: { ens: env.SELLER_ENS }` (a new env var)
+to `withX402`.
+
+**Impact if unfixed:** Every settle call returns 400. Demo dead.
+
+### IP-2 — `just fullflow-l4b` regression gate fails due to IP-1 (not the gateway)
+
+**File:** `justfile` — `fullflow-l4b` calls `full-flow-l3.sh` which hits the agent endpoint.
+
+Phase 1 Step 3 uses `just fullflow-l4b` as the regression gate after deploying the
+gateway. With IP-1 live, this gate is already failing — the test failure is IP-1,
+not a gateway regression. **Fix:** use `just fullflow-l4c-factory` as the Phase 1
+regression gate instead (bypasses the agent middleware, exercises only the
+facilitator and gateway directly).
+
+### IP-3 — `auth.to` ≠ resolved splitter → silent settlement failure (PRODUCTION BLOCKER)
+
+**Files:** `workers/agent/wrangler.toml`, `workers/facilitator/src/settle.ts`
+
+`agent/wrangler.toml` has `SPLITTER_ADDRESS = "0x0ad507..."` (legacy L3 splitter).
+This is what the agent passes as `payTo` / `recipient` to the middleware — so
+the buyer signs `auth.to = 0x0ad507...`.
+
+`settle.ts:80` uses `input.splitter ?? env.SPLITTER_ADDRESS` for the post-transfer
+balance poll and `distribute()` call. `input.splitter` = `0x372c0b...` (factory
+splitter, resolved via ENS). `auth.to` = `0x0ad507...`.
+
+The USDC transfer lands in `0x0ad507...` (what the buyer signed). The facilitator
+polls balance on `0x372c0b...`. Balance stays at 0. Times out after 30s →
+`FAILED` state. No attestation.
+
+**Fix:** `agent/wrangler.toml` must set `SPLITTER_ADDRESS = "0x372c0b951035da05058b175a15b4fe7d29f1fc4c"` 
+(the factory-deployed splitter for `seller.reckon402-test.eth`). This makes
+`auth.to == resolved splitter` so USDC lands in the right contract and the
+balance poll succeeds.
+
+**Note:** This fix means the agent is hardcoded to one SellingAgent's splitter.
+For demo purposes this is fine — the agent serves `seller.reckon402-test.eth`.
+The long-term fix is having the agent fetch `x402.splitter` from the gateway at
+request time, but that is post-hackathon scope.
+
+### IP-4 — `/admin/receipts` is auth-gated and has camelCase field names; dashboard reads neither correctly
+
+**Two sub-problems:**
+
+**IP-4a (auth):** `admin-route.ts:18-24` requires `Authorization: Bearer <ADMIN_TOKEN>`.
+`ADMIN_TOKEN` is a wrangler secret (set, 32 chars). The dashboard fetches
+`/admin/receipts` with no auth header → always 401 → call log always shows "no calls yet".
+
+**IP-4b (field names):** Admin route returns `tx`, `tdErc8004Tx`, `paymentId`, `submittedAt`.
+Dashboard reads `transaction`, `td_erc8004_tx`, `payment_id`, `submitted_at`.
+Every field is wrong — clickable links always `—`, trust counter always 0.
+
+**Fix options for IP-4a:**
+- Option A: Add a proxy endpoint on the orchestrator (`GET /receipts?limit=N`) that
+  forwards to the facilitator with the Bearer token server-side. Dashboard calls the
+  orchestrator (same origin, no CORS). Token stays secret. **Recommended — 20 min.**
+- Option B: Make `ADMIN_TOKEN` a public `[var]` and embed it in `app.js`. Bad security
+  practice, but acceptable for a hackathon with no real funds at risk.
+- Option C: Add a separate unauthenticated read-only receipts endpoint to the facilitator.
+  Clean but requires deploying the facilitator.
+
+**Fix for IP-4b:** Update `app.js` field references to use `tx`, `tdErc8004Tx`,
+`paymentId`, `submittedAt`. Same in `demo/index.html` if it reads `/admin/receipts`.
 
 ---
 
-## Phase 1 — Deploy `app.reckon402.com` (~1.5h, sequential, Claude runs)
-
-**Dependency chain is strict — each step gates the next.**
+## Phase 0 — Pre-flight (15 min, before anything else)
 
 ```
-Step 1: Apply gateway/migrations/0003_l4c_signed_writes.sql to reckon402-d1-gateway-dev
-        → verify: SELECT name FROM sqlite_master WHERE type='table' returns 3 rows
+0a. Register missing secret aliases in Infisical:
+    ENS_FUNDER_PK         = value of X402COMMIT_FUNDER_PK
+    RECKON402_DEPLOYER_PK = value of FACILITATOR_PK
+    RECKON402_ONBOARDING_PK = value of SELLER_PK
 
-Step 2: Derive RECKON402_ONBOARDING_EOA from RECKON402_ONBOARDING_PK
-        → edit gateway/wrangler.toml [vars] + [env.production.vars] + [env.staging.vars]
-        → commit
+    (These are the same key material under the names the orchestrator expects.
+    No new keys needed. Fund SELLER on Base Sepolia and ETH Sepolia — see 0b.)
 
-Step 3: wrangler deploy --env production (gateway)
-        → verify: curl admin/records returns 400 (not 404)
-        → verify: just fullflow-l4b still exits 0 (L4b regression)
+0b. Fund SELLER_ADDRESS (0xD53f...) on both chains:
+    - ETH Sepolia: ≥0.01 ETH (for potential future signed writes as ENS owner)
+    - Base Sepolia: ≥0.01 ETH (in case any Base Sepolia ops are needed)
+    Source: X402COMMIT_FUNDER has 2.5 ETH Base Sepolia — transfer from there.
 
-Step 4: wrangler secret put × 5 on onboard-orchestrator (Infisical-piped)
-        → ENS_FUNDER_PK, RECKON402_DEPLOYER_PK, RECKON402_ONBOARDING_PK,
-          ETH_SEPOLIA_RPC_PRIMARY, BASE_SEPOLIA_RPC_PRIMARY
+    cast send 0xD53ffac42496d73B3Faf946786688a8454F57b1f \
+      --value 0.02ether \
+      --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
+      --private-key "$X402COMMIT_FUNDER_PK"
 
-Step 5: Edit orchestrator wrangler.toml — fill SPLITTER_FACTORY_ADDRESS + RECKON402_ONBOARDING_EOA
-        → commit
+0c. Verify FACILITATOR has enough Base Sepolia ETH for Splitter + agentId deploys:
+    FACILITATOR (0x0A02...) = 1 ETH Base Sepolia ✓ (confirmed)
+    Each onboarding costs ~0.005 ETH — has headroom for 200 runs.
 
-Step 6: wrangler deploy --env production (onboard-orchestrator)
-        → verify: curl app.reckon402.com/healthz returns {"ok":true}
-        → verify: curl app.reckon402.com/ returns 200 (index.html)
-
-Step 7: just onboard seller9.reckon402-test.eth <SELLER_EOA>
-        → verify: 5 steps complete, gateway serves x402.splitter + x402.erc8004.agent_id
-        → verify: ENS subnode owner = SELLER_EOA (not funder)
-
-Step 8: just fullflow-l4c-onboard (automated smoke)
-        → must exit 0
-        → capture: smoke ENS name, post-attestation x402.amount value
-
-Step 9: tag L4c-onboarding-green + push
+0d. Confirm regression gate switch:
+    Replace `just fullflow-l4b` with `just fullflow-l4c-factory` in Phase 1 Step 3.
 ```
-
-**Known risks in Phase 1:**
-- `RECKON402_ONBOARDING_PK` may not be in Infisical yet (new key needed for 08B, not used in L4b). If missing, Phase 1 blocks completely. Must check Infisical secrets inventory first.
-- ENS funder wallet balance: each onboarding costs ~0.003 ETH Sepolia. Need ≥0.01 ETH for demo + rehearsal + retries.
-- Workers Assets `[assets]` binding requires `directory = "../../apps/frontend/dist"` — this is a relative path from the worker's directory. If the build is run from a different CWD, the path may not resolve. The `dist/` files are committed so no build step needed.
-- `RECKON402_DEPLOYER_PK` is the same key as the 08A KMS deployer conceptually, but the orchestrator needs a plain hex PK, not KMS. Confirm `RECKON402_DEPLOYER_PK` exists as a plain PK in Infisical (NOT the KMS alias used by `deploy-splitter-factory.mjs`).
 
 ---
 
-## Phase 2 — UI additions (~2.5h coding, can parallelize after Phase 1 Step 6)
+## Phase 1 — Fix IP-1 + IP-3 + IP-4, then deploy `app.reckon402.com`
 
-These are code changes that need to be deployed after Phase 1. They can be
-coded in parallel with Phase 1 Steps 7-9 or in a second pass.
+**These code fixes must land and deploy before the smoke tests will pass.**
 
-### 2A — `apps/frontend/dist/app.js` additions (~90 min, one agent)
+### Step 1 — Fix IP-1: add `extra` pass-through to `withX402` middleware
 
-**A1. Dashboard: populate agentId / splitter / owner / endpoint from records (15 min)**
-- Replace placeholder `—` values in `renderDashboardHeader()`
-- Source: `GET gateway.reckon402.com/records/:ensName?flat=true&backend=static`
-- Fields: `x402.erc8004.agent_id` → `#dash-agent-id`, `x402.splitter` → `#dash-splitter`,
+**File:** `packages/middleware-hono/src/withX402.ts`
+
+Add `extra?: Record<string, string>` to `X402Options`. Merge into both the
+402 `PaymentRequirements` object and the `requirements` object passed to
+`facilitator.verify()` and `facilitator.settle()`:
+
+```diff
+ export interface X402Options {
+   amount: string
+   network: string
+   asset: string
+   recipient: string
+   facilitator: Facilitator
++  extra?: Record<string, string>
+ }
+
+ function buildPaymentRequired(url: string, opts: X402Options): XPaymentRequired {
+   return {
+     x402Version: 2,
+     resource: { url },
+     accepts: [
+       {
+         ...
+-        extra: { name: 'USDC', version: '2' },
++        extra: { name: 'USDC', version: '2', ...opts.extra },
+       } satisfies PaymentRequirements,
+     ],
+   }
+ }
+
+-  const requirements: PaymentRequirements = {
+-    ...
+-    extra: { name: 'USDC', version: '2' },
+-  }
++  const requirements: PaymentRequirements = {
++    ...
++    extra: { name: 'USDC', version: '2', ...opts.extra },
++  }
+```
+
+### Step 2 — Fix IP-3: update agent `SPLITTER_ADDRESS` + add `SELLER_ENS` env var
+
+**Files:** `workers/agent/wrangler.toml`, `workers/agent/src/index.ts`
+
+```diff
+# wrangler.toml
+-SPLITTER_ADDRESS = "0x0ad507c6973eba86313794329ad9b12fbf24acd0"
++SPLITTER_ADDRESS = "0x372c0b951035da05058b175a15b4fe7d29f1fc4c"
++SELLER_ENS       = "seller.reckon402-test.eth"
+```
+
+```diff
+# src/index.ts — in withX402 call
+ const middleware = withX402({
+   amount: c.env.AMOUNT,
+   network: c.env.NETWORK,
+   asset: c.env.USDC_ADDRESS,
+   recipient: c.env.SPLITTER_ADDRESS,
+   facilitator: new Reckon402Facilitator(c.env.FACILITATOR_URL),
++  extra: { ens: c.env.SELLER_ENS },
+ })
+```
+
+Deploy agent worker after this change.
+
+### Step 3 — Apply gateway D1 migration 0003
+
+```bash
+infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
+  cd gateway
+  wrangler d1 execute reckon402-d1-gateway-dev --remote \
+    --file migrations/0003_l4c_signed_writes.sql
+'
+```
+
+Verify 3 tables exist. Regression gate: `just fullflow-l4c-factory` (NOT fullflow-l4b).
+
+### Step 4 — Wire `RECKON402_ONBOARDING_EOA` into gateway and orchestrator `wrangler.toml`
+
+`RECKON402_ONBOARDING_EOA` = `0xD53ffac42496d73B3Faf946786688a8454F57b1f` (SELLER address,
+derived from SELLER_PK = RECKON402_ONBOARDING_PK).
+
+Edit `gateway/wrangler.toml` — all three `[vars]` blocks:
+```diff
+-RECKON402_ONBOARDING_EOA = ""
++RECKON402_ONBOARDING_EOA = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
+```
+
+Edit `workers/onboard-orchestrator/wrangler.toml` — both `[vars]` blocks:
+```diff
+-SPLITTER_FACTORY_ADDRESS = ""
+-RECKON402_ONBOARDING_EOA = ""
++SPLITTER_FACTORY_ADDRESS = "0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
++RECKON402_ONBOARDING_EOA = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
+```
+
+Commit both.
+
+### Step 5 — Deploy gateway
+
+```bash
+infisical run ... wrangler deploy --env production  # from gateway/
+```
+
+Verify: `curl /admin/records` → 400 (not 404). Verify: `just fullflow-l4c-factory` exits 0.
+
+### Step 6 — Set orchestrator wrangler secrets (Infisical-piped)
+
+```bash
+infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
+  cd workers/onboard-orchestrator
+  printf "%s" "$X402COMMIT_FUNDER_PK"  | wrangler secret put ENS_FUNDER_PK           --env production
+  printf "%s" "$FACILITATOR_PK"        | wrangler secret put RECKON402_DEPLOYER_PK   --env production
+  printf "%s" "$SELLER_PK"             | wrangler secret put RECKON402_ONBOARDING_PK --env production
+  printf "%s" "$ETH_SEPOLIA_RPC_PRIMARY"  | wrangler secret put ETH_SEPOLIA_RPC_PRIMARY --env production
+  printf "%s" "$BASE_SEPOLIA_RPC_PRIMARY" | wrangler secret put BASE_SEPOLIA_RPC_PRIMARY --env production
+'
+```
+
+Verify: `wrangler secret list --env production` shows 5 secrets.
+
+### Step 7 — Deploy orchestrator worker
+
+```bash
+infisical run ... wrangler deploy --env production  # from workers/onboard-orchestrator/
+```
+
+Verify:
+```bash
+curl https://app.reckon402.com/healthz        # → {"ok":true}
+curl https://app.reckon402.com/               # → 200 (index.html)
+curl https://app.reckon402.com/app.js         # → 200
+```
+
+### Step 8 — First live onboarding (use smoke name, NOT seller9)
+
+Use `seller-smoke-1` for this step so the demo name `seller9` remains available:
+
+```bash
+infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
+  just onboard seller-smoke-1.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f
+'
+```
+
+### Step 9 — Automated smoke
+
+```bash
+just fullflow-l4c-onboard
+```
+
+Must exit 0. Captures smoke ENS name, post-attestation `x402.amount`.
+
+### Step 10 — Deploy agent worker (IP-1 + IP-3 fix)
+
+```bash
+infisical run ... wrangler deploy  # from workers/agent/ — no --env flag needed
+```
+
+Verify: `just fullflow-l4b` now exits 0 (agent middleware fix restores this gate).
+
+### Step 11 — Tag + push
+
+```bash
+git tag -a L4c-onboarding-green -m "..."
+git push --follow-tags
+```
+
+---
+
+## Phase 2 — UI additions (~2.5h coding, parallel agents after Phase 1 Step 7)
+
+### 2A — `apps/frontend/dist/app.js` + `apps/frontend/dist/index.html` (Agent 1, ~90 min)
+
+**A1. Fix IP-4b field names (5 min, do first)**
+- `r.transaction` → `r.tx`
+- `r.td_erc8004_tx` → `r.tdErc8004Tx`
+- `r.payment_id` → `r.paymentId`
+- `r.submitted_at` → `r.submittedAt`
+
+**A2. Fix IP-4a: add orchestrator receipts proxy (20 min)**
+Add `GET /receipts?limit=N` to `workers/onboard-orchestrator/src/index.ts`:
+proxies to `facilitator.reckon402.com/admin/receipts` with the Bearer token
+from a new secret `FACILITATOR_ADMIN_TOKEN`. Dashboard calls `/receipts` (same
+origin, no CORS, no token exposed to browser).
+
+Set the new wrangler secret:
+```bash
+printf "%s" "$ADMIN_TOKEN" | wrangler secret put FACILITATOR_ADMIN_TOKEN --env production
+```
+
+**A3. Dashboard: populate agentId / splitter / endpoint from records (15 min)**
+- Fetch `GET /records/:ensName?flat=true&backend=static` → `gateway.reckon402.com`
+- Map: `x402.erc8004.agent_id` → `#dash-agent-id`, `x402.splitter` → `#dash-splitter`,
   `x402.endpoint` → `#dash-endpoint`
-- ENS owner: separate call to `/records/:ensName?flat=true&backend=static` doesn't
-  include the ENS owner address — need ENS Registry read OR a gateway endpoint.
-  **Fallback: display splitter + agentId + endpoint, skip owner for now.**
 
-**A2. Dashboard: ENS Text Records collapsible panel (25 min)**
-- After dashboard header card, add a `<details>` element (no JS needed for collapse)
-- Fetch `GET /records/:ensName?flat=true&backend=static`
-- Render all keys in a 2-column table with clickable links for `0x...` values
-- Etherscan for Ethereum Sepolia addresses, Basescan for Base Sepolia addresses
+**A4. ENS Text Records collapsible panel (20 min)**
+- `<details>/<summary>` element after dashboard header — no extra JS
+- Same fetch as A3 — render all keys in 2-col table, `0x` values as clickable links
 
-**A3. "Run Test Call" button: open KeeperHub workflow OR browser paid call (30 min)**
+**A5. "Run Test Call" button: open KeeperHub workflow URL (5 min)**
+- Replace `alert()` with `window.open(CFG.KH_WORKFLOW_URL, '_blank')`
+- Add `KH_WORKFLOW_URL` to `CFG` object (populated after Phase 3C)
 
-Option B-simple (recommended): Change the `alert()` to open the KeeperHub workflow URL
-in a new tab. Pre-condition: KH workflow is published (Phase 3C).
+**A6. BPS split display on onboard form (15 min)**
+- Add a read-only section below the form fields showing the hardcoded split:
+  `0xD53f... (seller) 97% / 0x0A02... (platform) 2% / 0x66C2... (deployer) 1%`
 
-Option B-browser (richer, riskier): Make a real browser-side paid call using
-`signing.reckon402.com` + `facilitator.reckon402.com`. Requires:
-- POST to signing.reckon402.com/sign with the EIP-3009 payload
-- POST to facilitator.reckon402.com/x402/settle with the payment header
-- No CORS issues (signing.reckon402.com has `*` CORS, facilitator too)
-- BUT: browser needs SIGNING_WRAPPER_API_KEY — this is a secret. Cannot hardcode.
-  **This blocks Option B-browser unless we either make the key public (bad)
-  or add a proxy endpoint on the orchestrator (adds scope).**
+**A7. "Download KH Workflow" button on dashboard (20 min)**
+- After onboarding succeeds and dashboard loads, generate a `kh-workflow.json`
+  from the agent's ENS records (endpoint, amount, ENS name) and trigger browser download
 
-**Recommended: Option B-simple first** (open KH URL, 3 lines), add Option B-browser
-as a stretch after Phase 3 (KH publish). If KH isn't published in time, button
-stays as the `alert()` shell-command hint — still functional for the demo.
+### 2B — `demo/index.html` (Agent 2, ~45 min)
 
-**A4. Dashboard: filter receipts dropdown (20 min)**
-- Add `<select>` above the calls table: "All agents" + each known ENS name
-- On change: re-filter the `receipts` array in memory (no new fetch)
-- Seed: populate dropdown from the current ENS name + "All"
-- **Note:** receipts table does NOT store ENS name per payment (INSERT doesn't
-  include it). So "filter by agent" means filtering by `auth_to` (the splitter
-  address), which IS stored. Map `splitter → ensName` from the gateway records
-  fetch. This works for the single-agent demo case; with multiple agents it
-  requires a splitter→name lookup per receipt.
-  **Simplification: for the demo, the dropdown just shows the active ENS and
-  "All" — no per-receipt filtering needed since there's one agent per dashboard.**
+**B1. Boot-poll `/admin/receipts` (15 min)**
+- On page load: fetch `facilitator.reckon402.com/admin/receipts?limit=20` with
+  `Authorization: Bearer <ADMIN_TOKEN>` header
+- ADMIN_TOKEN must be embedded here (demo page is static, no proxy available)
+- Fix field names: `tx`, `tdErc8004Tx`, `paymentId`, `submittedAt`
 
-### 2B — `demo/index.html` additions (~45 min, one agent)
+**B2. Pause/Resume toggle (10 min)**
 
-**B1. Boot-poll `/admin/receipts` to pre-populate payment feed (15 min)**
-- On page load: `fetch('https://facilitator.reckon402.com/admin/receipts?limit=20')`
-- Add returned `payment_id` values to `knownPaymentIds` Set
-- Payment feed then works across page refreshes (not just in-session)
+**B3. Agent Roster dropdown (20 min)**
 
-**B2. Pause/Resume toggle for auto-refresh (10 min)**
-- Add a button that clears/restores the `setInterval` timers
-- Default: running. Pause before voiceover sections.
-
-**B3. Agent Roster: dropdown to filter by agentId or "All" (20 min)**
-- The roster already iterates all agents from `totalSupply`
-- Add a `<select>` above the roster table: "All agents" + `#1`, `#2`, etc.
-- On change: filter `rosterState` render to show only selected agentId
-
-### 2C — `recipes/kh-workflow.json` update (15 min, simple edit)
+### 2C — `recipes/kh-workflow.json` (Agent 3, 15 min)
 
 - Add `"extra": {"ens": "${DEMO_SELLER_ENS}"}` to each call node's config
-- The facilitator's L4c path reads `paymentRequirements.extra.ens` to run
-  splitter resolution. Without this, the KH call uses the old L3 SPLITTER_ADDRESS
-  env var and bypasses the ENS→Splitter resolution entirely.
-- **This is required for the KH demo to show the L4c trust loop.**
-- Make `DEMO_SELLER_ENS` a workflow variable (KH supports `${VAR}` interpolation).
+- Make `DEMO_SELLER_ENS` a KH workflow variable
 
 ---
 
-## Phase 3 — Static deployments (manual, ~40 min, user runs)
+## Phase 3 — Static deploys + KH publish (manual, ~40 min, user runs)
 
-These require a Cloudflare API token with `Pages:Edit` scope, which the Infisical
-token lacks. Must be done manually by the user in the CF dashboard.
-
-**3A — `reckon402.com` (CF Pages, `reckon402-landing`)**
-- Follow `landing/DEPLOY.md`
-- Source: `landing/index.html` (static, no build)
-- Custom domain: `reckon402.com`
-
-**3B — `demo.reckon402.com` (CF Pages, `reckon402-demo`)**
-- Follow `demo/DEPLOY.md`
-- Source: `demo/index.html` (static, no build)
-- Custom domain: `demo.reckon402.com`
-- **Deploy AFTER Phase 2B** so the boot-poll and pause toggle are in the file
-
-**3C — KeeperHub workflow publish**
-- Follow `tools/deploy/kh-platform-runbook.md`
-- Import `recipes/kh-workflow.json` (AFTER Phase 2C edits)
-- Set `SIGNING_WRAPPER_API_KEY` as a KH secret
-- Capture workflow URL → paste into AGENTS.md KH section
+- 3A: CF Pages `reckon402.com` (follow `landing/DEPLOY.md`)
+- 3B: CF Pages `demo.reckon402.com` — **after Phase 2B** so boot-poll is in the file
+- 3C: KeeperHub publish (follow `tools/deploy/kh-platform-runbook.md`) — **after Phase 2C**
 
 ---
 
-## Phase 4 — Demo rehearsal + submission (tomorrow, 2026-05-02)
+## Phase 4 — Demo rehearsal + submission (tomorrow)
 
 ```
 Morning:
-  Full demo run × 2 with fresh agents (seller10, seller11)
-  → Each run proves: onboard form → 5 steps → dashboard → 3 KH calls → badge + price change
-  → Check: Option C terminal pane updates correctly
-  → Check: demo.reckon402.com shows new agents in roster
-  → Check: reckon402.com landing page looks correct
+  Full demo run × 2 with fresh agents (seller9, seller10)
+  Each run proves: form → 5 steps → dashboard → 3 KH calls → badge + price change
+  Check: Option C terminal pane, demo.reckon402.com roster, reckon402.com landing
 
-Mainnet go/no-go decision (see decision rule in demo-design.md):
-  → Only proceed if testnet ran cleanly twice with no manual intervention
+Mainnet go/no-go: only if testnet ran cleanly twice without intervention
 
 Afternoon:
-  Record demo video (target: under 3 minutes)
-  Fill docs/submission/draft.md TODO markers:
-    - [TODO] frontend URL → https://app.reckon402.com (confirmed after Phase 1)
-    - [TODO] team names/handles
-  Final submission
+  Record video (target: <3 min)
+  Fill docs/submission/draft.md TODO markers
+  Submit
 ```
 
 ---
@@ -233,102 +408,40 @@ Afternoon:
 ## Dependency graph (critical path)
 
 ```
-Phase 1 Steps 1-3 (gateway migration + ONBOARDING_EOA + deploy)
-    ↓
-Phase 1 Steps 4-6 (orchestrator secrets + vars + deploy)
-    ↓
-Phase 1 Steps 7-8 (live onboard smoke)
-    ↓
-Phase 1 Step 9 (tag L4c-onboarding-green)
-    ↓
-Phase 2 coding (A1-A4, B1-B3, C) ← can run in parallel subagents
-    ↓
-Re-deploy orchestrator (Phase 2 frontend changes) + re-deploy demo page (Phase 3B)
-    ↓
+Phase 0 (15 min, secrets + funding)
+  ↓
+Phase 1 Steps 1-2 (IP-1 + IP-3 code fixes in middleware + agent)
+  ↓
+Phase 1 Steps 3-7 (gateway migration → orchestrator deploy → app.reckon402.com live)
+  ↓
+Phase 1 Steps 8-9 (live onboard + smoke)
+  ↓
+Phase 1 Step 10 (deploy agent with IP-1+IP-3 fix)
+  ↓
+Phase 2 (parallel agents: A=frontend, B=demo page, C=kh-workflow)
+  ↓
+Re-deploy orchestrator (2A changes) + static deploy demo page (2B) + KH publish (2C)
+  ↓
 Phase 4 rehearsal
 ```
 
-Phase 3A (`reckon402.com`) is independent — can be done any time.
-Phase 3C (KH publish) depends on Phase 2C (`extra.ens` fix).
+Phase 3A (`reckon402.com`) is independent — any time.
 
 ---
 
-## Parallel agent strategy for Phase 2
+## Risk register (post-review, verified)
 
-Phase 2 touches three independent files. Safe to run as concurrent agents:
-
-| Agent | Files | Duration |
-|-------|-------|----------|
-| Agent 1 | `apps/frontend/dist/app.js` + `apps/frontend/dist/index.html` | ~90 min |
-| Agent 2 | `demo/index.html` | ~45 min |
-| Agent 3 | `recipes/kh-workflow.json` | ~15 min |
-
-Agent 1 and Agent 2 don't touch the same files. Agent 3 is trivial.
-After all three complete: single commit, re-deploy orchestrator and demo page.
-
----
-
-## Key risks to challenge (bring to Opus)
-
-1. **`RECKON402_ONBOARDING_PK` in Infisical?** If this key doesn't exist yet,
-   Phase 1 is blocked. Need to confirm before starting.
-
-2. **`RECKON402_DEPLOYER_PK` = plain hex PK, not KMS alias.** The onboard
-   orchestrator calls `deploySplitter` and `registerAgentId` using a plain
-   `privateKeyToAccount(env.RECKON402_DEPLOYER_PK)`. The 08A SplitterFactory
-   deploy used KMS. Are these the same or different keys? If the same EOA
-   needs to be used but only exists as a KMS key, the orchestrator as written
-   CANNOT use it — `tools/onboard/src/steps/deploy-splitter.ts` uses
-   `privateKeyToAccount`, not the KMS client.
-
-3. **ENS funder wallet balance.** Easy to check, catastrophic to miss. Each
-   onboarding burns ~0.003 ETH Sepolia. Need ≥0.015 ETH for demo + rehearsals.
-
-4. **Workers Assets relative path.** `directory = "../../apps/frontend/dist"`
-   is relative to the worker's `wrangler.toml`. Does wrangler resolve this
-   correctly when run from repo root vs. from the worker directory?
-
-5. **`extra.ens` propagation to facilitator.** The KH workflow sends
-   `extra.ens` in the payment requirements. Does `agent.reckon402.com`
-   actually forward `extra` fields in the x402 request to the facilitator?
-   If not, the facilitator never sees the ENS name and L4c resolution fails.
-   This is the single highest-risk integration point for the KH demo path.
-
-6. **Receipts not tagged by ENS name.** The facilitator `receipts` D1 table
-   doesn't store which merchant/ENS the payment was for. The dashboard
-   `fetchRecentReceipts()` fetches all receipts. With multiple agents onboarded
-   (demo runs), the call log on `seller9`'s dashboard will show `seller10`'s
-   receipts too. Mitigation: single-agent demo, or filter by `auth_to` =
-   splitter address (requires mapping splitter → ensName in the frontend).
-
-7. **KeeperHub import timeline.** If the KH platform runbook requires a
-   manual app.keeperhub.com step that takes >30 min (account setup, approval),
-   Phase 3C could block Phase 4. Fallback: "Run Test Call" shows a shell
-   command or opens a raw curl. Still functional for demo.
-
-8. **Orchestrator `ctx.waitUntil` budget.** The onboarding runs in
-   `ctx.waitUntil` — Cloudflare gives 30s post-response CPU time. The 5-step
-   onboarding involves 3 chain txs + 2 gateway calls. If any tx takes >10s
-   to confirm (Base Sepolia can be slow), the worker may timeout and the
-   progress store shows the job as abandoned (no `failed` state, just stops).
-   The frontend polls `/onboard/:id/status` and would just hang. Mitigation:
-   use `just onboard` CLI for the demo rather than the browser form — CLI
-   has no 30s budget. For the video, this matters: if we show the browser form,
-   we need the 5 steps to complete within 30s of the 202 response.
-
----
-
-## Open decisions (need Opus challenge)
-
-1. **`RECKON402_DEPLOYER_PK` — same as KMS deployer or new plain-PK key?**
-   Current code path requires plain hex. The 08A factory deploy used KMS.
-   If we want the same EOA for both, we need to either: (a) extract the plain
-   PK from KMS (not possible — KMS is non-extractable by design), or (b) use
-   a different deployer EOA for onboarding (fine — the factory just needs to
-   be called from any funded EOA, not specifically the original deployer).
-
-2. **Browser form vs. CLI for demo.** Given the `ctx.waitUntil` 30s risk,
-   should the demo video show the browser form or drive it via CLI with the
-   dashboard open separately? Browser form is more impressive visually.
-   CLI is more reliable. Middle path: browser form for the video (impressive),
-   fall back to CLI for the live demo if timing is risky.
+| # | Risk | Severity | Status |
+|---|------|----------|--------|
+| 1 | Three secret names missing from Infisical | HIGH | **RESOLVED** — aliases of existing keys |
+| 2 | `RECKON402_DEPLOYER_PK` needs plain hex, not KMS | HIGH | **RESOLVED** — use `FACILITATOR_PK` |
+| 3 | ENS funder balance | ✓ OK | 3.9 ETH Sepolia, 2.5 ETH Base Sepolia |
+| 4 | SELLER has 0 ETH on both chains | MEDIUM | **Phase 0 step 0b** — fund from X402COMMIT_FUNDER |
+| 5 | Workers Assets relative path | LOW | Verified safe in wrangler.toml |
+| 6 | `extra.ens` never reaches facilitator (IP-1) | CRITICAL | **Phase 1 Step 1** — must fix |
+| 7 | `auth.to` ≠ resolved splitter (IP-3) | CRITICAL | **Phase 1 Step 2** — must fix |
+| 8 | `/admin/receipts` auth + field names (IP-4) | HIGH | **Phase 2A steps A1+A2** |
+| 9 | `ctx.waitUntil` 30s budget for 5-step onboard | MEDIUM | Demo uses CLI (`just onboard`) not browser form for video reliability |
+| 10 | Receipts not tagged by ENS | LOW | Mitigated by single-agent demo + splitter-address filter |
+| 11 | KH import timeline | LOW | fallback: shell command hint |
+| 12 | Smoke uses `seller9` — reserve for actual demo | MEDIUM | **Phase 1 Step 8** uses `seller-smoke-1` |

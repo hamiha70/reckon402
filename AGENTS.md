@@ -1053,9 +1053,11 @@ Splitter deployed via CREATE2 through a shared `SplitterFactory`.
 
 - `workers/facilitator/src/treasury/splitter-resolver.ts` — per-payment
   resolver. Reads `x402.splitter` + `x402.erc8004.agent_id` from the
-  gateway (parallel `Promise.all` fetch), validates the splitter came
-  from our factory via `SplitterFactory.isDeployed`, returns
-  `{splitter, agentId, ensName}` or `null` on any failure. Never throws.
+  gateway via a single `GET /records/:ensName?flat=true&backend=static`
+  call (flat-records endpoint, NOT the CCIP-Read `/lookup/` path).
+  Validates the splitter came from our factory via
+  `SplitterFactory.isDeployed`, returns `{splitter, agentId, ensName}`
+  or `null` on any failure. Never throws.
 - `workers/facilitator/src/settle-route.ts` — when `ENABLE_L4C_FACTORY=
   "true"`, runs splitter resolution BEFORE the SUBMITTED →
   PENDING_CONFIRMATION claim. Missing/forged record transitions the
@@ -1113,21 +1115,49 @@ once at deploy time for audit + cold-start logging.
 
 ### Deployment
 
-Landing sequence (flag-gated):
+**Status: SHIPPED 2026-05-01 — tag `L4c-factory-green`**
 
-1. `forge test --match-contract SplitterFactory` — 10/10 green.
-2. `forge script DeploySplitterFactory.s.sol:DeploySplitterFactory
-   --rpc-url $BASE_SEPOLIA_RPC --broadcast` — capture factory address.
-3. Apply `0003_l4c_splitter_factory.sql` to
-   `reckon402-d1-facilitator-dev`; write factory address into
-   `deployment_config.splitter_factory_address`.
-4. Deploy worker with `ENABLE_L4C_FACTORY="false"` — regression via
-   `full-flow-l4b.sh` MUST pass.
-5. Flip `ENABLE_L4C_FACTORY="true"`, run L4c smoke
-   (`full-flow-l4c-factory.sh` — Spec 08B's integration harness);
-   verify 422 on forged-splitter path + 200 on happy path.
-6. Flip `USE_LEGACY_AGENT_RESOLVER="false"`; re-run smoke.
-7. Push annotated tag `L4c-factory-green`.
+#### On-chain addresses
+
+| Contract | Address | Block | Tx |
+|----------|---------|-------|----|
+| SplitterFactory (v1) | `0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7` | 40932143 | `0x2d77e747000edceed7d63d6ce19f890c0ca676eadd3cc8e12e7dd721e323134c` |
+| seller.reckon402-test.eth Splitter (via factory) | `0x372c0b951035da05058b175a15b4fe7d29f1fc4c` | 40932952 | (seed-factory-splitter.mjs) |
+| Deployer (KMS) | `0x66c2858d9a8605957c516a77262eb66ee6be113c` | — | `alias/reckon402/mainnet/deployer/evm` |
+
+Deploy log: `contracts/deploy-logs/splitter-factory-base-sepolia-2026-05-01.md`
+
+#### Worker deploy sequence (completed)
+
+| Step | Action | Facilitator version |
+|------|--------|-------------------|
+| 1 | Flag-off deploy (`ENABLE_L4C_FACTORY="false"`) — L4b regression smoke | `847bdecb-...` |
+| 2 | Flag-on deploy (`ENABLE_L4C_FACTORY="true"`) — L4c smoke (SPLITTER_UNKNOWN path live) | `bf35d4a3-...` |
+| 3 | Legacy-off deploy (`USE_LEGACY_AGENT_RESOLVER="false"`) — final smoke PASS | `dc14eb8e-6537-43ea-a991-f3896ffdb152` |
+
+Gateway version at L4c-green: `3d9c120f-...` (redeployed with `--env production` to expose `/records/:ensName` flat-records endpoint)
+
+D1 migrations applied to `reckon402-d1-facilitator-dev` (remote):
+- `0003_l4c_splitter_factory.sql` — `deployment_config` kv table; factory address written at deploy
+- `0004_l4c_splitter_unknown_state.sql` — table-rebuild to add `SPLITTER_UNKNOWN` to receipts CHECK constraint
+
+#### Smoke results (2026-05-01T11:45:15Z)
+
+Scenario A — happy path (`seller.reckon402-test.eth`, splitter `0x372c0b...`):
+- settle HTTP 200, state `CONFIRMED`
+- settlement tx: `0x95c8d8aae62205de765eeb56d17bbd6166114dd949605825c38c6dd82d37489c`
+- attestation tx: `0xc67037b166fa55fe6f093f861fe9f56e9697e263840e1c1709de3b4138be2e8a`
+
+Scenario B — forged splitter (`seller-forged.reckon402-test.eth`, splitter `0x0ad507...` not in factory):
+- settle HTTP 422 `splitter_unknown`, state `SPLITTER_UNKNOWN`, transaction empty
+
+Results file: `tools/integration-tests/results-full-flow-l4c-factory-2026-05-01T11-45-15Z.md`
+
+#### Re-run
+
+```
+just fullflow-l4c-factory
+```
 
 ## L4c Onboarding + signed writes + frontend (Spec 08B)
 

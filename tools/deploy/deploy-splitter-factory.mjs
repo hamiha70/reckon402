@@ -31,6 +31,14 @@ async function main() {
   const rpcUrl = process.env.BASE_SEPOLIA_RPC_PRIMARY;
   if (!rpcUrl) throw new Error("BASE_SEPOLIA_RPC_PRIMARY not set (hydrate via infisical run)");
 
+  // Infisical injects the signer creds as the default AWS_ACCESS_KEY_ID.
+  // Deployer creds live under DEPLOYER_AWS_* — remap before KMS calls.
+  if (process.env.DEPLOYER_AWS_ACCESS_KEY_ID) {
+    process.env.AWS_ACCESS_KEY_ID     = process.env.DEPLOYER_AWS_ACCESS_KEY_ID;
+    process.env.AWS_SECRET_ACCESS_KEY = process.env.DEPLOYER_AWS_SECRET_ACCESS_KEY;
+    process.env.AWS_REGION            = process.env.DEPLOYER_AWS_REGION || "eu-central-1";
+  }
+
   // Build the artifact first if not present
   const artifactPath = resolve(REPO_ROOT, "contracts/out/SplitterFactory.sol/SplitterFactory.json");
   let artifact;

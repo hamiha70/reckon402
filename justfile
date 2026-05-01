@@ -46,6 +46,11 @@ seed kind amount:
 refund kind amount:
     {{secrets}} bash tools/scripts/refund.sh {{kind}} {{amount}}
 
+# L4c — deploy a factory Splitter for an existing SellingAgent and print the UPDATE SQL
+# for the gateway D1 record. Usage: just seed-factory-splitter <ensName> <sellerEoa>
+seed-factory-splitter ensName sellerEoa:
+    {{secrets}} node tools/deploy/seed-factory-splitter.mjs {{ensName}} {{sellerEoa}}
+
 # L4c — deploy the SplitterFactory contract to Base Sepolia (KMS-signed).
 # Writes deploy log to contracts/deploy-logs/splitter-factory-base-sepolia-<date>.md
 # and prints the factory address on stdout.

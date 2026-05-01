@@ -12,9 +12,10 @@ import { Reckon402Facilitator } from '@reckon402/facilitator-client'
 interface Env {
   NETWORK: string                  // e.g. "eip155:84532"
   USDC_ADDRESS: string             // USDC on the target chain
-  SPLITTER_ADDRESS: string         // payTo / auth.to
+  SPLITTER_ADDRESS: string         // payTo / auth.to — must be the factory-deployed Splitter for SELLER_ENS
   AMOUNT: string                   // atomic units; "10000" = 0.01 USDC
   FACILITATOR_URL: string          // e.g. "https://facilitator.reckon402.com/x402"
+  SELLER_ENS: string               // ENS name for this SellingAgent, passed as extra.ens for L4c splitter resolution
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -39,6 +40,7 @@ app.use('/research', async (c, next) => {
     asset: c.env.USDC_ADDRESS,
     recipient: c.env.SPLITTER_ADDRESS,
     facilitator: new Reckon402Facilitator(c.env.FACILITATOR_URL),
+    extra: { ens: c.env.SELLER_ENS },
   })
   return middleware(c, next)
 })

@@ -23,8 +23,8 @@ binding            = "ASSETS"
 not_found_handling = "single-page-application"
 
 [vars]
-SPLITTER_FACTORY_ADDRESS = ""                   # deploy-time; fill after Spec 08A deploy
-RECKON402_ONBOARDING_EOA = ""                   # public address of onboarding signer
+SPLITTER_FACTORY_ADDRESS = "0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
+RECKON402_ONBOARDING_EOA = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
 GATEWAY_BASE_URL         = "https://gateway.reckon402.com"
 FACILITATOR_BASE_URL     = "https://facilitator.reckon402.com"
 CHAIN_ID_BASE_SEPOLIA    = "84532"
@@ -45,8 +45,8 @@ binding            = "ASSETS"
 not_found_handling = "single-page-application"
 
 [env.production.vars]
-SPLITTER_FACTORY_ADDRESS = ""
-RECKON402_ONBOARDING_EOA = ""
+SPLITTER_FACTORY_ADDRESS = "0x3bbb50a50eb03f2d578d17f70ebc687b98e21fd7"
+RECKON402_ONBOARDING_EOA = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
 GATEWAY_BASE_URL         = "https://gateway.reckon402.com"
 FACILITATOR_BASE_URL     = "https://facilitator.reckon402.com"
 CHAIN_ID_BASE_SEPOLIA    = "84532"

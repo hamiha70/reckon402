@@ -24,7 +24,7 @@ CACHE_TTL_REPUTATION_S            = "300"
 # L4c: public address of the Reckon402 onboarding EOA. Fill at deploy time
 # (the corresponding private key lives in Infisical; the onboard-orchestrator
 # worker holds it).
-RECKON402_ONBOARDING_EOA          = ""
+RECKON402_ONBOARDING_EOA          = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
 
 # secrets bound at deploy time via `wrangler secret put` (from Infisical):
 #   RECKON402_RESOLVER_SIGNER_PK   — hot signer key (0x-prefixed 32-byte hex)
@@ -44,7 +44,7 @@ ENABLE_ERC8004_READS              = "true"
 STEALTH_ENABLED                   = "false"
 BASE_MAINNET_RPC                  = ""
 CACHE_TTL_REPUTATION_S            = "300"
-RECKON402_ONBOARDING_EOA          = ""
+RECKON402_ONBOARDING_EOA          = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
 
 [[env.production.routes]]
 pattern       = "gateway.reckon402.com"
@@ -62,7 +62,7 @@ ENABLE_ERC8004_READS              = "true"
 STEALTH_ENABLED                   = "false"
 BASE_MAINNET_RPC                  = ""
 CACHE_TTL_REPUTATION_S            = "300"
-RECKON402_ONBOARDING_EOA          = ""
+RECKON402_ONBOARDING_EOA          = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
 
 [[env.staging.routes]]
 pattern       = "gateway-staging.reckon402.com"

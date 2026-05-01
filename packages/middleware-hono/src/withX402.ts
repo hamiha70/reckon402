@@ -14,6 +14,7 @@ export interface X402Options {
   asset: string                // USDC address
   recipient: string            // payTo — at L3 this is the Splitter address
   facilitator: Facilitator
+  extra?: Record<string, string>  // merged into PaymentRequirements.extra (e.g. { ens: "seller.reckon402-test.eth" })
 }
 
 function buildPaymentRequired(url: string, opts: X402Options): XPaymentRequired {
@@ -28,7 +29,7 @@ function buildPaymentRequired(url: string, opts: X402Options): XPaymentRequired 
         asset: opts.asset,
         payTo: opts.recipient,
         maxTimeoutSeconds: 300,
-        extra: { name: 'USDC', version: '2' },
+        extra: { name: 'USDC', version: '2', ...opts.extra },
       } satisfies PaymentRequirements,
     ],
   }
@@ -104,7 +105,7 @@ export function withX402(opts: X402Options): MiddlewareHandler {
       asset: opts.asset,
       payTo: opts.recipient,
       maxTimeoutSeconds: 300,
-      extra: { name: 'USDC', version: '2' },
+      extra: { name: 'USDC', version: '2', ...opts.extra },
     }
 
     const verifyResult = await opts.facilitator.verify(payload, requirements)

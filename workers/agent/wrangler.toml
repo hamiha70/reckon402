@@ -14,4 +14,5 @@ NETWORK          = "eip155:84532"
 USDC_ADDRESS     = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 AMOUNT           = "10000"                                         # 0.01 USDC
 FACILITATOR_URL  = "https://facilitator.reckon402.com/x402"
-SPLITTER_ADDRESS = "0x0ad507c6973eba86313794329ad9b12fbf24acd0"
+SPLITTER_ADDRESS = "0x372c0b951035da05058b175a15b4fe7d29f1fc4c"
+SELLER_ENS       = "seller.reckon402-test.eth"

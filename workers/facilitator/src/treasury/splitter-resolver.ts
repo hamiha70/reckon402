@@ -33,9 +33,9 @@ export interface ResolvedSplitter {
 /**
  * Resolve the Splitter + agentId for a SellingAgent identified by ENS name.
  *
- * Reads via gateway (L4a₂ ENS resolution path):
- *   GET  {GATEWAY_BASE_URL}/lookup/{ensName}/x402.splitter?backend=static
- *   GET  {GATEWAY_BASE_URL}/lookup/{ensName}/x402.erc8004.agent_id?backend=static
+ * Reads via gateway flat-records endpoint:
+ *   GET  {GATEWAY_BASE_URL}/records/{ensName}?flat=true&backend=static
+ *   → { records: { "x402.splitter": "0x...", "x402.erc8004.agent_id": "1", ... } }
  *
  * Validates the splitter came from our SplitterFactory by calling
  * `SplitterFactory.isDeployed(splitter)`. Returns null on ANY failure
@@ -49,11 +49,10 @@ export async function resolveSplitterForPayment(
   env: SplitterResolverEnv,
   ensName: string,
 ): Promise<ResolvedSplitter | null> {
-  // Parallel fetch — both records are independent reads.
-  const [splitterRaw, agentIdRaw] = await Promise.all([
-    fetchRecord(env.GATEWAY_BASE_URL, ensName, 'x402.splitter'),
-    fetchRecord(env.GATEWAY_BASE_URL, ensName, 'x402.erc8004.agent_id'),
-  ])
+  // Single fetch — both records come from the flat-records endpoint.
+  const records = await fetchAllRecords(env.GATEWAY_BASE_URL, ensName)
+  const splitterRaw = records?.['x402.splitter']?.trim() || null
+  const agentIdRaw  = records?.['x402.erc8004.agent_id']?.trim() || null
   if (!splitterRaw || !agentIdRaw) {
     log.warn('resolve_missing_record', { ensName, splitterRaw, agentIdRaw })
     return null
@@ -106,20 +105,20 @@ export async function resolveSplitterForPayment(
   return { splitter, agentId, ensName }
 }
 
-async function fetchRecord(
+async function fetchAllRecords(
   gatewayUrl: string,
   ensName: string,
-  key: string,
-): Promise<string | null> {
+): Promise<Record<string, string> | null> {
+  // Use the flat-records endpoint — /lookup/:ensName/:key is the ABI-encoded
+  // CCIP-Read path and cannot be called with a plain key name.
   const url =
-    `${gatewayUrl}/lookup/${encodeURIComponent(ensName)}/` +
-    `${encodeURIComponent(key)}?backend=static`
+    `${gatewayUrl}/records/${encodeURIComponent(ensName)}` +
+    `?flat=true&backend=static`
   try {
     const res = await fetch(url, { method: 'GET' })
     if (!res.ok) return null
-    const body = (await res.json()) as { value?: string } | null
-    const v = body?.value?.trim()
-    return v && v.length > 0 ? v : null
+    const body = (await res.json()) as { records?: Record<string, string> } | null
+    return body?.records ?? null
   } catch {
     return null
   }

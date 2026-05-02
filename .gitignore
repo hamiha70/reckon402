@@ -19,6 +19,8 @@ build/
 # Wrangler / Cloudflare
 .wrangler/
 worker-configuration.d.ts
+apps/frontend/wrangler.jsonc
+apps/frontend/package-lock.json
 
 # Foundry
 out/

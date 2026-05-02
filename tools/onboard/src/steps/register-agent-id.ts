@@ -3,6 +3,7 @@ import {
   type Hex, type PublicClient, type WalletClient,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { nonceManager } from 'viem/nonce'
 import { baseSepolia } from 'viem/chains'
 import { IDENTITY_REGISTRY_BASE_SEPOLIA } from '../types.js'
 
@@ -70,7 +71,11 @@ export function makeRegisterAgentIdClients(
   rpcUrl: string,
   deployerPk: `0x${string}`,
 ): RegisterAgentIdClients {
-  const account = privateKeyToAccount(deployerPk)
+  // Shared singleton nonceManager — see deploy-escrow.ts for the rationale.
+  // Step 2 uses the onboarding PK (different EOA from the deployer that
+  // runs steps 3+4), but the manager keys by (address, chainId) so cross-
+  // PK use is safe and keeps the codebase consistent.
+  const account = privateKeyToAccount(deployerPk, { nonceManager })
   return {
     public: createPublicClient({ chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }) as PublicClient,
     wallet: createWalletClient({ account, chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }),

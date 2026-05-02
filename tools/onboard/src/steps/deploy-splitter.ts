@@ -3,6 +3,7 @@ import {
   type Hex, type PublicClient, type WalletClient,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { nonceManager } from 'viem/nonce'
 import { baseSepolia } from 'viem/chains'
 
 export const SPLITTER_FACTORY_ABI = [
@@ -62,7 +63,10 @@ export function makeDeploySplitterClients(
   rpcUrl: string,
   deployerPk: `0x${string}`,
 ): DeploySplitterClients {
-  const account = privateKeyToAccount(deployerPk)
+  // Shared singleton nonceManager — see deploy-escrow.ts for the rationale.
+  // Critical for the deployer/facilitator EOA which fires Escrow then
+  // Splitter back-to-back in a single Worker invocation.
+  const account = privateKeyToAccount(deployerPk, { nonceManager })
   return {
     public: createPublicClient({ chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }) as PublicClient,
     wallet: createWalletClient({ account, chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }),

@@ -3,6 +3,7 @@ import {
   type Hex, type PublicClient, type WalletClient,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { nonceManager } from 'viem/nonce'
 import { sepolia } from 'viem/chains'
 import {
   ENS_REGISTRY_SEPOLIA,
@@ -81,7 +82,11 @@ export function makeMintSubnameClients(
   rpcUrl: string,
   funderPk: `0x${string}`,
 ): MintSubnameClients {
-  const account = privateKeyToAccount(funderPk)
+  // Shared singleton nonceManager — see deploy-escrow.ts for the rationale.
+  // Step 1 fires several Ethereum-Sepolia txs in sequence (subnameRegister,
+  // setResolver, optional transfer); the manager prevents the same race
+  // class on Ethereum Sepolia.
+  const account = privateKeyToAccount(funderPk, { nonceManager })
   return {
     public: createPublicClient({ chain: sepolia, transport: http(rpcUrl, { timeout: 60_000 }) }) as PublicClient,
     wallet: createWalletClient({ account, chain: sepolia, transport: http(rpcUrl, { timeout: 60_000 }) }),

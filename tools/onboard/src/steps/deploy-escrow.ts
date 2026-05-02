@@ -3,6 +3,7 @@ import {
   type Hex, type PublicClient, type WalletClient,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { nonceManager } from 'viem/nonce'
 import { baseSepolia } from 'viem/chains'
 
 /// EscrowFactory ABI subset — predict + deploy + isDeployed checks. Shape
@@ -86,7 +87,14 @@ export function makeDeployEscrowClients(
   rpcUrl: string,
   deployerPk: `0x${string}`,
 ): DeployEscrowClients {
-  const account = privateKeyToAccount(deployerPk)
+  // Inject viem's default singleton nonceManager so successive writeContract
+  // calls from this PK locally increment the nonce instead of racing
+  // eth_getTransactionCount(pending). The Worker observed this race when
+  // step 3 (Escrow) and step 4 (Splitter) both fired with the same nonce
+  // because Alchemy's pending-count read replica hadn't propagated step 3's
+  // tx yet. Singleton is keyed by (address, chainId) and shared across all
+  // step files that import it, so nonce hand-off across steps is consistent.
+  const account = privateKeyToAccount(deployerPk, { nonceManager })
   return {
     public: createPublicClient({ chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }) as PublicClient,
     wallet: createWalletClient({ account, chain: baseSepolia, transport: http(rpcUrl, { timeout: 60_000 }) }),

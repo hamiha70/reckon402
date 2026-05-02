@@ -112,7 +112,14 @@ const KH_EVIDENCE = {
   tagline: 'Every x402 settlement writes ERC-8004 reputation. Every ENS lookup reads it back. The trust signal drives history-aware behavior — for this hackathon, a per-agent on-chain Escrow that holds funds against future claims and releases as on-chain reputation grows.',
   evidence: [
     {
-      item: 'KH workflow recipe: importable workflow definition for autonomous x402 buyer flow',
+      item: 'Live KH workflow: deployed publicly on app.keeperhub.com (manual-trigger node, owned by hamiha70 KH account)',
+      url: 'https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9',
+      workflowId: '5b5bx18671fappzbchqt9',
+      visibility: 'public',
+      published: '2026-05-02',
+    },
+    {
+      item: 'KH workflow recipe: importable workflow definition for autonomous x402 buyer flow (same definition that produced the live workflow above)',
       artifact: 'recipes/kh-workflow.json',
     },
     {
@@ -299,6 +306,22 @@ function renderKhPage() {
       </p>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card-hover bg-gray-900 border-2 border-pink-700/60 rounded-lg p-5 space-y-2 md:col-span-2">
+          <div class="flex items-center gap-2">
+            <span class="text-pink-300 text-xs uppercase tracking-wider font-bold">Live KH workflow</span>
+            <span class="text-[10px] bg-pink-900/40 text-pink-200 px-1.5 py-0.5 rounded uppercase tracking-wider">deployed · public</span>
+          </div>
+          <div class="text-sm text-gray-200 leading-relaxed">
+            Published on KeeperHub as a public workflow with a manual-trigger node, ready for judges to inspect:
+          </div>
+          <a href="https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9" target="_blank" rel="noopener"
+             class="block bg-gray-950 border border-gray-800 hover:border-pink-700 rounded p-3 text-pink-300 font-mono text-xs break-all transition-colors">
+            https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9
+          </a>
+          <div class="text-xs text-gray-500 leading-relaxed">
+            One-trigger workflow: hits <code class="inline">agent.reckon402.com/research</code>, the buyer-sdk path negotiates the x402 paywall, signing wrapper produces the EIP-712 PaymentAuthorization, facilitator settles + writes the ERC-8004 attestation. Owned by the <code class="inline">hamiha70</code> KH account.
+          </div>
+        </div>
         <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-2">
           <div class="text-pink-400 text-xs uppercase tracking-wider font-bold">@reckon402/kh-skill</div>
           <div class="text-sm text-gray-300 leading-relaxed">
@@ -310,10 +333,9 @@ function renderKhPage() {
         <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-2">
           <div class="text-pink-400 text-xs uppercase tracking-wider font-bold">recipes/kh-workflow.json</div>
           <div class="text-sm text-gray-300 leading-relaxed">
-            Importable workflow JSON: three sequential paid calls to
-            <code class="inline">agent.reckon402.com/research</code>, demonstrating attestation growth → tier walk → Escrow release.
+            Importable workflow JSON — same definition that produced the live workflow above. Drop it into another KH account to provision an identical workflow without re-engineering.
           </div>
-          <div class="text-xs text-gray-500">drop into KH and run — attestations accumulate live.</div>
+          <div class="text-xs text-gray-500">three sequential paid calls → attestations accumulate live</div>
         </div>
         <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-2">
           <div class="text-pink-400 text-xs uppercase tracking-wider font-bold">signing.reckon402.com</div>
@@ -407,6 +429,10 @@ KMS signer <span class="hl">0x46bbb05a…4305</span>                   signs the
     <section>
       <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Evidence at a glance</h2>
       <div class="bg-gray-900 border border-gray-800 rounded-lg divide-y divide-gray-800 text-sm">
+        <div class="p-4 flex justify-between items-center">
+          <div><span class="text-gray-400">Live workflow on KH</span> <code class="inline ml-2 text-pink-300">5b5bx18671fappzbchqt9</code></div>
+          <a class="evidence-link text-xs" href="https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9" target="_blank" rel="noopener">app.keeperhub.com →</a>
+        </div>
         <div class="p-4 flex justify-between items-center">
           <div><span class="text-gray-400">Workflow recipe</span> <code class="inline ml-2">recipes/kh-workflow.json</code></div>
           <a class="evidence-link text-xs" href="https://github.com/hamiha70/reckon402/blob/main/recipes/kh-workflow.json" target="_blank" rel="noopener">view on GitHub →</a>

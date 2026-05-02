@@ -41,7 +41,41 @@ Single new on-chain act: agent owner withdraws accrued buffer.
 
 ## Contracts
 
-Two new Solidity files under `contracts/src/`:
+Three Solidity files under `contracts/src/`. The L4d v1 design uses
+a pluggable tier strategy — see Q-09-5 below. The Escrow contract
+holds NO tier math; all tier evaluation is delegated to a separate
+`ITierStrategy` contract pinned at deploy time.
+
+### `interfaces/ITierStrategy.sol`
+
+```solidity
+interface ITierStrategy {
+    /// @return releaseBps ∈ [0, 10_000] for the (agentId, attestationCount) pair.
+    function evaluate(uint256 agentId, uint64 attestationCount)
+        external
+        view
+        returns (uint16 releaseBps);
+}
+```
+
+Strategies MUST be pure-deterministic under STATICCALL. Implementations
+may key on `agentId` (for per-agent shape) or ignore it (for shared
+policy). Strategy contracts are NOT upgradable per Escrow; to swap a
+strategy, deploy a new Escrow.
+
+### `LinearMonotonicTierStrategy.sol`
+
+Default v1 strategy. Holds the threshold-and-bps arrays previously
+embedded in the Escrow. Constructor validation is byte-identical to
+the pre-refactor inline validation that lived in `Escrow.sol`:
+
+- `thresholds.length == releaseBps.length > 0`
+- `thresholds[i] > thresholds[i-1]` for `i > 0` (strictly monotonic)
+- `releaseBps[i] >= releaseBps[i-1]` for `i > 0` (non-decreasing)
+- Each `releaseBps[i] <= 10_000`
+
+Exposes `thresholds()`, `releaseBpsArr()`, and `config()` for
+dashboard consumption.
 
 ### `Escrow.sol`
 
@@ -51,24 +85,20 @@ counter increment from `withdraw()`.
 
 ```solidity
 constructor(
-    IERC20  token_,                 // USDC (Base Sepolia: 0x036C…CF7e)
-    address identityRegistry_,      // ERC-8004 IdentityRegistry on this chain
-    address reputationRegistry_,    // ERC-8004 ReputationRegistry on this chain
-    uint256 agentId_,               // immutable; binds this Escrow to one NFT
-    address facilitatorClient_,     // EOA whose feedback drives the tier ramp
-    uint64[] memory tierThresholds_, // monotonically increasing attestation counts (uint64 matches ReputationRegistry.getSummary return type)
-    uint16[] memory tierReleaseBps_, // BPS each ≤ 10_000, monotonically non-decreasing
-    string  memory tag1_,           // "payment"
-    string  memory tag2_            // "x402-settlement"
+    IERC20         token_,                 // USDC (Base Sepolia: 0x036C…CF7e)
+    address        identityRegistry_,      // ERC-8004 IdentityRegistry on this chain
+    address        reputationRegistry_,    // ERC-8004 ReputationRegistry on this chain
+    uint256        agentId_,               // immutable; binds this Escrow to one NFT
+    address        facilitatorClient_,     // EOA whose feedback drives the tier ramp
+    address        tierStrategy_,          // ITierStrategy contract; called on every releasedBps()
+    string  memory tag1_,                  // "payment"   — feedback filter tag
+    string  memory tag2_                   // "x402-settlement"
 )
 ```
 
-Constructor invariants (revert otherwise):
-
-- `tierThresholds_.length == tierReleaseBps_.length > 0`
-- `tierThresholds_[i] > tierThresholds_[i-1]` for `i > 0` (strictly monotonic)
-- `tierReleaseBps_[i] >= tierReleaseBps_[i-1]` for `i > 0` (non-decreasing)
-- Each `tierReleaseBps_[i] <= 10_000`
+Constructor only validates non-zero arguments. Tier-array shape is
+validated by the strategy's own constructor at deploy time. The
+Escrow trusts whatever ITierStrategy address is supplied.
 
 Public surface:
 
@@ -303,27 +333,22 @@ endpoint that already serves the dashboard.
   internal accounting per agentId. Not a hackathon issue.
 - **No directory page** (`#/dashboard` listing all agents) shipped in
   L4d. Pinned as v1.5.
-- **Q-09-5 (pluggable tier strategy):** the v1 Escrow has the tier curve
-  PARAMETERS (thresholds + bps arrays) in the constructor, but the
-  evaluation FUNCTION is hardcoded as a linear walk through the array.
-  v1.5 will extract the evaluator behind an `ITierStrategy` interface:
-
-  ```solidity
-  interface ITierStrategy {
-      function evaluate(uint256 agentId, uint64 attestationCount)
-          external view returns (uint16 releaseBps);
-  }
-  ```
-
-  Escrow stores `address public immutable tierStrategy` and calls
-  `ITierStrategy(tierStrategy).evaluate(...)` on every `releasedBps()`
-  read. v1 ships a `LinearMonotonicStrategy(thresholds[], bps[])`
-  whose behaviour is byte-identical to today's inline walk. Future
-  strategies can be bonding curves, chain-specific schedules, or
-  agent-class-specific shapes. Each Escrow is pinned to one strategy
-  at deploy — not upgradable — but new agents onboarded later can
-  pick a newer strategy. Refactor cost: ~30 LOC + new strategy
-  contract + tests; deferred to L4d-end-to-end-green polish.
+- **Q-09-5 (pluggable tier strategy):** RESOLVED — shipped in v1
+  ahead of orchestrator integration. The Escrow holds NO tier math;
+  it delegates to an `ITierStrategy` contract pinned in the
+  constructor. v1 ships `LinearMonotonicTierStrategy(thresholds[],
+  releaseBps[])` whose behaviour is byte-identical to the
+  pre-refactor inline walk. Strategy contracts are CREATE2-stable
+  per (thresholds, releaseBps) tuple; the same strategy can be
+  shared across many Escrows. The strategy address IS part of the
+  Escrow's CREATE2 init-code hash, so different strategies for the
+  same (agentId, salt) yield distinct Escrow addresses — locked by
+  `EscrowFactoryTest.test_createEscrow_distinctStrategies_deployIndependently`.
+  Future strategies can be bonding curves, chain-specific schedules,
+  or agent-class-specific shapes; the rationale for landing the
+  pluggable shape now (rather than v1.5) is to avoid forcing
+  every upstream consumer (orchestrator, frontend, deploy
+  scripts) to refactor against a constructor signature change later.
 
 - **Q-09-6 (sybil floor on tier counts):** ReputationRegistry's
   `giveFeedback` derives `clientAddress` from `msg.sender`, NOT from

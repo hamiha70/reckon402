@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import { Test }            from "forge-std/Test.sol";
 import { Escrow }          from "../src/Escrow.sol";
+import { LinearMonotonicTierStrategy } from "../src/LinearMonotonicTierStrategy.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {
@@ -11,13 +12,16 @@ import {
     MockReputationRegistry
 } from "./mocks/EscrowMocks.sol";
 
-/// @notice Behavioural tests for the L4d Escrow contract.
-///         See `specs/09-l4d-escrow.md` "Contract-level test plan" for the
-///         scenario list this suite implements.
+/// @notice Behavioural tests for the L4d Escrow contract — pluggable
+///         strategy variant. Tier-curve constructor validation lives in
+///         `LinearMonotonicTierStrategy.t.sol` after the L4d refactor;
+///         this suite only tests Escrow-side behaviour (owner check,
+///         counters, withdraw arithmetic, reentrancy).
 contract EscrowTest is Test {
-    MockERC20              internal token;
-    MockIdentityRegistry   internal identity;
-    MockReputationRegistry internal reputation;
+    MockERC20                       internal token;
+    MockIdentityRegistry            internal identity;
+    MockReputationRegistry          internal reputation;
+    LinearMonotonicTierStrategy     internal tierStrategy;
 
     Escrow internal escrow;
 
@@ -29,7 +33,6 @@ contract EscrowTest is Test {
     string  internal constant TAG1     = "payment";
     string  internal constant TAG2     = "x402-settlement";
 
-    // Default v1 tier curve from specs/09-l4d-escrow.md (8 tiers).
     uint64[] internal defaultThresholds;
     uint16[] internal defaultBps;
 
@@ -59,21 +62,19 @@ contract EscrowTest is Test {
         defaultThresholds[6] = 300;   defaultBps[6] = 8500;
         defaultThresholds[7] = 1000;  defaultBps[7] = 10000;
 
-        escrow = _deploy(defaultThresholds, defaultBps);
+        tierStrategy = new LinearMonotonicTierStrategy(defaultThresholds, defaultBps);
+
+        escrow = _deploy(address(tierStrategy));
     }
 
-    function _deploy(uint64[] memory thresholds, uint16[] memory bps)
-        internal
-        returns (Escrow e)
-    {
+    function _deploy(address strategy) internal returns (Escrow e) {
         e = new Escrow(
             token,
             address(identity),
             address(reputation),
             AGENT_ID,
             facilitatorClient,
-            thresholds,
-            bps,
+            strategy,
             TAG1,
             TAG2
         );
@@ -86,41 +87,6 @@ contract EscrowTest is Test {
 
     // ─────────────────────── Constructor — invariants ───────────────────────
 
-    function test_ctor_lengthMismatch_reverts() public {
-        uint64[] memory ths = new uint64[](2); ths[0] = 0; ths[1] = 1;
-        uint16[] memory bps = new uint16[](3); bps[0] = 0; bps[1] = 500; bps[2] = 1000;
-        vm.expectRevert(Escrow.TierLengthsMismatch.selector);
-        _deploy(ths, bps);
-    }
-
-    function test_ctor_emptyTierArrays_reverts() public {
-        uint64[] memory ths = new uint64[](0);
-        uint16[] memory bps = new uint16[](0);
-        vm.expectRevert(Escrow.TierLengthsMismatch.selector);
-        _deploy(ths, bps);
-    }
-
-    function test_ctor_nonMonotonicThresholds_reverts() public {
-        uint64[] memory ths = new uint64[](3); ths[0] = 0; ths[1] = 5; ths[2] = 5;
-        uint16[] memory bps = new uint16[](3); bps[0] = 0; bps[1] = 500; bps[2] = 1000;
-        vm.expectRevert(Escrow.TierThresholdsNotMonotonic.selector);
-        _deploy(ths, bps);
-    }
-
-    function test_ctor_decreasingBps_reverts() public {
-        uint64[] memory ths = new uint64[](3); ths[0] = 0; ths[1] = 1; ths[2] = 2;
-        uint16[] memory bps = new uint16[](3); bps[0] = 500; bps[1] = 200; bps[2] = 1000;
-        vm.expectRevert(Escrow.TierBpsNotMonotonic.selector);
-        _deploy(ths, bps);
-    }
-
-    function test_ctor_bpsAboveDenominator_reverts() public {
-        uint64[] memory ths = new uint64[](2); ths[0] = 0; ths[1] = 1;
-        uint16[] memory bps = new uint16[](2); bps[0] = 0; bps[1] = 10001;
-        vm.expectRevert(Escrow.TierBpsExceedsDenominator.selector);
-        _deploy(ths, bps);
-    }
-
     function test_ctor_zeroToken_reverts() public {
         vm.expectRevert(Escrow.ZeroAddress.selector);
         new Escrow(
@@ -129,8 +95,7 @@ contract EscrowTest is Test {
             address(reputation),
             AGENT_ID,
             facilitatorClient,
-            defaultThresholds,
-            defaultBps,
+            address(tierStrategy),
             TAG1,
             TAG2
         );
@@ -144,8 +109,7 @@ contract EscrowTest is Test {
             address(reputation),
             AGENT_ID,
             facilitatorClient,
-            defaultThresholds,
-            defaultBps,
+            address(tierStrategy),
             TAG1,
             TAG2
         );
@@ -159,8 +123,7 @@ contract EscrowTest is Test {
             address(0),
             AGENT_ID,
             facilitatorClient,
-            defaultThresholds,
-            defaultBps,
+            address(tierStrategy),
             TAG1,
             TAG2
         );
@@ -174,46 +137,55 @@ contract EscrowTest is Test {
             address(reputation),
             AGENT_ID,
             address(0),
-            defaultThresholds,
-            defaultBps,
+            address(tierStrategy),
             TAG1,
             TAG2
         );
     }
 
-    function test_ctor_validCurve_deploysAndStoresImmutables() public view {
+    function test_ctor_zeroTierStrategy_reverts() public {
+        vm.expectRevert(Escrow.ZeroAddress.selector);
+        new Escrow(
+            token,
+            address(identity),
+            address(reputation),
+            AGENT_ID,
+            facilitatorClient,
+            address(0),
+            TAG1,
+            TAG2
+        );
+    }
+
+    function test_ctor_validArgs_storesImmutables() public view {
         assertEq(address(escrow.token()),              address(token));
         assertEq(escrow.identityRegistry(),            address(identity));
         assertEq(escrow.reputationRegistry(),          address(reputation));
         assertEq(escrow.agentId(),                     AGENT_ID);
         assertEq(escrow.facilitatorClient(),           facilitatorClient);
+        assertEq(escrow.tierStrategy(),                address(tierStrategy));
+        assertEq(escrow.tag1(),                        TAG1);
+        assertEq(escrow.tag2(),                        TAG2);
         assertEq(escrow.totalWithdrawn(),              0);
     }
 
-    // ─────────────────────── Tier ramp evaluation ───────────────────────
+    // ─────────────────────── Tier delegation ───────────────────────
+
+    function test_releasedBps_delegatesToStrategy() public {
+        // Seed the registry; assert the Escrow reports the strategy's
+        // tier output verbatim.
+        _seed(0, 30);
+        assertEq(escrow.releasedBps(), 5000);
+        assertEq(escrow.releasedBps(), tierStrategy.evaluate(AGENT_ID, 30));
+    }
 
     function test_releasedBps_atZeroCount_isT0() public {
         _seed(0, 0);
         assertEq(escrow.releasedBps(), 0);
     }
 
-    function test_releasedBps_atFirstThreshold_isT1() public {
-        _seed(0, 1);
-        assertEq(escrow.releasedBps(), 500);
-    }
-
-    function test_releasedBps_betweenThresholds_returnsLowerTier() public {
-        _seed(0, 2); // between T1 (1) and T2 (3)
-        assertEq(escrow.releasedBps(), 500, "should be T1 not T2");
-    }
-
     function test_releasedBps_atTopThreshold_isFullRelease() public {
         _seed(0, 1000);
-        assertEq(escrow.releasedBps(), 10000);
-    }
-
-    function test_releasedBps_aboveTopThreshold_saturates() public {
-        _seed(0, 1000 + 5000); // way past T7
         assertEq(escrow.releasedBps(), 10000);
     }
 
@@ -224,6 +196,25 @@ contract EscrowTest is Test {
             reputation.setCount(AGENT_ID, facilitatorClient, TAG1, TAG2, probes[i]);
             assertEq(escrow.releasedBps(), expected[i], "tier ramp mismatch");
         }
+    }
+
+    function test_swappingStrategyForAlternateCurve_changesReleasedBps() public {
+        // Deploy a second Escrow against a flatter strategy (5%/all the time);
+        // attestation count is irrelevant. Demonstrates that distinct
+        // Escrows on the same agent state can have different release shapes.
+        uint64[] memory ths = new uint64[](1); ths[0] = 0;
+        uint16[] memory bps = new uint16[](1); bps[0] = 500; // flat 5%
+
+        LinearMonotonicTierStrategy flat = new LinearMonotonicTierStrategy(ths, bps);
+        Escrow alt = _deploy(address(flat));
+
+        token.mint(address(alt), 1_000_000);
+        reputation.setCount(AGENT_ID, facilitatorClient, TAG1, TAG2, 1000);
+
+        assertEq(alt.releasedBps(), 500, "flat strategy must override count");
+        // The default-strategy Escrow at the same count returns 100%.
+        _seed(0, 1000);
+        assertEq(escrow.releasedBps(), 10000);
     }
 
     // ─────────────────────── Counter views ───────────────────────
@@ -400,19 +391,6 @@ contract EscrowTest is Test {
     }
 
     // ─────────────────────── Off-chain helpers ───────────────────────
-
-    function test_tierConfig_returnsConstructorArgs() public view {
-        (uint64[] memory ths, uint16[] memory bps, string memory t1, string memory t2) =
-            escrow.tierConfig();
-        assertEq(ths.length, defaultThresholds.length);
-        assertEq(bps.length, defaultBps.length);
-        for (uint256 i = 0; i < ths.length; ++i) {
-            assertEq(ths[i], defaultThresholds[i]);
-            assertEq(bps[i], defaultBps[i]);
-        }
-        assertEq(t1, TAG1);
-        assertEq(t2, TAG2);
-    }
 
     function test_getStats_returnsAllSeven() public {
         _seed(2_000_000, 30); // T4 → 50%

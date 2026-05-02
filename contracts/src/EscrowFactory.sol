@@ -30,8 +30,7 @@ contract EscrowFactory {
         address indexed escrow,
         bytes32 indexed salt,
         address          facilitatorClient,
-        uint64[]         tierThresholds,
-        uint16[]         tierReleaseBps,
+        address          tierStrategy,
         string           tag1,
         string           tag2
     );
@@ -59,21 +58,21 @@ contract EscrowFactory {
     /// @notice Deploy a per-agent Escrow.
     /// @param  agentId            ERC-8004 IdentityRegistry tokenId
     /// @param  facilitatorClient  EOA whose feedback drives the tier ramp
-    /// @param  tierThresholds     monotonically increasing attestation counts
-    /// @param  tierReleaseBps     each ≤ 10_000, monotonically non-decreasing
+    /// @param  tierStrategy       address of an `ITierStrategy` contract
+    ///                            that the new Escrow will delegate to on
+    ///                            every `releasedBps()` read
     /// @param  tag1               feedback tag1 filter (e.g. "payment")
     /// @param  tag2               feedback tag2 filter (e.g. "x402-settlement")
     /// @param  salt               caller-chosen; orchestrator uses
-    ///                            keccak256(abi.encodePacked(ensName, agentId))
+    ///                            keccak256(abi.encodePacked(ensName))
     /// @return escrow             deterministic deployed address
     function createEscrow(
-        uint256          agentId,
-        address          facilitatorClient,
-        uint64[]  memory tierThresholds,
-        uint16[]  memory tierReleaseBps,
-        string    memory tag1,
-        string    memory tag2,
-        bytes32          salt
+        uint256        agentId,
+        address        facilitatorClient,
+        address        tierStrategy,
+        string  memory tag1,
+        string  memory tag2,
+        bytes32        salt
     ) external returns (address escrow) {
         if (escrowOfAgent[agentId] != address(0)) {
             revert AlreadyDeployedForAgent(agentId);
@@ -82,17 +81,20 @@ contract EscrowFactory {
         address predicted = predictAddress(
             agentId,
             facilitatorClient,
-            tierThresholds,
-            tierReleaseBps,
+            tierStrategy,
             tag1,
             tag2,
             salt
         );
         if (isDeployed[predicted]) revert AlreadyDeployedAtAddress(predicted);
 
-        // Constructor inside Escrow validates tier-array shape; bubbles
-        // TierLengthsMismatch / TierThresholdsNotMonotonic / TierBpsNotMonotonic /
-        // TierBpsExceedsDenominator / ZeroAddress through the deploy.
+        // The new Escrow's constructor validates non-zero arguments and
+        // bubbles `Escrow.ZeroAddress` if `tierStrategy` is the zero
+        // address. The strategy itself is NOT validated to be ERC-165
+        // compatible — by design, any contract exposing the
+        // `ITierStrategy.evaluate` selector is acceptable. Strategies
+        // are pinned at deploy and cannot be swapped, so a bad strategy
+        // bricks a single Escrow without affecting any other.
         escrow = address(
             new Escrow{salt: salt}(
                 token,
@@ -100,8 +102,7 @@ contract EscrowFactory {
                 reputationRegistry,
                 agentId,
                 facilitatorClient,
-                tierThresholds,
-                tierReleaseBps,
+                tierStrategy,
                 tag1,
                 tag2
             )
@@ -117,8 +118,7 @@ contract EscrowFactory {
             escrow,
             salt,
             facilitatorClient,
-            tierThresholds,
-            tierReleaseBps,
+            tierStrategy,
             tag1,
             tag2
         );
@@ -130,13 +130,12 @@ contract EscrowFactory {
     ///         Splitter's `recipients[2]` slot atomically with the factory
     ///         deploy that lands the Escrow at that exact address).
     function predictAddress(
-        uint256          agentId,
-        address          facilitatorClient,
-        uint64[]  memory tierThresholds,
-        uint16[]  memory tierReleaseBps,
-        string    memory tag1,
-        string    memory tag2,
-        bytes32          salt
+        uint256        agentId,
+        address        facilitatorClient,
+        address        tierStrategy,
+        string  memory tag1,
+        string  memory tag2,
+        bytes32        salt
     ) public view returns (address) {
         bytes memory creationCode = abi.encodePacked(
             type(Escrow).creationCode,
@@ -146,8 +145,7 @@ contract EscrowFactory {
                 reputationRegistry,
                 agentId,
                 facilitatorClient,
-                tierThresholds,
-                tierReleaseBps,
+                tierStrategy,
                 tag1,
                 tag2
             )

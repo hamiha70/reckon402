@@ -7,16 +7,18 @@ import { ReentrancyGuard }  from "@openzeppelin/contracts/utils/ReentrancyGuard.
 
 import { IIdentityRegistry }   from "./interfaces/IIdentityRegistry.sol";
 import { IReputationRegistry } from "./interfaces/IReputationRegistry.sol";
+import { ITierStrategy }       from "./interfaces/ITierStrategy.sol";
 
 /// @title  Reckon402 Escrow (v1)
 /// @notice Per-agent risk buffer. Receives a slice of every settlement via a
 ///         Splitter recipient slot. Releases funds to the agent's
 ///         IdentityRegistry NFT owner, gated on a tier curve evaluated
 ///         against the agent's facilitator-attested settlement count.
+///
 /// @dev    No admin, no upgrade, no rescue. Authority follows the agent NFT —
-///         transferring the NFT transfers claim rights. Tier curve is
-///         parameterized at deploy time (NOT hardcoded) so the same code can
-///         host different schedules.
+///         transferring the NFT transfers claim rights. Tier evaluation is
+///         delegated to a pluggable `ITierStrategy` contract pinned in the
+///         constructor; the Escrow never decides tier math itself.
 contract Escrow is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -27,21 +29,18 @@ contract Escrow is ReentrancyGuard {
     address public immutable reputationRegistry;
     uint256 public immutable agentId;
     address public immutable facilitatorClient;
+    address public immutable tierStrategy;
+
+    /// @notice ReputationRegistry feedback-tag filter applied on every
+    ///         `attestationCount()` read. Pinned per Escrow at deploy.
+    string public tag1;
+    string public tag2;
 
     /// @notice Cumulative amount withdrawn over the lifetime of this Escrow.
     ///         Monotonically increasing. Used to cap future withdrawals at
     ///         `releasedAmount() - totalWithdrawn` — the on-chain replay
     ///         guard requested in the L4d spec.
     uint256 public totalWithdrawn;
-
-    // Tier curve, pinned per Escrow at deploy. Stored as plain dynamic
-    // arrays + two strings; constructor validates monotonicity + bounds.
-    // Threshold type is uint64 to match ReputationRegistry.getSummary's
-    // return type (avoids implicit casts during ramp evaluation).
-    uint64[] private _tierThresholds;
-    uint16[] private _tierReleaseBps;
-    string   private _tag1;
-    string   private _tag2;
 
     event Withdrawn(
         address indexed by,
@@ -56,8 +55,7 @@ contract Escrow is ReentrancyGuard {
         address indexed reputationRegistry,
         uint256          agentId,
         address          facilitatorClient,
-        uint64[]         tierThresholds,
-        uint16[]         tierReleaseBps,
+        address          tierStrategy,
         string           tag1,
         string           tag2
     );
@@ -65,54 +63,34 @@ contract Escrow is ReentrancyGuard {
     error NotOwner();
     error NothingToWithdraw();
     error WithdrawAmountExceedsAvailable(uint256 requested, uint256 available);
-    error TierLengthsMismatch();
-    error TierThresholdsNotMonotonic();
-    error TierBpsNotMonotonic();
-    error TierBpsExceedsDenominator();
     error ZeroAddress();
 
     constructor(
-        IERC20           token_,
-        address          identityRegistry_,
-        address          reputationRegistry_,
-        uint256          agentId_,
-        address          facilitatorClient_,
-        uint64[]  memory tierThresholds_,
-        uint16[]  memory tierReleaseBps_,
-        string    memory tag1_,
-        string    memory tag2_
+        IERC20         token_,
+        address        identityRegistry_,
+        address        reputationRegistry_,
+        uint256        agentId_,
+        address        facilitatorClient_,
+        address        tierStrategy_,
+        string  memory tag1_,
+        string  memory tag2_
     ) {
         if (
             address(token_) == address(0)            ||
             identityRegistry_ == address(0)          ||
             reputationRegistry_ == address(0)        ||
-            facilitatorClient_ == address(0)
+            facilitatorClient_ == address(0)         ||
+            tierStrategy_ == address(0)
         ) revert ZeroAddress();
-
-        uint256 n = tierThresholds_.length;
-        if (n == 0 || n != tierReleaseBps_.length) revert TierLengthsMismatch();
-
-        for (uint256 i = 0; i < n; ++i) {
-            if (i > 0 && tierThresholds_[i] <= tierThresholds_[i - 1]) {
-                revert TierThresholdsNotMonotonic();
-            }
-            if (tierReleaseBps_[i] > BPS_DENOMINATOR) {
-                revert TierBpsExceedsDenominator();
-            }
-            if (i > 0 && tierReleaseBps_[i] < tierReleaseBps_[i - 1]) {
-                revert TierBpsNotMonotonic();
-            }
-        }
 
         token              = token_;
         identityRegistry   = identityRegistry_;
         reputationRegistry = reputationRegistry_;
         agentId            = agentId_;
         facilitatorClient  = facilitatorClient_;
-        _tierThresholds    = tierThresholds_;
-        _tierReleaseBps    = tierReleaseBps_;
-        _tag1              = tag1_;
-        _tag2              = tag2_;
+        tierStrategy       = tierStrategy_;
+        tag1               = tag1_;
+        tag2               = tag2_;
 
         emit Deployed(
             address(token_),
@@ -120,8 +98,7 @@ contract Escrow is ReentrancyGuard {
             reputationRegistry_,
             agentId_,
             facilitatorClient_,
-            tierThresholds_,
-            tierReleaseBps_,
+            tierStrategy_,
             tag1_,
             tag2_
         );
@@ -168,28 +145,16 @@ contract Escrow is ReentrancyGuard {
         (uint64 count, , ) = IReputationRegistry(reputationRegistry).getSummary(
             agentId,
             clients,
-            _tag1,
-            _tag2
+            tag1,
+            tag2
         );
         return count;
     }
 
     /// @notice Tier release fraction in BPS (0..10_000) at the current
-    ///         attestation count. Walks the monotonic tier table and returns
-    ///         the highest qualifying release bps. Returns 0 if count below
-    ///         the lowest threshold.
+    ///         attestation count. Delegates to the pinned tier strategy.
     function releasedBps() public view returns (uint16) {
-        uint64 count = attestationCount();
-        uint16 best  = 0;
-        uint256 n = _tierThresholds.length;
-        for (uint256 i = 0; i < n; ++i) {
-            if (count >= _tierThresholds[i]) {
-                best = _tierReleaseBps[i];
-            } else {
-                break;
-            }
-        }
-        return best;
+        return ITierStrategy(tierStrategy).evaluate(agentId, attestationCount());
     }
 
     /// @notice Total amount unlocked for withdrawal so far (cumulative cap).
@@ -248,22 +213,10 @@ contract Escrow is ReentrancyGuard {
     // Off-chain helpers                                                    //
     // -------------------------------------------------------------------- //
 
-    /// @notice Tier configuration in one call (for dashboard rendering).
-    function tierConfig()
-        external
-        view
-        returns (
-            uint64[] memory thresholds,
-            uint16[] memory releaseBpsArr,
-            string   memory tag1Val,
-            string   memory tag2Val
-        )
-    {
-        return (_tierThresholds, _tierReleaseBps, _tag1, _tag2);
-    }
-
     /// @notice One-shot stats getter for the dashboard. All seven values
-    ///         pulled in a single eth_call.
+    ///         pulled in a single eth_call. The dashboard separately calls
+    ///         `tierStrategy()` + the strategy's own config endpoint to
+    ///         recover the tier table itself.
     function getStats()
         external
         view

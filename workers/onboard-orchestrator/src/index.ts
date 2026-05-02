@@ -136,7 +136,12 @@ app.post('/onboard', async (c) => {
 app.options('/receipts', (c) => new Response(null, { status: 204, headers: CORS }))
 app.get('/receipts', async (c) => {
   const limit = c.req.query('limit') ?? '20'
-  const url = `${c.env.FACILITATOR_BASE_URL}/admin/receipts?limit=${encodeURIComponent(limit)}`
+  // Forward optional payTo (per-agent Splitter address) so the dashboard
+  // can scope receipts to a single agent. Empty / missing = no filter.
+  const payTo = c.req.query('payTo') ?? ''
+  const params = new URLSearchParams({ limit })
+  if (payTo) params.set('payTo', payTo)
+  const url = `${c.env.FACILITATOR_BASE_URL}/admin/receipts?${params.toString()}`
   try {
     const upstream = await fetch(url, {
       headers: { Authorization: `Bearer ${c.env.FACILITATOR_ADMIN_TOKEN}` },

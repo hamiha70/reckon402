@@ -22,8 +22,8 @@ const CFG = {
   BASESCAN_ADDR:     'https://sepolia.basescan.org/address/',
   ETHERSCAN_TX:      'https://sepolia.etherscan.io/tx/',
   ETHERSCAN_ADDR:    'https://sepolia.etherscan.io/address/',
-  // Populated after KeeperHub workflow is published (Phase 3C)
-  KH_WORKFLOW_URL:   'https://app.keeperhub.run/workflow/reckon402-research',
+  // KeeperHub workflow (published 2026-05-02 — see AGENTS.md "L4 deployments")
+  KH_WORKFLOW_URL:   'https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9',
 }
 
 // Reckon402-controlled EOAs that share the SellingAgent's Splitter recipient
@@ -514,18 +514,21 @@ function stopDashboard() {
 async function refreshDashboard() {
   if (!activeEns) return
   try {
-    const [recordsRes, receiptsRes] = await Promise.all([
-      fetchRecords(activeEns),
-      fetchRecentReceipts(),
-    ])
+    // Records first — we need the per-agent Splitter address to scope the
+    // receipts query so each agent's dashboard only shows its own paid calls.
+    // The added latency vs Promise.all is ~one network round-trip and the
+    // tradeoff is worth it for filter correctness on first paint.
+    const recordsRes = await fetchRecords(activeEns)
+    splitterAddrCached = recordsRes.splitter ?? null
+    const receiptsRes = await fetchRecentReceipts(splitterAddrCached)
+
     renderDashboardHeader(recordsRes)
     renderTerminalPane(recordsRes)
     renderEnsRecords(recordsRes.allRecords)
-    renderCallLog(receiptsRes)
+    renderCallLog(receiptsRes, splitterAddrCached)
 
     escrowAddrCached = recordsRes.escrow ?? null
     agentIdCached    = recordsRes.agentId ?? null
-    splitterAddrCached = recordsRes.splitter ?? null
 
     // Splitter is immutable so we read once per address and reuse forever.
     if (splitterAddrCached) {
@@ -611,9 +614,16 @@ async function fetchRecords(ens) {
 
 // Receipts are fetched via the orchestrator proxy (/receipts) which adds
 // server-side Bearer auth. The frontend never sees the ADMIN_TOKEN.
-async function fetchRecentReceipts() {
+//
+// payTo (optional) — per-agent Splitter address. When passed, the facilitator
+// returns only receipts whose auth_to matches, so each agent's dashboard
+// shows just its own paid calls instead of every settlement on the
+// facilitator. Falls back to all-receipts when omitted.
+async function fetchRecentReceipts(payTo) {
   try {
-    const res = await fetch(`${CFG.ORCHESTRATOR_BASE}/receipts?limit=20`)
+    const params = new URLSearchParams({ limit: '20' })
+    if (payTo) params.set('payTo', payTo)
+    const res = await fetch(`${CFG.ORCHESTRATOR_BASE}/receipts?${params.toString()}`)
     if (!res.ok) return []
     const body = await res.json()
     return Array.isArray(body?.receipts) ? body.receipts : []
@@ -791,19 +801,35 @@ function renderTierTable(count) {
   }
 }
 
-function renderCallLog(receipts) {
+function renderCallLog(receipts, splitterAddr) {
   const tbody = $('#calls-table')
   tbody.innerHTML = ''
-  if (!receipts || !receipts.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-gray-600 italic py-4 text-center">no calls yet</td></tr>'
+  // Belt-and-suspenders client-side filter: even though the orchestrator
+  // proxy already passes ?payTo=<splitter> to the facilitator, an older
+  // facilitator deploy that doesn't yet honor the filter would return
+  // every receipt. We filter again here so the dashboard never bleeds
+  // another agent's paid calls into this view.
+  let filtered = receipts || []
+  if (splitterAddr && filtered.length) {
+    const target = splitterAddr.toLowerCase()
+    filtered = filtered.filter(r => (r.payTo ?? '').toLowerCase() === target)
+  }
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-gray-600 italic py-4 text-center">no calls yet</td></tr>'
     return
   }
-  for (const r of receipts) {
+  for (const r of filtered) {
     const tr = document.createElement('tr')
     tr.className = 'border-t border-gray-800'
-    // API returns camelCase: tx, tdErc8004Tx, paymentId, submittedAt
+    // API returns camelCase: tx, tdErc8004Tx, paymentId, submittedAt, reconcileNotes
     const settleLink = r.tx
       ? `<a href="${CFG.BASESCAN_TX}${r.tx}" target="_blank" class="text-blue-400 underline">${trunc(r.tx, 8)}</a>`
+      : '—'
+    // distributeTx is embedded in reconcileNotes as "distributeTx=0x..." — parsed defensively;
+    // historical receipts where the field is missing render '—'.
+    const distMatch = (r.reconcileNotes || '').match(/distributeTx=(0x[a-fA-F0-9]{64})/)
+    const distributeLink = distMatch
+      ? `<a href="${CFG.BASESCAN_TX}${distMatch[1]}" target="_blank" class="text-amber-400 underline">${trunc(distMatch[1], 8)}</a>`
       : '—'
     const attestLink = r.tdErc8004Tx
       ? `<a href="${CFG.BASESCAN_TX}${r.tdErc8004Tx}" target="_blank" class="text-green-400 underline">${trunc(r.tdErc8004Tx, 8)}</a>`
@@ -812,6 +838,7 @@ function renderCallLog(receipts) {
       <td class="py-1 text-gray-400 text-xs">${fmtTs(r.submittedAt)}</td>
       <td class="py-1 text-gray-300 text-xs">${trunc(r.paymentId, 8)}</td>
       <td class="py-1 text-xs">${settleLink}</td>
+      <td class="py-1 text-xs">${distributeLink}</td>
       <td class="py-1 text-xs">${attestLink}</td>
     `
     tbody.appendChild(tr)
@@ -882,12 +909,29 @@ async function connectWallet() {
   await refreshClaimGate()
 }
 
-// Re-evaluate whether the Claim button + wallet status row should be visible
-// based on:
-//   1. User has connected a wallet (connectedAddress != null)
-//   2. The active dashboard agent has an Escrow + agentId from ENS
-//   3. The connected wallet === IdentityRegistry.ownerOf(agentId)
-//   4. withdrawableNow > 0 from the latest getStats() snapshot
+// Re-evaluate the Claim row + wallet status row visibility.
+//
+// Rendering policy (intentionally always-visible when an Escrow exists, so
+// the Claim affordance is discoverable in screenshots and the demo video
+// even before MetaMask is connected):
+//
+//   No Escrow on this agent (legacy / pre-L4d agents)
+//     → claim row hidden entirely.
+//
+//   Escrow exists, no wallet connected
+//     → row visible, amount populated from getStats(), button disabled with
+//       hint "Connect wallet to claim". Owner flag tells the user which
+//       wallet they need to connect (NFT owner address).
+//
+//   Escrow exists, wallet connected, wrong owner
+//     → row visible, amount populated, button disabled with hint
+//       "Wrong wallet (owner: 0x…)".
+//
+//   Escrow exists, wallet connected, correct owner, nothing to claim
+//     → row visible, amount = 0, button disabled with hint "Nothing to claim".
+//
+//   Escrow exists, wallet connected, correct owner, claimable > 0
+//     → row visible, amount > 0, button enabled with text "Claim All".
 async function refreshClaimGate() {
   const btn        = $('#wallet-connect-btn')
   const statusRow  = $('#wallet-status')
@@ -898,50 +942,77 @@ async function refreshClaimGate() {
   const claimTo    = $('#claim-to')
   if (!btn) return
 
-  // Default state: no wallet, hide everything claim-related.
+  // Wallet-connect button + status row are wallet-driven, not Escrow-driven.
   if (!connectedAddress) {
     btn.textContent = 'Connect Wallet'
     btn.disabled = false
     statusRow?.classList.add('hidden')
-    claimRow?.classList.add('hidden')
-    return
+  } else {
+    btn.textContent = trunc(connectedAddress)
+    btn.disabled = true
+    statusRow?.classList.remove('hidden')
+    $('#wallet-address').textContent = connectedAddress
   }
 
-  // Wallet connected → show address.
-  btn.textContent = trunc(connectedAddress)
-  btn.disabled = true
-  statusRow?.classList.remove('hidden')
-  $('#wallet-address').textContent = connectedAddress
-
-  // Without an active L4d agent on this dashboard, skip ownership lookup.
+  // No Escrow on this agent → hide the claim affordance entirely.
   if (!escrowAddrCached || !agentIdCached) {
-    ownerFlag.innerHTML = '<span class="text-gray-600">(no on-chain Escrow on this agent)</span>'
+    if (ownerFlag && connectedAddress) {
+      ownerFlag.innerHTML = '<span class="text-gray-600">(no on-chain Escrow on this agent)</span>'
+    }
     claimRow?.classList.add('hidden')
     return
   }
 
-  // Look up IdentityRegistry NFT owner for this agentId — single eth_call.
+  // Escrow exists → ALWAYS show the row. Populate amount from the latest
+  // getStats() snapshot (independent of wallet state).
+  claimRow?.classList.remove('hidden')
+  const w = escrowSnapshot?.withdrawableNow ?? 0n
+  claimAmt.textContent = fmtUsdc(w.toString())
+
+  // Look up the NFT owner once — drives the "to" address shown in the row
+  // even before the user connects, so they know which wallet to use.
   let nftOwner = null
   try {
     nftOwner = await readNftOwner(CFG.BASE_SEPOLIA_RPC, IDENTITY_REGISTRY_BASE_SEPOLIA, agentIdCached)
   } catch (err) {
     console.error('readNftOwner failed', err)
-    ownerFlag.innerHTML = '<span class="text-red-400">(owner check failed)</span>'
-    claimRow?.classList.add('hidden')
+  }
+
+  // No wallet → preview state.
+  if (!connectedAddress) {
+    claimTo.textContent = nftOwner ? trunc(nftOwner) : '(connect wallet)'
+    if (claimBtn) {
+      claimBtn.disabled = true
+      claimBtn.textContent = 'Connect wallet to claim'
+    }
+    return
+  }
+
+  // Wallet connected → owner check drives button state.
+  if (!nftOwner) {
+    if (ownerFlag) ownerFlag.innerHTML = '<span class="text-red-400">(owner check failed)</span>'
+    claimTo.textContent = trunc(connectedAddress)
+    if (claimBtn) {
+      claimBtn.disabled = true
+      claimBtn.textContent = 'Owner check failed'
+    }
     return
   }
 
   if (nftOwner === connectedAddress) {
-    ownerFlag.innerHTML = '<span class="text-green-400">✓ owner of agent NFT — can claim</span>'
-    // Show + arm the Claim row
-    const w = escrowSnapshot?.withdrawableNow ?? 0n
-    claimRow?.classList.remove('hidden')
-    claimAmt.textContent = fmtUsdc(w.toString())
-    claimTo.textContent  = trunc(connectedAddress)
-    if (claimBtn) claimBtn.disabled = (w === 0n)
+    if (ownerFlag) ownerFlag.innerHTML = '<span class="text-green-400">✓ owner of agent NFT — can claim</span>'
+    claimTo.textContent = trunc(connectedAddress)
+    if (claimBtn) {
+      claimBtn.disabled = (w === 0n)
+      claimBtn.textContent = w === 0n ? 'Nothing to claim' : 'Claim All'
+    }
   } else {
-    ownerFlag.innerHTML = `<span class="text-amber-300">connected wallet is not the agent NFT owner (${trunc(nftOwner ?? '—')})</span>`
-    claimRow?.classList.add('hidden')
+    if (ownerFlag) ownerFlag.innerHTML = `<span class="text-amber-300">connected wallet is not the agent NFT owner (${trunc(nftOwner)})</span>`
+    claimTo.textContent = trunc(nftOwner)
+    if (claimBtn) {
+      claimBtn.disabled = true
+      claimBtn.textContent = 'Wrong wallet'
+    }
   }
 }
 

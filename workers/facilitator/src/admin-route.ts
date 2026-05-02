@@ -36,23 +36,47 @@ export async function adminReceiptsHandler(c: Context<{ Bindings: Env }>) {
 
   const n = limit(c)
   const stateFilter = c.req.query('state')
-  const rows = stateFilter
-    ? await c.env.DB
-        .prepare(`SELECT * FROM receipts WHERE state = ?1 ORDER BY submitted_at DESC LIMIT ?2`)
-        .bind(stateFilter, n)
-        .all()
-    : await c.env.DB
-        .prepare(`SELECT * FROM receipts ORDER BY submitted_at DESC LIMIT ?1`)
-        .bind(n)
-        .all()
+  // Optional payTo filter — used by the dashboard to scope receipts to a
+  // single agent's per-agent Splitter so each agent's view shows only its
+  // own paid calls. Case-insensitive (Ethereum addresses are case-insensitive
+  // in practice; we lower-cased on insert in settle.ts at L4d migration).
+  const payToFilter = c.req.query('payTo')?.toLowerCase()
 
-  log.info('admin_receipts', { limit: n, state: stateFilter ?? 'all', count: rows.results.length })
+  // Build query dynamically. SQLite's `?` placeholders don't support
+  // optional clauses cleanly, so we branch on filter presence.
+  let rows
+  if (stateFilter && payToFilter) {
+    rows = await c.env.DB
+      .prepare(`SELECT * FROM receipts WHERE state = ?1 AND LOWER(auth_to) = ?2 ORDER BY submitted_at DESC LIMIT ?3`)
+      .bind(stateFilter, payToFilter, n)
+      .all()
+  } else if (stateFilter) {
+    rows = await c.env.DB
+      .prepare(`SELECT * FROM receipts WHERE state = ?1 ORDER BY submitted_at DESC LIMIT ?2`)
+      .bind(stateFilter, n)
+      .all()
+  } else if (payToFilter) {
+    rows = await c.env.DB
+      .prepare(`SELECT * FROM receipts WHERE LOWER(auth_to) = ?1 ORDER BY submitted_at DESC LIMIT ?2`)
+      .bind(payToFilter, n)
+      .all()
+  } else {
+    rows = await c.env.DB
+      .prepare(`SELECT * FROM receipts ORDER BY submitted_at DESC LIMIT ?1`)
+      .bind(n)
+      .all()
+  }
+
+  log.info('admin_receipts', { limit: n, state: stateFilter ?? 'all', payTo: payToFilter ?? 'all', count: rows.results.length })
   return c.json({
     count: rows.results.length,
     receipts: rows.results.map(r => ({
       paymentId:     (r as Record<string, unknown>).payment_id,
       state:         (r as Record<string, unknown>).state,
       payer:         (r as Record<string, unknown>).auth_from,
+      // payTo (= per-agent Splitter) — exposed so the dashboard can filter
+      // and so it's visible in admin tooling.
+      payTo:         (r as Record<string, unknown>).auth_to,
       amount:        (r as Record<string, unknown>).auth_value,
       tx:            (r as Record<string, unknown>).transaction,
       tdErc8004Tx:   (r as Record<string, unknown>).td_erc8004_tx,

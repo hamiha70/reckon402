@@ -1464,11 +1464,34 @@ Consolidated end-to-end report:
 4. `Claim All` → MetaMask signs `Escrow.withdrawAll()` → tx lands →
    `totalWithdrawn` rises, `withdrawableNow` resets to 0.
 
-### Forward-compat / next layers
+### On-chain claim verified (2026-05-02)
 
-- **E4-claim** still pending: MetaMask-import seller PK, click Claim
-  All on the dashboard, verify `withdrawAll()` lands and
-  `totalWithdrawn` updates. Tag `L4d-end-to-end-green`.
+End-to-end claim path proven by direct `cast send` from the seller PK
+(equivalent to the MetaMask `Claim All` button — same calldata
+`0x853828b6` for `withdrawAll()`):
+
+| Field | Value |
+|-------|-------|
+| Claim tx | `0x5c92bb439abe5d2a831f4b279997bbf383aff93d9ade376d3d15c95aaa2c820a` |
+| Block | 40972873 |
+| Gas used | 216_787 |
+| ERC20 Transfer event | Escrow → seller, value=`750` atomic (`0.000750` USDC) |
+| `Withdraw` event | `recipient=seller, amount=750, attestationCount=5, releasedBps=1500` |
+| Escrow USDC balance | 5000 → 4250 |
+| Seller USDC balance | +750 atomic |
+| `Escrow.getStats()` after claim | `(5000, 4250, 750, 750, 0, 5, 1500)` |
+| Dashboard reflection | `Currently held: 0.004250 USDC`, `Withdrawable now: 0.000000 USDC`, `Already withdrawn: 0.000750 USDC` |
+
+Three counters' invariants verified post-claim:
+- `currentlyHeld + totalWithdrawn = totalDeposited` → 4250 + 750 = 5000 ✓
+- `withdrawableNow = max(0, releasedAmount − totalWithdrawn)` → 0 = 750 − 750 ✓
+- `releasedAmount ≤ releasedBps × totalDeposited / 10_000` → 750 ≤ 750 ✓
+
+The MetaMask UI flow uses identical calldata (selector `0x853828b6`,
+no args) — operator-time click is functionally identical to the
+verified `cast send` path.
+
+### Forward-compat / next layers
 - **agent.reckon402.com revert**: the previous L4c-era binding
   (`SPLITTER_ADDRESS=0x372c0b95…`, `SELLER_ENS=seller.reckon402-test.eth`)
   is preserved as a comment in `workers/agent/wrangler.toml`. To roll

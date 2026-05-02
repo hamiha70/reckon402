@@ -1,14 +1,14 @@
 # Reckon402 Demo Design — ETHGlobal OpenAgents 2026
 
-> **Status:** LOCKED 2026-05-01  
-> **Canonical source for demo narrative:** also see `memory/demo_narrative.md`  
+> **Status:** LOCKED 2026-05-02 (reconciled with `docs/canonical-narrative.md` A0 lock)
+> **Canonical source for demo narrative:** `docs/canonical-narrative.md` (locked)
 > Converged from design session; implementation plan follows.
 
 ---
 
 ## The one-sentence claim
 
-> "Every x402 settlement writes trust on-chain. That trust changes what you pay next. We closed this loop — in production, on testnets, end-to-end."
+> "Every x402 settlement writes trust on-chain. A portion of every payment flows into the SellingAgent's per-agent on-chain Escrow; the Escrow's release schedule is parameterized by the same on-chain trust signal. Funds release as reputation grows, NFT-bound to the agent's IdentityRegistry token."
 
 Everything in the demo either proves that sentence or is cut.
 
@@ -46,7 +46,7 @@ Click **"See the demo →"** — opens `demo.reckon402.com`.
 
 **Agent Roster panel** (portfolio, all agents):
 - Reads `totalSupply(IdentityRegistry)` → iterates agentIds
-- Shows: agentId, wallet (truncated), rep count, price tier, last seen
+- Shows: agentId, wallet (truncated), `attestationCount`, current Escrow tier (T0–T7), `currentlyHeld`, `withdrawableNow`, last seen
 - Auto-refreshes every 5s (toggle Pause/Resume button)
 
 **Payment Feed panel**:
@@ -54,7 +54,7 @@ Click **"See the demo →"** — opens `demo.reckon402.com`.
 - Each row: paymentId (truncated), status badge, amount, age, Basescan tx link
 - New rows pulse green on arrival
 
-Point at agent #1 — rep count 56, bronze tier, price 0.95 USDC. "This agent has 56 real on-chain attestations. It earned a 5% discount."
+Point at agent #1 — `attestationCount=56` → tier T4 → `releasedBps=5000` (50% of deposited Escrow released). "This agent has 56 real on-chain settlement attestations. Half the Escrow buffer has unlocked; the other half stays held against future claims until the count walks T4 → T5."
 
 ---
 
@@ -70,9 +70,9 @@ Form fields (pre-filled for the demo):
 | Full ENS name | `seller9.reckon402-test.eth` (computed) | no |
 | SellingAgent EOA | `0xD53f...` | yes |
 | HTTPS endpoint | `https://agent.reckon402.com/research` | yes |
-| Base amount | `100000` (= 0.10 USDC) | yes |
-| Revenue split | `0xD53f... 97% / 0x0A02... 2% / 0x66C2... 1%` | hardcoded, greyed |
-| Discount tiers | bronze ≥1 (-5%) / silver ≥3 (-10%) / gold ≥10 (-15%) | hardcoded, greyed |
+| Base amount | `10000` (= 0.01 USDC, canonical test amount) | yes |
+| Revenue split | `0xD53f... 87% / 0x0A02... 3% / Escrow 10%` | hardcoded, greyed |
+| Tier strategy | `LinearMonotonicTierStrategy v1` — thresholds [0,1,3,10,30,100,300,1000], release BPS [0,500,1500,3000,5000,7000,8500,10000] | hardcoded, greyed |
 
 Click **[Deploy]**.
 
@@ -99,9 +99,10 @@ After step 5 completes, auto-navigate to `#/agent/seller9.reckon402-test.eth`.
 
 **Header card:**
 - ENS name: `seller9.reckon402-test.eth`
-- Current price: `0.100 USDC` (from gateway `?backend=erc8004`)
+- Base price: `0.010 USDC` (from gateway `?backend=erc8004` → `x402.amount`)
 - agentId: `3`
-- Splitter: `0x372c...` (clickable Basescan link)
+- Splitter: `0x372c...` (87% seller / 3% facilitator-fee / 10% Escrow) — clickable Basescan link
+- Escrow: `0x...` (per-agent, NFT-bound) — clickable Basescan link
 - Endpoint: `https://agent.reckon402.com/research`
 - ENS owner: `0xD53f...` (clickable Etherscan link)
 
@@ -111,50 +112,84 @@ After step 5 completes, auto-navigate to `#/agent/seller9.reckon402-test.eth`.
 |-----|-------|------|
 | `x402.splitter` | `0x372c...` | Basescan |
 | `x402.erc8004.agent_id` | `3` | — |
-| `x402.amount` | `100000` | — |
+| `x402.amount` | `10000` | — |
 | `x402.endpoint` | `https://agent.reckon402.com/research` | — |
 | ... 8 more records | ... | ... |
 
 > "These are the ENS text records. They live on Ethereum Sepolia. Any resolver on any chain can read them."
 
-**Trust tier panel:**
-- Count: `0 attestations` — badge: `[no tier]` (gray)
-- Tier table with active row highlighted:
-  ```
-  0+   base (no discount)   0.100 USDC  ← active
-  1+   bronze (5% off)      0.095 USDC
-  3+   silver (10% off)     0.090 USDC
-  10+  gold (15% off)       0.085 USDC
-  ```
+**Escrow trust panel** (the hero panel — read live from `Escrow.getStats()` via one `eth_call` to Base Sepolia, refreshed every 3s):
+
+| Counter | Value (post-onboarding, pre-settlement) |
+|---------|------------------------------------------|
+| `attestationCount` | `0` (T0 tier — no on-chain history yet) |
+| `releasedBps` | `0` (no fraction released) |
+| `totalDeposited` | `0` |
+| `currentlyHeld` | `0` |
+| `withdrawableNow` | `0` |
+| `totalWithdrawn` | `0` |
+
+Tier table with active row highlighted (the active row is the floor of the current `attestationCount`):
+
+```
+T0    0+   releasedBps=0      ← active
+T1    1+   releasedBps=500    (5% of deposited released)
+T2    3+   releasedBps=1500   (15% released)
+T3   10+   releasedBps=3000   (30% released)
+T4   30+   releasedBps=5000   (50% released)
+... up to T7 (1000+ attestations → 100% released)
+```
 
 **Option C terminal pane** (always visible, auto-refreshes 3s):
 ```
-$ curl gateway.reckon402.com/records/seller9.reckon402-test.eth?flat=true&backend=erc8004
-{"records": {"x402.amount": "100000", ...}}
+$ cast call $ESCROW "getStats()(uint256,uint256,uint256,uint256,uint256,uint256,uint256)" --rpc-url https://sepolia.base.org
+0  0  0  0  0  0  0
 ```
 
-#### Step D — Trigger 3 paid calls via KeeperHub (~45s)
+#### Step D — Trigger 3 paid calls via KeeperHub, then Claim (~45s)
 
 Switch to KeeperHub tab. Open "Reckon402 ResearchAgent" workflow.
 
 > "I'll trigger this from KeeperHub — an agent orchestration platform — to show this works from any compliant x402 buyer, not just our own tooling."
 
-Click **Run**. KeeperHub executes 3 sequential calls to `agent.reckon402.com/research` via `signing.reckon402.com`.
+Click **Run**. KeeperHub executes 3 sequential calls to `agent.reckon402.com/research` via `signing.reckon402.com`. Each call settles 0.01 USDC on-chain; the Splitter routes 1000 atomic (10%) into the per-agent Escrow on every settlement; the facilitator writes one ERC-8004 `NewFeedback` event per settlement.
 
 Switch back to `app.reckon402.com` dashboard. Within 15s:
 
 - Call log fills: 3 rows, each with settlement tx (Basescan) + attestation tx (Basescan)
-- Trust count: `0 → 1 → 2 → 3`
-- Badge: `[no tier] → [bronze]` at count 1
-- Tier table: bronze row highlighted — current price `0.095 USDC`
+- Escrow trust panel updates live:
+
+| Counter | After 3 settlements |
+|---------|---------------------|
+| `attestationCount` | `3` (T2 tier crossed) |
+| `releasedBps` | `1500` (15%) |
+| `totalDeposited` | `3000` atomic (= 0.003 USDC, 10% of 0.030 USDC settled) |
+| `currentlyHeld` | `3000` (none withdrawn yet) |
+| `withdrawableNow` | `450` (= 3000 × 1500 / 10000) |
+
+- Tier table: T2 row highlighted (active tier walked T0 → T1 at count 1, T1 → T2 at count 3)
 
 **Option C terminal pane updates automatically:**
 ```
-$ curl gateway.reckon402.com/records/seller9.reckon402-test.eth?flat=true&backend=erc8004
-{"records": {"x402.amount": "95000", ...}}
+$ cast call $ESCROW "getStats()(uint256,uint256,uint256,uint256,uint256,uint256,uint256)" --rpc-url https://sepolia.base.org
+3000  3000  450  0  450  3  1500
 ```
 
-> "Three paid calls. Three attestations written to the ERC-8004 registry on Base Sepolia. The gateway read them back. The price changed. The trust loop is closed — without us touching a single config file."
+Click **Connect Wallet** → import the seller PK in MetaMask. The connected address must match `IdentityRegistry.ownerOf(agentId)` for the Claim button to activate. Click **Claim All** → MetaMask signs `Escrow.withdrawAll()` (calldata `0x853828b6`, no args) → tx lands on Base Sepolia → 450 atomic transfers from Escrow to the seller.
+
+After the claim:
+
+| Counter | After 3 settlements + claim |
+|---------|------------------------------|
+| `currentlyHeld` | `2550` (= 3000 − 450) |
+| `totalWithdrawn` | `450` |
+| `withdrawableNow` | `0` (all of the released slice is now withdrawn) |
+| `attestationCount` | `3` (unchanged) |
+| `releasedBps` | `1500` (unchanged) |
+
+The remaining 2550 atomic stays locked in the Escrow until the next attestation pushes the agent into T3 (10 attestations → 30% released → an additional 450 atomic unlocks).
+
+> "Three settlements. Three on-chain attestations. The Escrow held back 90% of the buffer at T0; at T2 it released 15% of the deposited slice; the seller's NFT-bound owner claimed it on-chain in one transaction. The trust loop is closed — settlements feed reputation, reputation parameterizes Escrow release, the seller's NFT controls withdrawal."
 
 ---
 

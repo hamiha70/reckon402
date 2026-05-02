@@ -61,6 +61,19 @@ const SPLIT_DISPLAY = [
 // AGENTS.md "L4a2 ERC-8004 client + reads".
 const IDENTITY_REGISTRY_BASE_SEPOLIA = '0x8004A818BFB912233c491871b3d84c89A494BD9e'
 
+// Base Sepolia EIP-155 chainId, hex form for wallet_switchEthereumChain.
+const BASE_SEPOLIA_CHAIN_ID_HEX = '0x14a34'  // 84532
+
+// Function selectors (4-byte) — precomputed via `cast sig` against
+// contracts/src/Escrow.sol + IdentityRegistry. Hardcoded so the frontend
+// doesn't need a runtime keccak library.
+const SEL = {
+  getStats:        '0xc59d4847', // Escrow.getStats() — 7 return slots
+  withdrawAll:     '0x853828b6', // Escrow.withdrawAll() — no args
+  withdraw:        '0x2e1a7d4d', // Escrow.withdraw(uint256)
+  ownerOf:         '0x6352211e', // IERC721.ownerOf(uint256)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function $(sel) { return document.querySelector(sel) }
 function $$(sel) { return [...document.querySelectorAll(sel)] }
@@ -108,6 +121,77 @@ function escapeHtml(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+// ─── Minimal ABI codec ───────────────────────────────────────────────────
+// Pads a hex value (no 0x) to 32-byte (64-char) slots, leftpad with zeros.
+function pad32(hexNo0x) {
+  const h = hexNo0x.startsWith('0x') ? hexNo0x.slice(2) : hexNo0x
+  return h.padStart(64, '0')
+}
+// Encode a uint256 as a 32-byte slot (BigInt-safe).
+function encUint256(v) {
+  const big = typeof v === 'bigint' ? v : BigInt(v)
+  return pad32(big.toString(16))
+}
+// Encode an address as a 32-byte slot.
+function encAddress(addr) {
+  return pad32(String(addr).replace(/^0x/, '').toLowerCase())
+}
+// Decode a 0x-prefixed eth_call result as an array of 32-byte hex strings (no 0x prefix).
+function decodeSlots(hex) {
+  const h = hex.startsWith('0x') ? hex.slice(2) : hex
+  const slots = []
+  for (let i = 0; i < h.length; i += 64) slots.push(h.slice(i, i + 64))
+  return slots
+}
+function slotToBigInt(slot) { return BigInt('0x' + slot) }
+function slotToAddress(slot) { return '0x' + slot.slice(24) }
+
+// Single-shot eth_call against the public Base Sepolia RPC. `to` is the
+// contract address, `selector` is 0x-prefixed 4-byte fn selector, `args` is
+// the already-encoded calldata tail (no 0x prefix). Returns raw 0x-hex.
+async function ethCall(rpcUrl, to, selector, encodedArgsNo0x = '') {
+  const data = selector + encodedArgsNo0x
+  const body = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'eth_call',
+    params: [{ to, data }, 'latest'],
+  }
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`RPC ${res.status}`)
+  const json = await res.json()
+  if (json.error) throw new Error(`RPC error: ${json.error.message ?? JSON.stringify(json.error)}`)
+  return json.result
+}
+
+// Read Escrow.getStats() — returns the 7-tuple as a plain object.
+async function readEscrowStats(rpcUrl, escrowAddr) {
+  const raw = await ethCall(rpcUrl, escrowAddr, SEL.getStats, '')
+  const slots = decodeSlots(raw)
+  if (slots.length < 7) throw new Error(`bad getStats() response: ${raw}`)
+  return {
+    totalDeposited:   slotToBigInt(slots[0]),
+    currentlyHeld:    slotToBigInt(slots[1]),
+    totalWithdrawn:   slotToBigInt(slots[2]),
+    releasedAmount:   slotToBigInt(slots[3]),
+    withdrawableNow:  slotToBigInt(slots[4]),
+    attestationCount: Number(slotToBigInt(slots[5])),  // uint64 fits in JS number
+    releasedBps:      Number(slotToBigInt(slots[6])),  // uint16 fits
+  }
+}
+
+// Read IdentityRegistry.ownerOf(agentId) — returns the owner EOA (lowercase).
+async function readNftOwner(rpcUrl, identityRegistry, agentId) {
+  const raw = await ethCall(rpcUrl, identityRegistry, SEL.ownerOf, encUint256(agentId))
+  const slots = decodeSlots(raw)
+  if (!slots[0]) throw new Error(`bad ownerOf() response: ${raw}`)
+  return slotToAddress(slots[0]).toLowerCase()
+}
+
 // ─── Routing (hash-based) ─────────────────────────────────────────────────
 function activate(viewId) {
   for (const v of $$('.view')) v.classList.remove('active')
@@ -146,6 +230,10 @@ if (labelInput && ensPreview) {
   })
 }
 
+// Tracks which onboarding flow the user picked (5-step legacy or 6-step L4d).
+// Read by renderSteps() to pick the correct label set + step count.
+let activeFlowL4d = false
+
 form?.addEventListener('submit', async (e) => {
   e.preventDefault()
   const fd = new FormData(form)
@@ -153,7 +241,10 @@ form?.addEventListener('submit', async (e) => {
   const sellerEoa = String(fd.get('sellerEoa') ?? '')
   const endpoint  = String(fd.get('endpoint')  ?? '')
   const amountInput = String(fd.get('amount')  ?? '')
+  const enableL4dEscrow = $('#l4d-toggle')?.checked ?? false
   const name = `${label}.${CFG.PARENT_ENS}`
+
+  activeFlowL4d = enableL4dEscrow
 
   // Reset the agent-mint card from any prior submit on the same page load,
   // then stash the form context so renderAgentMintCard can populate `owner`.
@@ -172,18 +263,24 @@ form?.addEventListener('submit', async (e) => {
     return
   }
 
-  // 3-recipient Splitter: seller / facilitator+deployer fee / risk-buffer escrow.
-  // The factory enforces recipients[0] === sellerEoa; we mirror that here so a
-  // mismatch fails fast in the browser.
-  const recipients = [sellerEoa, FACILITATOR_EOA, RISK_BUFFER_EOA]
-  const bps        = [SELLER_BPS, FACILITATOR_BPS, RISK_BUFFER_BPS]
+  // L4d flow: orchestrator picks recipients itself (3-way Splitter to
+  //   [seller, FACILITATOR_FEE_EOA, predictedEscrow]). We do NOT send
+  //   recipients/bps because the predicted Escrow address only exists
+  //   server-side after AgentID step lands.
+  // Legacy flow: 3-recipient Splitter with the shared risk-buffer EOA.
+  //   Factory enforces recipients[0] === sellerEoa; we mirror that here.
+  const payload = { name, sellerEoa, endpoint, amount: amountAtomic, enableL4dEscrow }
+  if (!enableL4dEscrow) {
+    payload.recipients = [sellerEoa, FACILITATOR_EOA, RISK_BUFFER_EOA]
+    payload.bps        = [SELLER_BPS,  FACILITATOR_BPS, RISK_BUFFER_BPS]
+  }
 
   let res
   try {
     res = await fetch(`${CFG.ORCHESTRATOR_BASE}/onboard`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, sellerEoa, endpoint, amount: amountAtomic, recipients, bps }),
+      body: JSON.stringify(payload),
     })
   } catch (err) {
     showOnboardError(`network error: ${err.message}`)
@@ -239,16 +336,30 @@ async function pollOnboardStatus(onboardId, ensName) {
   }
 }
 
+// Step-label sets. The L4d flow reorders + extends the legacy set, so we keep
+// both side-by-side and key off `activeFlowL4d` set at form-submit time.
+// Source of truth: tools/onboard/src/orchestrator.ts (legacy + L4d branches).
+const STEP_LABELS_LEGACY = {
+  1: 'Mint ENS subname',
+  2: 'Deploy Splitter via factory',
+  3: 'Register ERC-8004 agentId',
+  4: 'Set ENS records (gateway bootstrap)',
+  5: 'Seed gateway + transfer ENS ownership',
+}
+const STEP_LABELS_L4D = {
+  1: 'Mint ENS subname',
+  2: 'Register ERC-8004 agentId',
+  3: 'Deploy Escrow via factory',
+  4: 'Deploy Splitter via factory',
+  5: 'Set ENS records (gateway bootstrap)',
+  6: 'Seed gateway + transfer ENS ownership',
+}
+
 function renderSteps(el, steps) {
-  const labels = {
-    1: 'Mint ENS subname',
-    2: 'Deploy Splitter via factory',
-    3: 'Register ERC-8004 agentId',
-    4: 'Set ENS records (gateway bootstrap)',
-    5: 'Seed gateway + transfer ENS ownership',
-  }
+  const labels = activeFlowL4d ? STEP_LABELS_L4D : STEP_LABELS_LEGACY
+  const ids = Object.keys(labels).map(Number)
   el.innerHTML = ''
-  for (const id of [1, 2, 3, 4, 5]) {
+  for (const id of ids) {
     const step = steps.find(s => s.id === id)
     const li = document.createElement('li')
     li.className = 'flex items-center gap-2 py-1'
@@ -298,24 +409,26 @@ function formatNoteHtml(note) {
   return `<span class="text-amber-200/70">${escapeHtml(key)}=</span><span class="text-amber-200">${escapeHtml(value)}</span>`
 }
 
-// Reveals the agent-mint result card once step 3 completes with a `note` of
-// the form `agentId=<n>`. The orchestrator emits this annotation in step 3's
-// end-event (see tools/onboard/src/orchestrator.ts). Owner address comes from
-// the form submission stashed in `pendingOnboard`.
+// Reveals the agent-mint result card once the AgentID step completes with
+// a `note` of the form `agentId=<n>`. The step ID is 3 in the legacy flow
+// and 2 in the L4d flow — we just scan all steps for the first agentId
+// note rather than hardcoding the position. Owner address comes from
+// `pendingOnboard` stashed at form submit.
 function renderAgentMintCard(steps) {
   const cardEl = $('#agent-mint-card')
-  if (!cardEl) return
-  const step3 = steps.find(s => s.id === 3)
-  if (!step3 || !step3.note || !pendingOnboard) return
-  const m = step3.note.match(/^agentId=(\d+)$/)
-  if (!m) return
+  if (!cardEl || !pendingOnboard) return
+  let mintStep = null
+  for (const s of steps) {
+    if (s?.note && /^agentId=\d+$/.test(s.note)) { mintStep = s; break }
+  }
+  if (!mintStep) return
 
-  const agentId = m[1]
+  const agentId = mintStep.note.slice('agentId='.length)
   $('#mint-agent-id').textContent = `#${agentId}`
   $('#mint-owner').textContent = pendingOnboard.sellerEoa
   const txEl = $('#mint-tx')
-  if (step3.txHash && txEl) {
-    txEl.innerHTML = `<a href="${CFG.BASESCAN_TX}${step3.txHash}" target="_blank" class="text-blue-400 underline">${trunc(step3.txHash, 8)}</a>`
+  if (mintStep.txHash && txEl) {
+    txEl.innerHTML = `<a href="${CFG.BASESCAN_TX}${mintStep.txHash}" target="_blank" class="text-blue-400 underline">${trunc(mintStep.txHash, 8)}</a>`
   } else if (txEl) {
     txEl.textContent = '—'
   }
@@ -326,9 +439,20 @@ function renderAgentMintCard(steps) {
 let dashboardTimer = null
 let activeEns = null
 
+// Per-dashboard cache of the latest on-chain Escrow snapshot. Set by
+// refreshDashboard when an x402.escrow record is present. Consumed by
+// renderBufferPanel + claim-button gating.
+let escrowSnapshot = null
+let escrowAddrCached = null
+let agentIdCached    = null
+
 function startDashboard(ens) {
   stopDashboard()
   activeEns = ens
+  escrowSnapshot = null; escrowAddrCached = null; agentIdCached = null
+  // Reset wallet-status row so a stale state from a prior agent doesn't
+  // leak across navigations.
+  refreshClaimGate()
   $('#dashboard-ens').textContent = ens
   // Buyer-facing price is constant. We pull base records directly (?backend=static)
   // so the dashboard never silently inherits any gateway-side discount logic.
@@ -355,16 +479,48 @@ async function refreshDashboard() {
     renderEnsRecords(recordsRes.allRecords)
     renderCallLog(receiptsRes)
 
-    // Attestation count = receipts that landed an ERC-8004 NewFeedback tx.
-    const attestationCount = (receiptsRes ?? []).filter(r => r.tdErc8004Tx).length
-    $('#trust-count').textContent = String(attestationCount)
-    const tier = activeTier(attestationCount)
-    const badge = $('#trust-badge')
-    badge.className = `ml-auto px-3 py-1 rounded text-xs font-bold ${tier.bgCls} ${tier.textCls}`
-    badge.textContent = tier.label
+    escrowAddrCached = recordsRes.escrow ?? null
+    agentIdCached    = recordsRes.agentId ?? null
 
-    renderBufferPanel(recordsRes.baseAmount, attestationCount, tier)
-    renderTierTable(attestationCount)
+    // L4d on-chain mode: pull the authoritative counters from
+    // Escrow.getStats() directly. Falls back to off-chain accounting if
+    // the eth_call fails or no x402.escrow record is present.
+    if (escrowAddrCached) {
+      try {
+        escrowSnapshot = await readEscrowStats(CFG.BASE_SEPOLIA_RPC, escrowAddrCached)
+      } catch (err) {
+        console.error('escrow getStats failed', err)
+        escrowSnapshot = null
+      }
+    } else {
+      escrowSnapshot = null
+    }
+
+    if (escrowSnapshot) {
+      // On-chain: trust attestationCount from the contract (single source).
+      const count = escrowSnapshot.attestationCount
+      const tier = activeTier(count)
+      $('#trust-count').textContent = String(count)
+      const badge = $('#trust-badge')
+      badge.className = `ml-auto px-3 py-1 rounded text-xs font-bold ${tier.bgCls} ${tier.textCls}`
+      badge.textContent = tier.label
+      renderBufferPanelOnChain(escrowSnapshot)
+      renderTierTable(count)
+    } else {
+      // Off-chain accounting (legacy seller9 path)
+      const attestationCount = (receiptsRes ?? []).filter(r => r.tdErc8004Tx).length
+      const tier = activeTier(attestationCount)
+      $('#trust-count').textContent = String(attestationCount)
+      const badge = $('#trust-badge')
+      badge.className = `ml-auto px-3 py-1 rounded text-xs font-bold ${tier.bgCls} ${tier.textCls}`
+      badge.textContent = tier.label
+      renderBufferPanel(recordsRes.baseAmount, attestationCount, tier)
+      renderTierTable(attestationCount)
+    }
+
+    // Repaint claim-button gate every refresh so changes in wallet state
+    // (connect / disconnect / chain switch / NFT transfer) flow through.
+    await refreshClaimGate()
   } catch (err) {
     console.error('dashboard refresh failed', err)
   }
@@ -382,6 +538,7 @@ async function fetchRecords(ens) {
       baseAmount: amount,
       allRecords: records,
       splitter:  records['x402.splitter'] ?? null,
+      escrow:    records['x402.escrow']   ?? null,
       agentId:   records['x402.erc8004.agent_id'] ?? null,
       endpoint:  records['x402.endpoint'] ?? null,
     }
@@ -415,6 +572,13 @@ function renderDashboardHeader(r) {
     splitterEl.textContent = '—'
   }
 
+  const escrowEl = $('#dash-escrow')
+  if (r.escrow) {
+    escrowEl.innerHTML = `<a href="${CFG.BASESCAN_ADDR}${r.escrow}" target="_blank" class="text-blue-400 underline">${trunc(r.escrow)}</a>`
+  } else if (escrowEl) {
+    escrowEl.innerHTML = '<span class="text-gray-600 text-xs italic">legacy (no per-agent escrow)</span>'
+  }
+
   $('#dash-agent-id').textContent = r.agentId ?? '—'
   $('#dash-owner').textContent = '—'  // not returned by flat-records; populated if needed
 }
@@ -427,10 +591,23 @@ function renderTerminalPane(r) {
   $('#terminal-output').textContent = JSON.stringify(snippet, null, 2)
 }
 
-// Risk-buffer accounting: every settlement deposits `bufferPerCallAtomic` into
-// the on-chain risk-buffer EOA. The seller's "claimable" balance is the
-// accrued total times the current tier's release fraction.
+// Risk-buffer accounting (legacy / off-chain mode): every settlement deposits
+// `bufferPerCallAtomic` into the shared risk-buffer EOA. The seller's
+// "claimable" balance is the accrued total times the current tier's release
+// fraction. The on-chain Escrow.getStats() path supersedes this when an
+// x402.escrow record exists; see renderBufferPanelOnChain.
 function renderBufferPanel(baseAmount, attestationCount, tier) {
+  $('#escrow-mode-badge').textContent = 'off-chain accounting'
+  $('#escrow-mode-badge').className = 'text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-gray-800 text-gray-500'
+  $('#buf-row1-label').textContent = 'Per-call buffer'
+  $('#buf-row2-label').textContent = 'Total accrued'
+  $('#buf-row3-label').textContent = 'Released to seller'
+  $('#buf-row4-label').textContent = 'Claimable now'
+  $('#buf-row5-label').classList.add('hidden')
+  $('#buffer-withdrawn').classList.add('hidden')
+  $('#escrow-foot-on').classList.add('hidden')
+  $('#escrow-foot-off').classList.remove('hidden')
+
   const baseAtomic = baseAmount ?? '100000'
   const perCall   = bufferPerCallAtomic(baseAtomic)
   const accrued   = perCall * BigInt(attestationCount)
@@ -439,6 +616,27 @@ function renderBufferPanel(baseAmount, attestationCount, tier) {
   $('#buffer-accrued').textContent  = fmtUsdc(accrued.toString())
   $('#buffer-released').textContent = `${(tier.releaseBps / 100).toFixed(0)}%`
   $('#buffer-claimable').textContent = fmtUsdc(released.toString())
+}
+
+// On-chain mode: counters come straight from Escrow.getStats(). All values
+// reflect actual ERC-20 balance and `totalWithdrawn` state on Base Sepolia.
+function renderBufferPanelOnChain(stats) {
+  $('#escrow-mode-badge').textContent = 'on-chain Escrow'
+  $('#escrow-mode-badge').className = 'text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-900/60 text-amber-200'
+  $('#buf-row1-label').textContent = 'Total deposited'
+  $('#buf-row2-label').textContent = 'Currently held'
+  $('#buf-row3-label').textContent = 'Released to seller'
+  $('#buf-row4-label').textContent = 'Withdrawable now'
+  $('#buf-row5-label').classList.remove('hidden')
+  $('#buffer-withdrawn').classList.remove('hidden')
+  $('#escrow-foot-off').classList.add('hidden')
+  $('#escrow-foot-on').classList.remove('hidden')
+
+  $('#buffer-per-call').textContent = fmtUsdc(stats.totalDeposited.toString())
+  $('#buffer-accrued').textContent  = fmtUsdc(stats.currentlyHeld.toString())
+  $('#buffer-released').textContent = `${(stats.releasedBps / 100).toFixed(0)}%`
+  $('#buffer-claimable').textContent = fmtUsdc(stats.withdrawableNow.toString())
+  $('#buffer-withdrawn').textContent = fmtUsdc(stats.totalWithdrawn.toString())
 }
 
 function renderEnsRecords(records) {
@@ -511,6 +709,159 @@ function renderCallLog(receipts) {
 $('#run-call-btn')?.addEventListener('click', () => {
   window.open(CFG.KH_WORKFLOW_URL, '_blank')
 })
+
+// ─── Wallet connect + claim ──────────────────────────────────────────────
+// We use raw `window.ethereum` so the page works with any EIP-1193 provider
+// (MetaMask, Rabby, OKX, …) without an SDK dependency. The connected
+// account drives the Claim button gate against IdentityRegistry.ownerOf.
+
+let connectedAddress = null
+
+async function connectWallet() {
+  const eth = /** @type {any} */ (window).ethereum
+  if (!eth) {
+    alert('No EIP-1193 wallet detected. Install MetaMask, Rabby, or similar to claim.')
+    return
+  }
+  try {
+    const accounts = await eth.request({ method: 'eth_requestAccounts' })
+    connectedAddress = accounts?.[0]?.toLowerCase() ?? null
+    // Auto-switch to Base Sepolia. Users on the wrong chain can't sign
+    // the withdraw, so we offer the switch up front rather than failing
+    // mid-claim.
+    try {
+      const cur = await eth.request({ method: 'eth_chainId' })
+      if (cur !== BASE_SEPOLIA_CHAIN_ID_HEX) {
+        await eth.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: BASE_SEPOLIA_CHAIN_ID_HEX }],
+        })
+      }
+    } catch (err) {
+      // 4902 = chain not added → ask the wallet to add it
+      if (err?.code === 4902) {
+        await eth.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId:           BASE_SEPOLIA_CHAIN_ID_HEX,
+            chainName:         'Base Sepolia',
+            nativeCurrency:    { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls:           ['https://sepolia.base.org'],
+            blockExplorerUrls: ['https://sepolia.basescan.org'],
+          }],
+        })
+      } else {
+        console.error('chain switch failed', err)
+      }
+    }
+
+    // Pick up provider-side account / chain changes without reloading.
+    eth.on?.('accountsChanged', (accts) => {
+      connectedAddress = accts?.[0]?.toLowerCase() ?? null
+      refreshClaimGate()
+    })
+    eth.on?.('chainChanged', () => refreshClaimGate())
+  } catch (err) {
+    console.error('wallet connect failed', err)
+    alert(`Wallet connect failed: ${err?.message ?? err}`)
+    return
+  }
+  await refreshClaimGate()
+}
+
+// Re-evaluate whether the Claim button + wallet status row should be visible
+// based on:
+//   1. User has connected a wallet (connectedAddress != null)
+//   2. The active dashboard agent has an Escrow + agentId from ENS
+//   3. The connected wallet === IdentityRegistry.ownerOf(agentId)
+//   4. withdrawableNow > 0 from the latest getStats() snapshot
+async function refreshClaimGate() {
+  const btn        = $('#wallet-connect-btn')
+  const statusRow  = $('#wallet-status')
+  const ownerFlag  = $('#wallet-owner-flag')
+  const claimRow   = $('#claim-row')
+  const claimBtn   = $('#claim-btn')
+  const claimAmt   = $('#claim-amount')
+  const claimTo    = $('#claim-to')
+  if (!btn) return
+
+  // Default state: no wallet, hide everything claim-related.
+  if (!connectedAddress) {
+    btn.textContent = 'Connect Wallet'
+    btn.disabled = false
+    statusRow?.classList.add('hidden')
+    claimRow?.classList.add('hidden')
+    return
+  }
+
+  // Wallet connected → show address.
+  btn.textContent = trunc(connectedAddress)
+  btn.disabled = true
+  statusRow?.classList.remove('hidden')
+  $('#wallet-address').textContent = connectedAddress
+
+  // Without an active L4d agent on this dashboard, skip ownership lookup.
+  if (!escrowAddrCached || !agentIdCached) {
+    ownerFlag.innerHTML = '<span class="text-gray-600">(no on-chain Escrow on this agent)</span>'
+    claimRow?.classList.add('hidden')
+    return
+  }
+
+  // Look up IdentityRegistry NFT owner for this agentId — single eth_call.
+  let nftOwner = null
+  try {
+    nftOwner = await readNftOwner(CFG.BASE_SEPOLIA_RPC, IDENTITY_REGISTRY_BASE_SEPOLIA, agentIdCached)
+  } catch (err) {
+    console.error('readNftOwner failed', err)
+    ownerFlag.innerHTML = '<span class="text-red-400">(owner check failed)</span>'
+    claimRow?.classList.add('hidden')
+    return
+  }
+
+  if (nftOwner === connectedAddress) {
+    ownerFlag.innerHTML = '<span class="text-green-400">✓ owner of agent NFT — can claim</span>'
+    // Show + arm the Claim row
+    const w = escrowSnapshot?.withdrawableNow ?? 0n
+    claimRow?.classList.remove('hidden')
+    claimAmt.textContent = fmtUsdc(w.toString())
+    claimTo.textContent  = trunc(connectedAddress)
+    if (claimBtn) claimBtn.disabled = (w === 0n)
+  } else {
+    ownerFlag.innerHTML = `<span class="text-amber-300">connected wallet is not the agent NFT owner (${trunc(nftOwner ?? '—')})</span>`
+    claimRow?.classList.add('hidden')
+  }
+}
+
+async function claimAll() {
+  if (!escrowAddrCached || !connectedAddress) return
+  const eth = /** @type {any} */ (window).ethereum
+  if (!eth) return
+  const statusEl = $('#claim-status')
+  statusEl?.classList.remove('hidden')
+  statusEl.innerHTML = '<span class="text-gray-400">submitting tx…</span>'
+
+  try {
+    const txHash = await eth.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: connectedAddress,
+        to:   escrowAddrCached,
+        data: SEL.withdrawAll,  // no args
+      }],
+    })
+    statusEl.innerHTML =
+      `<span class="text-green-400">✓ tx submitted:</span> ` +
+      `<a href="${CFG.BASESCAN_TX}${txHash}" target="_blank" class="text-blue-400 underline">${trunc(txHash, 8)}</a>`
+    // Poll the dashboard refresh shortly so the new totalWithdrawn lands
+    // visibly without waiting for the 3s heartbeat.
+    setTimeout(refreshDashboard, 4_000)
+  } catch (err) {
+    statusEl.innerHTML = `<span class="text-red-400">claim failed:</span> ${escapeHtml(err?.message ?? String(err))}`
+  }
+}
+
+$('#wallet-connect-btn')?.addEventListener('click', connectWallet)
+$('#claim-btn')?.addEventListener('click', claimAll)
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
 route()

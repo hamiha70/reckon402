@@ -71,6 +71,25 @@
           <span class="text-xs text-gray-600 block mt-1">Charged to the buyer for every paid call. Constant — does not vary with seller reputation.</span>
         </label>
 
+        <!-- L4d on-chain Escrow toggle -->
+        <label class="flex items-start gap-3 bg-gray-950 border border-amber-900/60 rounded p-3 cursor-pointer">
+          <input type="checkbox" name="enableL4dEscrow" id="l4d-toggle" checked
+            class="mt-0.5 h-4 w-4 accent-amber-400" />
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs uppercase tracking-wider text-amber-300 font-bold">On-chain Escrow (L4d)</span>
+              <span class="text-[10px] bg-amber-800/40 text-amber-200 px-1.5 py-0.5 rounded">recommended</span>
+            </div>
+            <div class="text-xs text-gray-300 mt-1 leading-snug">
+              Deploy a per-agent <span class="font-mono text-amber-200">Escrow</span> via <span class="font-mono">EscrowFactory</span> as recipients[2] of the Splitter.
+              The 10% buffer is held on-chain by the agent's own Escrow and the seller claims it directly via <span class="font-mono">withdrawAll()</span> — gated on owning the agent NFT.
+            </div>
+            <div class="text-[10px] text-gray-600 mt-1 leading-snug">
+              Off → legacy 5-step flow (the buffer slice goes to a shared software EOA, accounting is off-chain).
+            </div>
+          </div>
+        </label>
+
         <!-- ERC-8004 identity disclosure -->
         <div class="bg-gray-950 border border-gray-800 rounded p-3">
           <div class="flex items-center justify-between">
@@ -176,10 +195,22 @@
       <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-bold text-green-400" id="dashboard-ens">—</h2>
-          <button id="run-call-btn"
-            class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded font-bold">
-            Run Test Call
-          </button>
+          <div class="flex items-center gap-2">
+            <button id="wallet-connect-btn"
+              class="bg-amber-600 hover:bg-amber-500 text-gray-950 text-sm px-3 py-2 rounded font-bold">
+              Connect Wallet
+            </button>
+            <button id="run-call-btn"
+              class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded font-bold">
+              Run Test Call
+            </button>
+          </div>
+        </div>
+        <!-- Wallet status row — populated by wallet-connect handler -->
+        <div id="wallet-status" class="mb-3 text-xs font-mono hidden">
+          <span class="text-gray-500">connected:</span>
+          <span id="wallet-address" class="text-amber-200 break-all"></span>
+          <span id="wallet-owner-flag" class="ml-2"></span>
         </div>
         <dl class="grid grid-cols-2 gap-3 text-sm">
           <dt class="text-gray-500">Current price</dt>
@@ -188,6 +219,8 @@
           <dd id="dash-agent-id" class="font-mono text-gray-200">—</dd>
           <dt class="text-gray-500">Splitter</dt>
           <dd id="dash-splitter" class="font-mono text-gray-200">—</dd>
+          <dt class="text-gray-500">Escrow</dt>
+          <dd id="dash-escrow" class="font-mono text-gray-200">—</dd>
           <dt class="text-gray-500">Endpoint</dt>
           <dd id="dash-endpoint" class="font-mono text-gray-200 text-xs break-all">—</dd>
           <dt class="text-gray-500">ENS Owner</dt>
@@ -213,32 +246,62 @@
       </details>
 
       <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
-        <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-3">Risk buffer (escrow)</h3>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm uppercase tracking-wider text-gray-500">Risk buffer (escrow)</h3>
+          <span id="escrow-mode-badge"
+            class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-gray-800 text-gray-500">
+            off-chain accounting
+          </span>
+        </div>
         <div class="mb-4 flex items-center gap-3">
           <span class="text-3xl font-bold tabular-nums" id="trust-count">0</span>
           <span class="text-gray-500 text-sm">attestations</span>
           <span id="trust-badge" class="ml-auto px-3 py-1 rounded text-xs font-bold bg-gray-700 text-gray-300">no tier</span>
         </div>
         <dl class="grid grid-cols-2 gap-2 text-sm mb-4">
-          <dt class="text-gray-500">Per-call buffer</dt>
+          <dt class="text-gray-500" id="buf-row1-label">Per-call buffer</dt>
           <dd id="buffer-per-call" class="font-mono text-gray-200">—</dd>
-          <dt class="text-gray-500">Total accrued</dt>
+          <dt class="text-gray-500" id="buf-row2-label">Total accrued</dt>
           <dd id="buffer-accrued" class="font-mono text-amber-200">—</dd>
-          <dt class="text-gray-500">Released to seller</dt>
+          <dt class="text-gray-500" id="buf-row3-label">Released to seller</dt>
           <dd id="buffer-released" class="font-mono text-gray-200">—</dd>
-          <dt class="text-gray-500">Claimable now</dt>
+          <dt class="text-gray-500" id="buf-row4-label">Claimable now</dt>
           <dd id="buffer-claimable" class="font-mono text-green-300 font-bold">—</dd>
+          <dt class="text-gray-500 hidden" id="buf-row5-label">Already withdrawn</dt>
+          <dd id="buffer-withdrawn" class="font-mono text-gray-300 hidden">—</dd>
         </dl>
+
+        <!-- Claim button — only shown when (a) Escrow is configured AND
+             (b) connected wallet matches IdentityRegistry.ownerOf(agentId). -->
+        <div id="claim-row" class="hidden mb-4 flex items-center gap-3 bg-gray-950 border border-amber-900/60 rounded p-3">
+          <div class="flex-1 text-xs">
+            <div class="text-gray-400">Withdraw <span id="claim-amount" class="text-green-300 font-bold font-mono">—</span> to
+              <span id="claim-to" class="text-amber-200 font-mono">—</span></div>
+            <div class="text-[10px] text-gray-600 mt-0.5">Calls <span class="font-mono">Escrow.withdrawAll()</span> via your connected wallet. Gas in ETH on Base Sepolia.</div>
+          </div>
+          <button id="claim-btn"
+            class="bg-amber-500 hover:bg-amber-400 text-gray-950 text-sm px-4 py-2 rounded font-bold disabled:bg-gray-700 disabled:text-gray-500">
+            Claim All
+          </button>
+        </div>
+        <div id="claim-status" class="hidden mb-4 text-xs font-mono"></div>
+
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider">
             <tr><th class="text-left py-1">Attestations</th><th class="text-left py-1">Tier</th><th class="text-right py-1">% buffer released</th></tr>
           </thead>
           <tbody id="tier-table" class="font-mono"></tbody>
         </table>
-        <div class="text-[10px] text-gray-600 mt-3 leading-snug">
-          v1 ships display-only escrow: the 10% buffer slice from every settlement lands in the risk-buffer EOA on-chain.
-          The "claimable" amount above is the off-chain accounting view of what the seller has earned back.
-          On-chain claim contract is v1.5.
+        <div id="escrow-foot-on" class="text-[10px] text-gray-600 mt-3 leading-snug hidden">
+          On-chain Escrow active. Counters above come from a single <span class="font-mono">Escrow.getStats()</span>
+          eth_call to Base Sepolia. The Claim button calls
+          <span class="font-mono">Escrow.withdrawAll()</span> directly — only the holder of the agent NFT
+          (IdentityRegistry tokenId) can authorize it.
+        </div>
+        <div id="escrow-foot-off" class="text-[10px] text-gray-600 mt-3 leading-snug">
+          v1 legacy mode (no per-agent Escrow): the 10% buffer slice lands in a shared risk-buffer EOA on-chain.
+          The "claimable" amount above is an off-chain accounting view; there's no on-chain withdraw path for this agent.
+          Onboard a new agent with the L4d toggle on to flip into on-chain mode.
         </div>
       </div>
 

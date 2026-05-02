@@ -24,7 +24,28 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GATEWAY_URL="${GATEWAY_URL:-https://gateway.reckon402.com}"
 FACILITATOR_URL="${FACILITATOR_URL:-https://facilitator.reckon402.com}"
+AGENT_URL="${AGENT_URL:-https://agent.reckon402.com}"
 SELLER_NAME="${SELLER_NAME:-seller.reckon402-test.eth}"
+
+# Propagate to l3.sh which reads SELLER_ENS (legacy variable name).
+export SELLER_ENS="$SELLER_NAME"
+
+# Read the canonical per-call amount from the live agent's 402 challenge so the
+# buyer signs whatever amount the currently-deployed agent worker advertises.
+# If the challenge can't be parsed, AMOUNT stays unset and buyer-sign-l3.mjs
+# falls back to its hardcoded default (10000 = 0.01 USDC) — preserving legacy
+# behavior for the canonical seller11 / seller (legacy) configurations.
+if [ -z "${AMOUNT:-}" ]; then
+  CHALLENGE_AMOUNT=$(curl -s -D - -o /dev/null --max-time 10 "$AGENT_URL/research" \
+    | grep -i "^payment-required:" | tr -d '\r' | sed -E 's/^[^:]+:[[:space:]]*//' \
+    | base64 -d 2>/dev/null \
+    | python3 -c 'import sys,json; print(json.load(sys.stdin)["accepts"][0]["amount"])' 2>/dev/null \
+    || echo "")
+  if [ -n "$CHALLENGE_AMOUNT" ]; then
+    export AMOUNT="$CHALLENGE_AMOUNT"
+  fi
+fi
+
 STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 RUN_LOG="$SCRIPT_DIR/run-full-flow-l4b-$STAMP.log"
 RESULT_MD="$SCRIPT_DIR/results-full-flow-l4b-$STAMP.md"
@@ -32,7 +53,9 @@ RESULT_MD="$SCRIPT_DIR/results-full-flow-l4b-$STAMP.md"
 echo "=== L4b₁ full-flow + attestation-write integration test ===" | tee "$RUN_LOG"
 echo "Gateway:     $GATEWAY_URL"    | tee -a "$RUN_LOG"
 echo "Facilitator: $FACILITATOR_URL"| tee -a "$RUN_LOG"
+echo "Agent:       $AGENT_URL"      | tee -a "$RUN_LOG"
 echo "Seller:      $SELLER_NAME"    | tee -a "$RUN_LOG"
+echo "Amount:      ${AMOUNT:-<default 10000 from buyer-sign-l3.mjs>}" | tee -a "$RUN_LOG"
 echo "Start:       $STAMP"          | tee -a "$RUN_LOG"
 echo ""                             | tee -a "$RUN_LOG"
 

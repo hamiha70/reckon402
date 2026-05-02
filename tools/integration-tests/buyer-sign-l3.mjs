@@ -27,7 +27,7 @@ import { signPayment, encodeXPaymentHeader } from '../../packages/buyer-sdk/dist
 const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e'
 const NETWORK = 'eip155:84532'
 const CHAIN_ID = 84532
-const AMOUNT = '10000' // 0.01 USDC
+const AMOUNT = process.env.AMOUNT || '10000' // default 0.01 USDC; override via AMOUNT env (e.g. for non-canonical-priced agents)
 
 const BUYER_PK = process.env.BUYER_DEMO_1_PK
 const BUYER_ADDRESS = process.env.BUYER_DEMO_1_ADDRESS
@@ -59,7 +59,7 @@ const signed = await signPayment({
 
 console.error(`[buyer-sign-l3] buyer=${signed.authorization.from}`)
 console.error(`[buyer-sign-l3] splitter=${signed.authorization.to}`)
-console.error(`[buyer-sign-l3] amount=${AMOUNT} (0.01 USDC)`)
+console.error(`[buyer-sign-l3] amount=${AMOUNT}`)
 console.error(`[buyer-sign-l3] nonce=${signed.authorization.nonce}`)
 console.error(`[buyer-sign-l3] validBefore=${signed.authorization.validBefore}`)
 console.error(`[buyer-sign-l3] paymentId=${signed.paymentId}`)

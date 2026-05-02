@@ -23,7 +23,7 @@ After every `CONFIRMED` payment the facilitator worker writes a `ReputationRegis
 
 ### ENS-Resolved Pricing That Reads Reputation Back
 
-The gateway at `https://gateway.reckon402.com` implements EIP-3668 + ENSIP-10 wildcard resolution via `ezccip.js`. The on-chain resolver (`Reckon402Resolver` at `0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a` on Ethereum Sepolia) encodes `msg.sender` into `callData` (CCIP-Read Pattern A), so vanilla `viem` and `wagmi` clients work without custom code. The gateway decodes the caller, reads the `ReputationRegistry` on Base Sepolia to find the SellingAgent's attestation count, maps that count to a risk tier, and applies Reckon402's risk-adjusted routing fee before returning a signed `x402.amount` record. The demo SellingAgent (`seller11.reckon402-test.eth`) has accumulated 5 attestations and is in the **T2 tier**: 10% routing-fee reduction applied, BuyingAgent pays `90000` (0.090 USDC). An unknown SellingAgent at the same base price would route at `100000` (0.10 USDC) — the extra 11% is Reckon402's risk fee on an unverified counterparty.
+The gateway at `https://gateway.reckon402.com` implements EIP-3668 + ENSIP-10 wildcard resolution via `ezccip.js`. The on-chain resolver (`Reckon402Resolver` at `0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a` on Ethereum Sepolia) encodes `msg.sender` into `callData` (CCIP-Read Pattern A), so vanilla `viem` and `wagmi` clients work without custom code. The gateway decodes the caller, reads the `ReputationRegistry` on Base Sepolia to find the SellingAgent's attestation count, and returns it as a signed `x402.amount` record. That count is the trust signal: downstream of the gateway it drives the SellingAgent's per-agent on-chain Escrow release schedule via a pluggable `ITierStrategy`. The v1 default `LinearMonotonicTierStrategy` ships thresholds `[0, 1, 3, 10, 30, 100, 300, 1000]` and release BPS `[0, 500, 1500, 3000, 5000, 7000, 8500, 10000]`. The demo SellingAgent (`seller11.reckon402-test.eth`) has accumulated 5 on-chain attestations and sits at tier T2 with `releasedBps = 1500`.
 
 ### SellingAgent Onboarding in ~60 Seconds
 
@@ -81,7 +81,7 @@ The seller11 demo proves the loop end-to-end: 5 paid calls × 0.01 USDC → 5 fa
 - **EscrowFactory v1 (Base Sepolia):** `0xb06998682bd716e0864257b3ac3aa1fc4cc64589`
 - **LinearMonotonicTierStrategy v1 (Base Sepolia):** `0xc498155bc4a2e4ba979ad5797298107c63b26c4e` — thresholds `[0, 1, 3, 10, 30, 100, 300, 1000]`, release BPS `[0, 500, 1500, 3000, 5000, 7000, 8500, 10000]`
 - **seller11 per-agent Escrow (Base Sepolia):** `0x863d2105B57Cb98129B68b934FF5708DC9432aAA` — agentId `5423`, NFT-bound to `0xD53ffac42496d73B3Faf946786688a8454F57b1f`
-- **Demo SellingAgent reputation:** 5 on-chain attestations → T2 tier (10% routing-fee reduction), live price `0.090 USDC`
+- **Demo SellingAgent reputation:** 5 on-chain attestations → T2 tier (`releasedBps = 1500`); the count is the trust signal driving the per-agent Escrow release schedule
 - **First on-chain claim tx (`Escrow.withdrawAll()`):** `0x5c92bb439abe5d2a831f4b279997bbf383aff93d9ade376d3d15c95aaa2c820a` — released 750 atomic (`0.000750 USDC`) to the seller after the tier walked to T2
 - **npm org:** https://www.npmjs.com/org/reckon402
 - **First live ERC-8004 attestation tx (Base Sepolia):** `0xf3fd14044152cb9a15912b030c9209a69ce7aa5687c32937f4c07ce142ab61e2`
@@ -97,7 +97,7 @@ The seller11 demo proves the loop end-to-end: 5 paid calls × 0.01 USDC → 5 fa
 
 ### Delivery-Proof: Volume Cap vs Per-Transaction Truth
 
-Today's settlement attestation caps fraud volume. A SellingAgent with a strong on-chain reputation cannot commit unlimited fraud without eventually losing tier status — the attestation count is bounded by paid settlements, and a SellingAgent that delivers nothing eventually stops receiving discounted prices. But attestations do not prove that a specific paid request was correctly delivered; fraud is possible inside the paid set.
+Today's settlement attestation caps fraud volume. A SellingAgent with a strong on-chain reputation cannot commit unlimited fraud without eventually losing tier status — the attestation count is bounded by paid settlements, and a SellingAgent that delivers nothing eventually stops accumulating the trust signal that downstream consumers read. But attestations do not prove that a specific paid request was correctly delivered; fraud is possible inside the paid set.
 
 Post-hackathon, Reckon402 closes this per-transaction gap via a **BuyingAgent-side delivery-proof SDK** using Reclaim Protocol (`@reclaimprotocol/zk-fetch`) zkTLS. A BuyingAgent that receives a failed or incorrect paid response generates a zkTLS proof of the failure (proof generation runs off the critical settlement path, ~4s, Node ≥18) and submits it post-facto to the facilitator. The facilitator writes a **negative ERC-8004 attestation** against the SellingAgent's `agentId`, which **unlocks Escrow withdrawal back to the buyer** for the disputed amount. This closes the exact gap that settlement-caps leave open: settlement caps fraud *volume*; delivery-proof catches fraud *inside the paid set*.
 
@@ -124,7 +124,7 @@ ENS is not cosmetic here. `seller11.reckon402-test.eth` is the SellingAgent's id
 
 Reckon402 ships:
 - **`@reckon402/kh-skill`** (`packages/kh-skill/`, workspace stub at `@0.1.0`, marked private as a post-hackathon stub): a KeeperHub workflow node reference implementation that wraps `@reckon402/buyer-sdk`. Demonstrates Focus Area 2 (Payments) — KeeperHub workflows paying x402-priced APIs autonomously.
-- **`recipes/kh-workflow.json`**: A workflow JSON recipe showing three sequential paid calls to `agent.reckon402.com/research`, demonstrating the reputation-growth loop (0% → 5% → 10% → 15% discount as attestations accumulate).
+- **`recipes/kh-workflow.json`**: A workflow JSON recipe showing three sequential paid calls to `agent.reckon402.com/research`, demonstrating the closed-loop attestation-growth flow that drives the SellingAgent's per-agent Escrow release behavior.
 
 **Builder Feedback (`FEEDBACK.md`):** Four concrete gaps found while integrating KeeperHub:
 1. In-sandbox EIP-712 typed-data signing is a hard blocker for x402 buyer flows. We built around it with an AWS Lambda + KMS signing wrapper (`signing.reckon402.com`); a first-party KH signing primitive would make this a one-line integration.

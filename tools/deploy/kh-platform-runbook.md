@@ -8,9 +8,13 @@ Target platform: `app.keeperhub.com`
 ## Background
 
 The `recipes/kh-workflow.json` defines a three-call sequential workflow
-("Reckon402 ResearchAgent") demonstrating ERC-8004 reputation growth and
-tier-based discount pricing. It must be imported into the KeeperHub platform
-so judges can discover and run it from the Hub.
+("Reckon402 ResearchAgent") demonstrating the closed-loop trust-signal flow
+on Base Sepolia: every confirmed x402 settlement writes a facilitator-signed
+ERC-8004 attestation, and the gateway reads that count back via CCIP-Read on
+the next call. The published KH workflow is a manual-trigger discovery
+anchor; the executable buyer flow signs EIP-712 payloads via the signing
+wrapper at `signing.reckon402.com`. It must be imported into the KeeperHub
+platform so judges can discover and run it from the Hub.
 
 ---
 

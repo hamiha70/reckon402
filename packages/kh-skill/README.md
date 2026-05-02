@@ -113,9 +113,11 @@ X-Api-Key: <SIGNING_WRAPPER_API_KEY>
 Import [`recipes/kh-workflow.json`](https://github.com/hamiha70/reckon402/blob/main/recipes/kh-workflow.json)
 into [app.keeperhub.com](https://app.keeperhub.com) as a new workflow.
 The workflow defines three sequential `reckon402-buyer` nodes demonstrating
-ERC-8004 reputation growth and tier-based discount pricing: base price →
-5% discount → 10% discount as on-chain attestations accumulate from real
-USDC settlements on Base.
+the closed-loop trust signal: each confirmed x402 settlement writes a
+facilitator-signed ERC-8004 attestation on Base, and the next ENS lookup
+reads the updated count back through CCIP-Read. That count drives the
+SellingAgent's per-agent on-chain Escrow release schedule via a pluggable
+`ITierStrategy`.
 
 ### KeeperHub workflow node shape
 
@@ -138,8 +140,9 @@ USDC settlements on Base.
 
 Set `SIGNING_WRAPPER_API_KEY` in the workflow's secret store — do not paste
 the plaintext value into the config. Subsequent nodes can set
-`"amount_usdc": null` to let the gateway return the tier-discounted price
-that reflects the previous settlement's ERC-8004 attestation.
+`"amount_usdc": null` to let the gateway return the live signed
+`x402.amount` that reflects the SellingAgent's updated ERC-8004
+attestation count.
 
 ## End-to-end flow
 
@@ -154,8 +157,9 @@ KH workflow node ("reckon402-buyer")
 ```
 
 Each settled call writes an ERC-8004 `NewFeedback` event to the Base
-`ReputationRegistry`. The gateway reads the updated reputation on the
-next call and returns the discounted price automatically.
+`ReputationRegistry`. The gateway reads the updated attestation count on
+the next call and returns it as a signed `x402.amount`; downstream the
+same count drives the SellingAgent's per-agent Escrow release schedule.
 
 ## Links
 

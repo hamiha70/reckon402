@@ -18,6 +18,7 @@ help:
     @echo "  just deploy-gateway-staging Deploy gateway-staging.reckon402.com Worker"
     @echo "  just deploy-orchestrator    Deploy app.reckon402.com Worker (bundles apps/frontend/dist as assets)"
     @echo "  just deploy-all             Deploy all six production Workers in sequence"
+    @echo "  just fork-tests-all         Run L3 + L4d Foundry fork tests vs live Base Sepolia"
 
 # Show available recipes
 default:
@@ -115,6 +116,30 @@ onboard-l4d ensName sellerEoa endpoint='https://agent.reckon402.com/research' am
 # and 08B orchestrator + gateway admin routes live.
 fullflow-l4c-onboard:
     {{secrets}} bash tools/integration-tests/run-l4c-onboard.sh
+
+# Run the L4d Escrow fork tests against live Base Sepolia. Forks the chain
+# at the latest block, registers a fresh ERC-8004 agentId on the real
+# IdentityRegistry, deploys factory + tier strategy + per-agent Escrow,
+# distributes USDC, walks tiers via real giveFeedback() calls, and
+# withdraws as the NFT owner. Also runs read-only sanity assertions on
+# the live seller11 Escrow + EscrowFactory immutables.
+#
+# Default `forge test` does NOT exercise these (gated on L4D_FORK_TEST=1)
+# so offline runs stay green and fast.
+fork-test-l4d:
+    {{secrets}} bash -c 'cd contracts && L4D_FORK_TEST=1 forge test --fork-url "$BASE_SEPOLIA_RPC_PRIMARY" --match-contract EscrowForkTest -vv'
+
+# Run the L3 Splitter fork test against live Base Sepolia. Forks the chain,
+# signs an EIP-3009 transferWithAuthorization for a freshly-deployed
+# Splitter, broadcasts it via the real USDC contract on the fork, then
+# distributes and asserts the BPS-correct deltas. Same gating pattern as
+# fork-test-l4d above.
+fork-test-l3:
+    {{secrets}} bash -c 'cd contracts && SPLITTER_FORK_TEST=1 forge test --fork-url "$BASE_SEPOLIA_RPC_PRIMARY" --match-contract SplitterForkTest -vv'
+
+# Run BOTH fork suites in sequence. Useful as a pre-submission gate to
+# prove the contracts integrate end-to-end with live registries.
+fork-tests-all: fork-test-l3 fork-test-l4d
 
 # Deploy reckon402.com landing Worker (no package.json — uses npx)
 deploy-landing:

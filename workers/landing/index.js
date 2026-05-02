@@ -170,16 +170,20 @@ function renderEnsPage() {
       <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Why ENS is load-bearing here</h2>
       <p class="text-gray-300 text-sm leading-relaxed mb-3">
         ENS is not cosmetic in Reckon402. <code class="inline">seller11.reckon402-test.eth</code> is the
-        SellingAgent's identity AND Reckon402's risk-routing oracle simultaneously. The same ENS name
-        returns a different routed price as on-chain reputation accumulates — the gateway resolves
-        <code class="inline">x402.amount</code> by reading the ERC-8004 attestation count live and
-        passing it through the configured <code class="inline">ITierStrategy</code>.
+        SellingAgent's identity AND the on-chain anchor that wires every settlement into the
+        per-agent Escrow + tier-strategy contracts. The buyer-facing price
+        (<code class="inline">x402.amount</code>) stays constant; what walks with on-chain reputation
+        is how much of the Escrow buffer the seller can <em>withdraw</em>. Each paid call grows the
+        SellingAgent's ERC-8004 attestation count; the next call reads it back through CCIP-Read
+        and the configured <code class="inline">ITierStrategy</code> recomputes the released BPS in
+        the agent's Escrow.
       </p>
       <ul class="text-gray-300 text-sm leading-relaxed space-y-2 list-none">
         <li class="flex gap-2"><span class="text-blue-400 shrink-0">›</span><span>ENSIP-10 wildcard subnames under <code class="inline">reckon402-test.eth</code>, one per SellingAgent</span></li>
         <li class="flex gap-2"><span class="text-blue-400 shrink-0">›</span><span>EIP-3668 CCIP-Read with <code class="inline">msg.sender</code> in <code class="inline">callData</code> (Pattern A) — vanilla viem and wagmi clients work without custom code</span></li>
-        <li class="flex gap-2"><span class="text-blue-400 shrink-0">›</span><span>ENSIP-25 text records (<code class="inline">x402.erc8004.registry</code>, <code class="inline">x402.erc8004.agent_id</code>) create the canonical ENS↔ERC-8004 binding at SellingAgent onboarding</span></li>
+        <li class="flex gap-2"><span class="text-blue-400 shrink-0">›</span><span>ENSIP-25 text records (<code class="inline">x402.erc8004.registry</code>, <code class="inline">x402.erc8004.agent_id</code>, <code class="inline">x402.escrow</code>) create the canonical ENS↔ERC-8004↔Escrow binding at SellingAgent onboarding</span></li>
         <li class="flex gap-2"><span class="text-blue-400 shrink-0">›</span><span>Gateway-enforced ACL splits ownership: SellingAgent-owned keys cannot be silently overwritten by the platform</span></li>
+        <li class="flex gap-2"><span class="text-blue-400 shrink-0">›</span><span>The same ENS name resolves the agent's <em>tier</em> as reputation grows — not the price the buyer pays</span></li>
       </ul>
     </section>
 
@@ -273,10 +277,10 @@ curl -s https://gateway.reckon402.com/healthz</pre>
 
   return renderShell({
     title: 'ENS',
-    description: 'ENS as the SellingAgent identity AND the trust-routing oracle. CCIP-Read returns a risk-adjusted x402.amount computed from live ERC-8004 attestations.',
+    description: 'ENS as the SellingAgent identity AND the on-chain anchor for the per-agent Escrow + tier-strategy. The trust signal walks the Escrow withdrawal BPS, not the buyer-facing price.',
     eyebrow: 'ETHGlobal OpenAgents 2026 · ENS prize tracks',
-    heading: 'ENS as identity AND trust-routing oracle.',
-    subheading: 'Best ENS Integration for AI Agents · Most Creative Use of ENS. Same ENS name returns a different routed price as on-chain reputation accumulates — the gateway reads ERC-8004 live and passes the count through a pluggable ITierStrategy.',
+    heading: 'ENS as identity AND escrow-tier anchor.',
+    subheading: 'Best ENS Integration for AI Agents · Most Creative Use of ENS. The same ENS name resolves the agent\'s tier as on-chain reputation accumulates — the gateway reads ERC-8004 live and passes the count through a pluggable ITierStrategy that controls the per-agent Escrow\'s withdrawable BPS. The buyer-facing price stays constant.',
     accentColor: 'blue',
     body,
   });

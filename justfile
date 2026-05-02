@@ -94,6 +94,23 @@ onboard ensName sellerEoa endpoint='https://agent.reckon402.com/research' amount
       --endpoint {{endpoint}} \
       --amount {{amount}}
 
+# L4d — onboard a fresh SellingAgent via the 6-step CLI with a per-agent
+# on-chain Escrow. ENS mint -> ERC-8004 agentId -> Escrow deploy -> 3-recipient
+# Splitter (seller / facilitator-fee / Escrow) -> ENS records (incl. x402.escrow)
+# -> gateway seed + ENS ownership transfer.
+#
+# Requires Infisical secrets: ESCROW_FACTORY_ADDRESS, TIER_STRATEGY_ADDRESS,
+# FACILITATOR_FEE_EOA — pinned to the L4d-strategy-deployed canonical addresses.
+#
+# Usage: just onboard-l4d <ensName> <sellerEoa> [endpoint] [amount]
+onboard-l4d ensName sellerEoa endpoint='https://agent.reckon402.com/research' amount='100000':
+    {{secrets}} pnpm -C tools/onboard exec tsx src/cli.ts \
+      --name {{ensName}} \
+      --seller-eoa {{sellerEoa}} \
+      --endpoint {{endpoint}} \
+      --amount {{amount}} \
+      --enable-l4d-escrow
+
 # L4c — live full-flow onboard + paid-call smoke. Assumes 08A factory deployed
 # and 08B orchestrator + gateway admin routes live.
 fullflow-l4c-onboard:

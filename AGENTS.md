@@ -1493,7 +1493,7 @@ artefacts of the onboarding run.
 | `releasedBps` after 5 rounds | `1500` (15%) |
 | `withdrawableNow` after 5 rounds | `750` atomic = `0.000750` USDC |
 | Gateway-side discount BEFORE | `100000` (base) |
-| Gateway-side discount AFTER | `90000` (T2, 15% off) |
+| Gateway-side discount AFTER | `90000` (T2, 10% off) |
 | Frontend dashboard | renders all 7 counters from `Escrow.getStats()` via raw `eth_call`; tier table highlights the active row |
 
 Per-round artefacts in

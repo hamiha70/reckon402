@@ -239,6 +239,36 @@ async function readSplitterRecipients(rpcUrl, splitterAddr) {
 }
 
 // ─── Routing (hash-based) ─────────────────────────────────────────────────
+//
+// Two views, two top-nav links:
+//   #/                                  → onboarding form  (`onboard` link)
+//   #/agent/<ensName>                   → dashboard for that agent
+//   #/agent/                            → redirect to the last-viewed agent,
+//                                         falling back to DEFAULT_AGENT_ENS.
+//
+// The dashboard nav link's href stays sticky to the last visited agent so
+// the toggle "dashboard ↔ onboard" works as a back-and-forth without ever
+// landing on an empty hash.
+
+const DEFAULT_AGENT_ENS = 'seller20.reckon402-test.eth'
+// Key suffix is bumped whenever the canonical demo agent rotates, so stale
+// sessionStorage from prior testing sessions is silently invalidated.
+const LAST_AGENT_KEY    = 'reckon402:lastAgentEns:v2'
+
+function getLastAgentEns() {
+  try {
+    return sessionStorage.getItem(LAST_AGENT_KEY) || DEFAULT_AGENT_ENS
+  } catch {
+    return DEFAULT_AGENT_ENS
+  }
+}
+function rememberAgentEns(ens) {
+  if (!ens) return
+  try { sessionStorage.setItem(LAST_AGENT_KEY, ens) } catch { /* private mode etc. */ }
+  const dashLink = $('#nav-dashboard')
+  if (dashLink) dashLink.setAttribute('href', `#/agent/${encodeURIComponent(ens)}`)
+}
+
 function activate(viewId) {
   for (const v of $$('.view')) v.classList.remove('active')
   const el = $(`#${viewId}`)
@@ -250,15 +280,26 @@ async function route() {
   if (h.startsWith('#/agent/')) {
     const ens = decodeURIComponent(h.slice('#/agent/'.length))
     if (ens) {
+      rememberAgentEns(ens)
       activate('view-dashboard')
       startDashboard(ens)
       return
     }
+    // Empty agent path → redirect to the last-viewed agent. Use replace so
+    // the empty-hash entry doesn't pollute browser history (back button stays
+    // useful).
+    const fallback = getLastAgentEns()
+    location.replace(`#/agent/${encodeURIComponent(fallback)}`)
+    return
   }
   activate('view-onboard')
   stopDashboard()
 }
 window.addEventListener('hashchange', route)
+
+// Sync the dashboard nav link to the last-viewed agent (or default) on first
+// load so a fresh visitor's first click goes somewhere meaningful.
+rememberAgentEns(getLastAgentEns())
 
 // ─── Onboarding form ──────────────────────────────────────────────────────
 const form = $('#onboard-form')

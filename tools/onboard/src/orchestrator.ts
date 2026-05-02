@@ -10,6 +10,9 @@ import {
 import {
   registerAgentId, makeRegisterAgentIdClients, type RegisterAgentIdClients,
 } from './steps/register-agent-id.js'
+import {
+  deployEscrow, makeDeployEscrowClients, type DeployEscrowClients,
+} from './steps/deploy-escrow.js'
 import { setEnsRecords } from './steps/set-ens-records.js'
 import { seedGateway } from './steps/seed-gateway.js'
 
@@ -18,13 +21,43 @@ export interface StepPlugins {
   makeEnsClients?:      (rpcUrl: string, pk: `0x${string}`) => MintSubnameClients
   makeSplitterClients?: (rpcUrl: string, pk: `0x${string}`) => DeploySplitterClients
   makeIdentityClients?: (rpcUrl: string, pk: `0x${string}`) => RegisterAgentIdClients
+  makeEscrowClients?:   (rpcUrl: string, pk: `0x${string}`) => DeployEscrowClients
   fetchImpl?:           typeof fetch
 }
 
+// L4d on-chain Escrow constants — pinned per AGENTS.md "L4b framing lock"
+// + the L4d feedback-tag convention. The orchestrator passes these to
+// every Escrow it deploys in v1; future versions may make them per-agent.
+const L4D_ATTESTATION_TAG1 = 'payment'
+const L4D_ATTESTATION_TAG2 = 'x402-settlement'
+
+// L4d 3-way Splitter BPS — locked at the L4d-pre-onchain-baseline -> L4d
+// economic-model rewrite. Sums to 10_000.
+const L4D_SELLER_BPS          = 8700
+const L4D_FACILITATOR_FEE_BPS = 300
+const L4D_ESCROW_BPS          = 1000
+
 /**
- * Orchestrate the 5-step onboarding flow. Each step emits a progress blob to
- * `args.progressSink`. If any step throws, the orchestrator records the error
- * on that step and rethrows — no rollback, no retry (per spec §3.7).
+ * Orchestrate the onboarding flow. The flow shape depends on
+ * `args.enableL4dEscrow`:
+ *
+ * - `false` / unset (legacy):
+ *     1. Mint ENS subname
+ *     2. Deploy Splitter via factory
+ *     3. Register ERC-8004 agentId
+ *     4. Set ENS records (gateway bootstrap)
+ *     5. Seed gateway + transfer ENS ownership
+ *
+ * - `true` (L4d on-chain Escrow path):
+ *     1. Mint ENS subname
+ *     2. Register ERC-8004 agentId            <-- moved up from legacy step 3
+ *     3. Deploy Escrow via factory             <-- NEW
+ *     4. Deploy Splitter via factory           <-- 3-recipient: [seller, facilitator-fee, escrow]
+ *     5. Set ENS records (gateway bootstrap)   <-- now includes x402.escrow
+ *     6. Seed gateway + transfer ENS ownership
+ *
+ * If any step throws, the orchestrator records the error on that step and
+ * rethrows — no rollback, no retry (per spec §3.7).
  */
 export async function runOnboard(
   env: OnboardEnv,
@@ -45,9 +78,6 @@ export async function runOnboard(
     env.BASE_SEPOLIA_RPC_PRIMARY,
     env.RECKON402_DEPLOYER_PK,
   )
-  // Identity registration uses the seller's key so the agentId is minted
-  // directly to the seller — no safeTransferFrom needed (the IdentityRegistry
-  // does not support standard ERC-721 transfers).
   const identityClients = (plugins.makeIdentityClients ?? makeRegisterAgentIdClients)(
     env.BASE_SEPOLIA_RPC_PRIMARY,
     env.RECKON402_ONBOARDING_PK,
@@ -55,9 +85,6 @@ export async function runOnboard(
   const deployerAddress = identityClients.wallet.account!.address as `0x${string}`
 
   const fetchImpl = plugins.fetchImpl ?? fetch
-
-  const recipients = args.recipients ?? [args.sellerEoa]
-  const bps        = args.bps        ?? [10_000]
 
   async function step<T>(
     id: StepId,
@@ -83,7 +110,8 @@ export async function runOnboard(
     }
   }
 
-  // Step 1 — mint ENS subname (funder keeps ownership for bootstrap window)
+  // Step 1 — mint ENS subname (funder keeps ownership for bootstrap window).
+  // Same in both flows.
   const mintRes = await step(1, 'Mint ENS subname', async () => {
     const r = await mintSubname(ensClients, {
       parentName: args.parentName,
@@ -98,6 +126,164 @@ export async function runOnboard(
       note: `subname=${args.name}`,
     }
   })
+
+  if (args.enableL4dEscrow) {
+    // ─── L4d 6-step on-chain-Escrow flow ──────────────────────────────────
+    if (!env.ESCROW_FACTORY_ADDRESS || !env.TIER_STRATEGY_ADDRESS || !env.FACILITATOR_FEE_EOA) {
+      throw new Error(
+        'enableL4dEscrow=true requires env.ESCROW_FACTORY_ADDRESS, ' +
+        'env.TIER_STRATEGY_ADDRESS, and env.FACILITATOR_FEE_EOA. ' +
+        'Update the orchestrator worker wrangler.toml [vars] block.',
+      )
+    }
+
+    const escrowClients = (plugins.makeEscrowClients ?? makeDeployEscrowClients)(
+      env.BASE_SEPOLIA_RPC_PRIMARY,
+      env.RECKON402_DEPLOYER_PK,
+    )
+
+    // Step 2 (L4d) — register ERC-8004 agentId BEFORE Escrow + Splitter so
+    // we have agentId for the Escrow's CREATE2 prediction.
+    const identityRes = await step(2, 'Register ERC-8004 agentId', async () => {
+      const r = await registerAgentId(identityClients, {
+        identityRegistry: env.IDENTITY_REGISTRY_BASE_SEPOLIA,
+        tokenURI:         `${env.GATEWAY_BASE_URL}/agents/${encodeURIComponent(args.name)}/metadata.json`,
+        deployerEoa:      deployerAddress,
+        sellerEoa:        args.sellerEoa,
+      })
+      return {
+        result:       r,
+        txHash:       r.agentRegisterTx,
+        externalLink: r.externalLink,
+        note:         `agentId=${r.agentId}`,
+      }
+    })
+
+    // Step 3 (L4d) — deploy per-agent Escrow at a deterministic CREATE2
+    // address derived from (agentId, facilitatorClient, tierStrategy,
+    // tag1, tag2, salt=keccak256(ensName)).
+    const escrowRes = await step(3, 'Deploy Escrow via factory', async () => {
+      const r = await deployEscrow(escrowClients, {
+        factoryAddress:    env.ESCROW_FACTORY_ADDRESS!,
+        ensName:           args.name,
+        agentId:           identityRes.agentId,
+        facilitatorClient: env.FACILITATOR_FEE_EOA!,
+        tierStrategy:      env.TIER_STRATEGY_ADDRESS!,
+        tag1:              L4D_ATTESTATION_TAG1,
+        tag2:              L4D_ATTESTATION_TAG2,
+      })
+      return {
+        result:       r,
+        txHash:       r.escrowDeployTx ?? undefined,
+        externalLink: r.externalLink,
+        note:         `escrow=${r.escrow}`,
+      }
+    })
+
+    // Step 4 (L4d) — deploy Splitter with 3 recipients:
+    //   [0] seller             — 87% (where the agent's revenue lands)
+    //   [1] facilitator-fee    —  3% (Reckon402 fee EOA)
+    //   [2] escrow             — 10% (drips out via the tier ramp)
+    const l4dRecipients: `0x${string}`[] = [
+      args.sellerEoa,
+      env.FACILITATOR_FEE_EOA!,
+      escrowRes.escrow,
+    ]
+    const l4dBps = [L4D_SELLER_BPS, L4D_FACILITATOR_FEE_BPS, L4D_ESCROW_BPS]
+
+    const splitterRes = await step(4, 'Deploy Splitter via factory', async () => {
+      const r = await deploySplitter(splitterClients, {
+        factoryAddress: env.SPLITTER_FACTORY_ADDRESS,
+        ensName:        args.name,
+        sellerEoa:      args.sellerEoa,
+        recipients:     l4dRecipients,
+        bps:            l4dBps,
+      })
+      return {
+        result:       r,
+        txHash:       r.splitterDeployTx ?? undefined,
+        externalLink: r.externalLink,
+        note:         `splitter=${r.splitter}`,
+      }
+    })
+
+    // Step 5 (L4d) — ENS records (now includes x402.escrow).
+    const records: Record<string, string> = {
+      'x402.splitter':         splitterRes.splitter,
+      'x402.escrow':           escrowRes.escrow,
+      'x402.facilitator':      env.FACILITATOR_BASE_URL,
+      'x402.erc8004.registry': `eip155:${env.CHAIN_ID_BASE_SEPOLIA}:${env.IDENTITY_REGISTRY_BASE_SEPOLIA}`,
+      'x402.erc8004.agent_id': identityRes.agentId.toString(),
+      'x402.endpoint':         args.endpoint,
+      'x402.amount':           args.amount,
+      'x402.pricing':          JSON.stringify({ discount_bps: 0 }),
+      'x402.asset':            `eip155:${env.CHAIN_ID_BASE_SEPOLIA}/erc20:0x036CbD53842c5426634e7929541eC2318f3dCF7e`,
+      'x402.scheme':           'eip3009',
+      'x402.version':          '2',
+      'x402.attestation':      'on',
+      'x402.yield':            'none',
+    }
+    await step(5, 'Set ENS records (gateway bootstrap)', async () => {
+      const r = await setEnsRecords({
+        gatewayBaseUrl: env.GATEWAY_BASE_URL,
+        ensName:        args.name,
+        records,
+        onboardingPk:   env.RECKON402_ONBOARDING_PK,
+      }, { fetch: fetchImpl })
+      return {
+        result:       r,
+        externalLink: r.externalLink,
+        note:         `records=${Object.keys(records).length}`,
+      }
+    })
+
+    // Step 6 (L4d) — seed gateway agent_id_index + final subnode transfer.
+    await step(6, 'Seed gateway + transfer ENS ownership', async () => {
+      await seedGateway({
+        gatewayBaseUrl: env.GATEWAY_BASE_URL,
+        ensName:        args.name,
+        chainId:        env.CHAIN_ID_BASE_SEPOLIA,
+        agentId:        identityRes.agentId,
+        records,
+        onboardingPk:   env.RECKON402_ONBOARDING_PK,
+      }, { fetch: fetchImpl })
+
+      const transferTx = await transferSubnodeOwnership(
+        ensClients,
+        mintRes.subnode,
+        args.sellerEoa,
+      )
+      return {
+        result: { transferTx },
+        txHash: transferTx,
+        externalLink: `https://sepolia.etherscan.io/tx/${transferTx}`,
+        note: 'owner=seller',
+      }
+    })
+
+    const lastStep = steps[steps.length - 1]
+    const finalTransferTx = (lastStep?.txHash ?? null) as `0x${string}` | null
+
+    return {
+      ensName:                args.name,
+      sellerEoa:              args.sellerEoa,
+      agentId:                identityRes.agentId,
+      splitter:               splitterRes.splitter,
+      splitterDeployTx:       splitterRes.splitterDeployTx,
+      escrow:                 escrowRes.escrow,
+      escrowDeployTx:         escrowRes.escrowDeployTx,
+      subnameRegisterTx:      mintRes.subnameRegisterTx,
+      subnameOwnerTransferTx: finalTransferTx,
+      agentRegisterTx:        identityRes.agentRegisterTx,
+      agentTransferTx:        identityRes.agentTransferTx,
+      steps,
+    }
+  }
+
+  // ─── Legacy 5-step flow (seller9-compatible) ──────────────────────────────
+
+  const recipients = args.recipients ?? [args.sellerEoa]
+  const bps        = args.bps        ?? [10_000]
 
   // Step 2 — deploy Splitter via factory
   const splitterRes = await step(2, 'Deploy Splitter via factory', async () => {
@@ -132,7 +318,7 @@ export async function runOnboard(
     }
   })
 
-  // Step 4 — set ENS records via gateway /admin/bootstrap (signed by onboarding key)
+  // Step 4 — set ENS records via gateway /admin/bootstrap
   const records: Record<string, string> = {
     'x402.splitter':         splitterRes.splitter,
     'x402.facilitator':      env.FACILITATOR_BASE_URL,
@@ -172,7 +358,6 @@ export async function runOnboard(
       onboardingPk:   env.RECKON402_ONBOARDING_PK,
     }, { fetch: fetchImpl })
 
-    // Final ownership transfer to the seller — closes the bootstrap window.
     const transferTx = await transferSubnodeOwnership(
       ensClients,
       mintRes.subnode,
@@ -186,8 +371,6 @@ export async function runOnboard(
     }
   })
 
-  // Last transferTx was captured but not returned from step() generically.
-  // Recover from the last step blob.
   const lastStep = steps[steps.length - 1]
   const finalTransferTx = (lastStep?.txHash ?? null) as `0x${string}` | null
 
@@ -197,6 +380,8 @@ export async function runOnboard(
     agentId:                identityRes.agentId,
     splitter:               splitterRes.splitter,
     splitterDeployTx:       splitterRes.splitterDeployTx,
+    escrow:                 null,                  // legacy flow does NOT deploy an escrow
+    escrowDeployTx:         null,
     subnameRegisterTx:      mintRes.subnameRegisterTx,
     subnameOwnerTransferTx: finalTransferTx,
     agentRegisterTx:        identityRes.agentRegisterTx,

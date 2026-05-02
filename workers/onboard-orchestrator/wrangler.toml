@@ -29,6 +29,14 @@ GATEWAY_BASE_URL         = "https://gateway.reckon402.com"
 FACILITATOR_BASE_URL     = "https://facilitator.reckon402.com"
 CHAIN_ID_BASE_SEPOLIA    = "84532"
 
+# L4d on-chain Escrow factory + per-deploy tier-strategy + facilitator-fee EOA.
+# Live values from `L4d-strategy-deployed` (2026-05-02). When a request sets
+# enableL4dEscrow=true, the orchestrator deploys a per-agent Escrow via this
+# factory and threads the predicted address into the Splitter's recipients[2].
+ESCROW_FACTORY_ADDRESS   = "0xb06998682bd716e0864257b3ac3aa1fc4cc64589"
+TIER_STRATEGY_ADDRESS    = "0xc498155bc4a2e4ba979ad5797298107c63b26c4e"
+FACILITATOR_FEE_EOA      = "0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455"
+
 # secrets (wrangler secret put, Infisical-piped):
 #   ETH_SEPOLIA_RPC_PRIMARY, BASE_SEPOLIA_RPC_PRIMARY,
 #   ENS_FUNDER_PK, RECKON402_DEPLOYER_PK, RECKON402_ONBOARDING_PK
@@ -50,6 +58,9 @@ RECKON402_ONBOARDING_EOA = "0xD53ffac42496d73B3Faf946786688a8454F57b1f"
 GATEWAY_BASE_URL         = "https://gateway.reckon402.com"
 FACILITATOR_BASE_URL     = "https://facilitator.reckon402.com"
 CHAIN_ID_BASE_SEPOLIA    = "84532"
+ESCROW_FACTORY_ADDRESS   = "0xb06998682bd716e0864257b3ac3aa1fc4cc64589"
+TIER_STRATEGY_ADDRESS    = "0xc498155bc4a2e4ba979ad5797298107c63b26c4e"
+FACILITATOR_FEE_EOA      = "0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455"
 
 [[env.production.routes]]
 pattern       = "app.reckon402.com"

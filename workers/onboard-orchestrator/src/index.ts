@@ -26,6 +26,14 @@ app.get('/healthz', async (c) => {
 interface OnboardRequest {
   name?: unknown; sellerEoa?: unknown; endpoint?: unknown; amount?: unknown
   recipients?: unknown; bps?: unknown
+  /**
+   * L4d on-chain Escrow flag. When true, the orchestrator runs the 6-step
+   * flow (mint → agentId → escrow → 3-recipient splitter → ENS records →
+   * gateway seed). When false / absent, the legacy 5-step flow runs.
+   * Requires ESCROW_FACTORY_ADDRESS / TIER_STRATEGY_ADDRESS /
+   * FACILITATOR_FEE_EOA to be configured on the worker.
+   */
+  enableL4dEscrow?: unknown
 }
 
 app.post('/onboard', async (c) => {
@@ -44,6 +52,23 @@ app.post('/onboard', async (c) => {
   const bps = Array.isArray(body.bps)
     ? body.bps.filter(b => typeof b === 'number') as number[]
     : undefined
+  const enableL4dEscrow = body.enableL4dEscrow === true
+
+  // Fast-fail if the request asks for L4d but the worker isn't configured.
+  // The orchestrator would throw the same error one step later, but failing
+  // here keeps the error surface in the HTTP response rather than burying it
+  // in onboard_progress.error.
+  if (enableL4dEscrow && (
+    !c.env.ESCROW_FACTORY_ADDRESS ||
+    !c.env.TIER_STRATEGY_ADDRESS  ||
+    !c.env.FACILITATOR_FEE_EOA
+  )) {
+    return c.json({
+      error: 'l4d_not_configured',
+      detail: 'enableL4dEscrow=true requires ESCROW_FACTORY_ADDRESS, ' +
+              'TIER_STRATEGY_ADDRESS, and FACILITATOR_FEE_EOA to be set on the worker',
+    }, 503, CORS)
+  }
 
   if (!name || !sellerEoa || !endpoint || !amount) {
     return c.json({ error: 'missing_required_field' }, 422, CORS)
@@ -71,6 +96,9 @@ app.post('/onboard', async (c) => {
     SPLITTER_FACTORY_ADDRESS: c.env.SPLITTER_FACTORY_ADDRESS as `0x${string}`,
     RECKON402_RESOLVER_SEPOLIA: '0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a',
     IDENTITY_REGISTRY_BASE_SEPOLIA: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
+    ESCROW_FACTORY_ADDRESS:   c.env.ESCROW_FACTORY_ADDRESS as `0x${string}` | undefined,
+    TIER_STRATEGY_ADDRESS:    c.env.TIER_STRATEGY_ADDRESS  as `0x${string}` | undefined,
+    FACILITATOR_FEE_EOA:      c.env.FACILITATOR_FEE_EOA    as `0x${string}` | undefined,
     GATEWAY_BASE_URL:         c.env.GATEWAY_BASE_URL,
     FACILITATOR_BASE_URL:     c.env.FACILITATOR_BASE_URL,
     CHAIN_ID_BASE_SEPOLIA:    84532,
@@ -78,6 +106,7 @@ app.post('/onboard', async (c) => {
 
   const args: OnboardArgs = {
     name, parentName, label, sellerEoa, endpoint, amount, recipients, bps,
+    enableL4dEscrow,
     progressSink: async (step: OnboardStep) => {
       try { await store.recordStep(onboardId, step) } catch { /* swallow */ }
     },

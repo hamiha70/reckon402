@@ -17,6 +17,10 @@ const runOnboardMock = vi.fn(async (_env: unknown, args: any) => {
     agentId: 3n,
     splitter: getAddress('0xcafe000000000000000000000000000000000001'),
     splitterDeployTx: '0xdeploy',
+    escrow: args.enableL4dEscrow
+      ? getAddress('0xea8b000000000000000000000000000000000001')
+      : null,
+    escrowDeployTx: args.enableL4dEscrow ? '0xescrow' : null,
     subnameRegisterTx: '0xens',
     subnameOwnerTransferTx: '0xowner',
     agentRegisterTx: '0xagent',
@@ -167,6 +171,7 @@ describe('POST /onboard', () => {
       sellerEoa: SELLER,
       endpoint: 'https://agent.reckon402.com/research',
       amount: '100000',
+      enableL4dEscrow: false,    // default when the request body omits the flag
     })
     expect(typeof onboardArgs.progressSink).toBe('function')
 
@@ -189,6 +194,79 @@ describe('POST /onboard', () => {
       env, { waitUntil: () => {} } as ExecutionContext,
     )
     expect(res.status).toBe(422)
+  })
+
+  test('enableL4dEscrow=true with all L4d env vars set → 202 + flag + L4d env threaded into runOnboard', async () => {
+    runOnboardMock.mockClear()
+    const { default: worker } = await import('../src/index.js')
+    const { db } = makeFakeDb()
+    const env: Env = {
+      ...makeEnv(db),
+      ESCROW_FACTORY_ADDRESS: getAddress('0xb06998682bd716e0864257b3ac3aa1fc4cc64589'),
+      TIER_STRATEGY_ADDRESS:  getAddress('0xc498155bc4a2e4ba979ad5797298107c63b26c4e'),
+      FACILITATOR_FEE_EOA:    getAddress('0x0a0228e6a5e1d7be234a190a8d9a3af9e08ec455'),
+    }
+
+    const SELLER = getAddress('0xd53f000000000000000000000000000000000010')
+    const waitPromises: Promise<unknown>[] = []
+    const ctx = { waitUntil: (p: Promise<unknown>) => waitPromises.push(p) } as ExecutionContext
+
+    const res = await worker.fetch(
+      new Request('https://app.test/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:            'seller10.reckon402-test.eth',
+          sellerEoa:       SELLER,
+          endpoint:        'https://seller10.example.com/hello',
+          amount:          '10000',
+          enableL4dEscrow: true,
+        }),
+      }),
+      env, ctx,
+    )
+    expect(res.status).toBe(202)
+    await Promise.all(waitPromises)
+
+    expect(runOnboardMock).toHaveBeenCalledTimes(1)
+    const [onboardEnv, onboardArgs] = runOnboardMock.mock.calls[0]!
+
+    expect(onboardArgs.enableL4dEscrow).toBe(true)
+    expect(onboardEnv).toMatchObject({
+      ESCROW_FACTORY_ADDRESS: env.ESCROW_FACTORY_ADDRESS,
+      TIER_STRATEGY_ADDRESS:  env.TIER_STRATEGY_ADDRESS,
+      FACILITATOR_FEE_EOA:    env.FACILITATOR_FEE_EOA,
+    })
+  })
+
+  test('enableL4dEscrow=true but ESCROW_FACTORY_ADDRESS missing → 503 l4d_not_configured (no runOnboard, no DB row)', async () => {
+    runOnboardMock.mockClear()
+    const { default: worker } = await import('../src/index.js')
+    const { db, rows } = makeFakeDb()
+    // makeEnv() omits the L4d trio — they're optional.
+    const env = makeEnv(db)
+
+    const res = await worker.fetch(
+      new Request('https://app.test/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:            'seller10.reckon402-test.eth',
+          sellerEoa:       getAddress('0xd53f000000000000000000000000000000000010'),
+          endpoint:        'https://seller10.example.com/hello',
+          amount:          '10000',
+          enableL4dEscrow: true,
+        }),
+      }),
+      env, { waitUntil: () => {} } as ExecutionContext,
+    )
+    expect(res.status).toBe(503)
+    const body = await res.json() as { error: string; detail: string }
+    expect(body.error).toBe('l4d_not_configured')
+    expect(body.detail).toMatch(/ESCROW_FACTORY_ADDRESS.*TIER_STRATEGY_ADDRESS.*FACILITATOR_FEE_EOA/s)
+
+    expect(runOnboardMock).not.toHaveBeenCalled()
+    expect(rows.size).toBe(0)
   })
 
   test('malformed ENS name (no dots) → 422', async () => {

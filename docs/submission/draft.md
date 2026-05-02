@@ -118,9 +118,13 @@ The core submission. Reckon402 is a settlement-attestation primitive for agent c
 
 ### ENS — Best ENS Integration for AI Agents + Most Creative Use
 
+**Track page: https://reckon402.com/ens** (browseable summary + on-chain evidence; `?format=json` for the raw record)
+
 ENS is not cosmetic here. `seller11.reckon402-test.eth` is the SellingAgent's identity and Reckon402's risk-routing oracle simultaneously. The CCIP-Read resolver returns a risk-adjusted `x402.amount` computed from the SellingAgent's live ERC-8004 attestation count — the same ENS name, different routed price, as reputation accumulates. ENSIP-25 text records (`x402.erc8004.registry`, `x402.erc8004.agent_id`) are written at onboarding, creating the ENS↔ERC-8004 canonical binding. The gateway-enforced ACL makes SellingAgent text-record ownership meaningful: the SellingAgent's EOA must sign any write to `x402.amount`, `x402.pricing`, `x402.attestation`, or `x402.endpoint`. The platform cannot change these records without the SellingAgent's key.
 
 ### KeeperHub — Best Integration + Builder Feedback Bounty
+
+**Track page: https://reckon402.com/keeperhub** (browseable summary + the four builder-feedback gaps inline; `?format=json` for the raw record)
 
 Reckon402 ships:
 - **`@reckon402/kh-skill`** (`packages/kh-skill/`, workspace stub at `@0.1.0`, marked private as a post-hackathon stub): a KeeperHub workflow node reference implementation that wraps `@reckon402/buyer-sdk`. Demonstrates Focus Area 2 (Payments) — KeeperHub workflows paying x402-priced APIs autonomously.

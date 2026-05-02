@@ -345,4 +345,46 @@ describe('runOnboard L4d 6-step flow', () => {
     expect(result.escrow).toBeNull()
     expect(result.escrowDeployTx).toBeNull()
   })
+
+  test('custom --bps override: forwarded into Splitter constructor when sum=10000', async () => {
+    const env = makeEnv()
+    const { plugins, calls } = makePlugins({ agentId: 13n })
+
+    const result = await runOnboard(env, {
+      ...baseArgs,
+      bps: [9000, 200, 800],   // sum = 10_000 → valid
+    }, plugins)
+
+    expect(result.steps).toHaveLength(6)
+    expect(calls.splitterWrites).toHaveLength(1)
+    // The Splitter createSplitter call must receive the override [9000,200,800],
+    // NOT the canonical default [8700, 300, 1000].
+    expect(calls.splitterWrites[0]!.args.args[2]).toEqual([9000, 200, 800])
+    // Recipients are still [seller, fac-fee, escrow] — recipients are not
+    // operator-customizable in path B, only the BPS triple is.
+    expect(calls.splitterWrites[0]!.args.args[1]).toEqual([SELLER, FACILITATOR_FEE, PREDICTED_ESCROW])
+  })
+
+  test('--bps wrong length: orchestrator rejects before any contract call', async () => {
+    const env = makeEnv()
+    const { plugins, calls } = makePlugins({ agentId: 14n })
+
+    await expect(
+      runOnboard(env, { ...baseArgs, bps: [5000, 5000] }, plugins),
+    ).rejects.toThrow(/--bps to have exactly 3 values/)
+
+    // Splitter step never runs → no write captured.
+    expect(calls.splitterWrites).toHaveLength(0)
+  })
+
+  test('--bps sum mismatch: orchestrator rejects before any contract call', async () => {
+    const env = makeEnv()
+    const { plugins, calls } = makePlugins({ agentId: 15n })
+
+    await expect(
+      runOnboard(env, { ...baseArgs, bps: [8000, 300, 1000] }, plugins),
+    ).rejects.toThrow(/--bps must sum to 10000.*9300/s)
+
+    expect(calls.splitterWrites).toHaveLength(0)
+  })
 })

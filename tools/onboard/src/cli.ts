@@ -3,11 +3,14 @@
  * Reckon402 L4c / L4d onboarding CLI.
  *
  * Usage (L4d 6-step / on-chain Escrow):
- *   tsx tools/onboard/src/cli.ts --name seller10.reckon402-test.eth \
+ *   tsx tools/onboard/src/cli.ts --name seller12.reckon402-test.eth \
  *     --seller-eoa 0xD53F... \
  *     --endpoint https://agent.reckon402.com/research \
  *     --amount 100000 \
- *     --enable-l4d-escrow
+ *     --enable-l4d-escrow \
+ *     [--bps 8700,300,1000]    # optional: override the 87/3/10 default.
+ *                              # exactly 3 values, sum must = 10_000.
+ *                              # recipients fixed to [seller, fac-fee, escrow].
  *
  * Usage (legacy L4c 5-step):
  *   tsx tools/onboard/src/cli.ts --name seller9.reckon402-test.eth \
@@ -15,6 +18,10 @@
  *     --endpoint https://agent.reckon402.com/research \
  *     --amount 100000 \
  *     [--recipients 0x...,0x...] [--bps 5000,5000]
+ *
+ * Both paths validate sum(bps) == 10_000 before any on-chain call so a
+ * malformed split fails fast with a friendly error instead of a
+ * low-level Splitter constructor revert.
  *
  * Env vars (all required unless noted):
  *   ETH_SEPOLIA_RPC_PRIMARY, BASE_SEPOLIA_RPC_PRIMARY

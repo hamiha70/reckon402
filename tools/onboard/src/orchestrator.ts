@@ -181,15 +181,34 @@ export async function runOnboard(
     })
 
     // Step 4 (L4d) — deploy Splitter with 3 recipients:
-    //   [0] seller             — 87% (where the agent's revenue lands)
-    //   [1] facilitator-fee    —  3% (Reckon402 fee EOA)
-    //   [2] escrow             — 10% (drips out via the tier ramp)
+    //   [0] seller             (where the agent's revenue lands)
+    //   [1] facilitator-fee    (Reckon402 fee EOA)
+    //   [2] escrow             (drips out via the tier ramp)
+    //
+    // BPS defaults are the canonical L4d triple [8700, 300, 1000]
+    // (87/3/10), but operators can override via args.bps for new agents.
+    // The Splitter constructor enforces sum == 10_000 — we sanity-check
+    // here so the failure message is friendly instead of a low-level revert.
     const l4dRecipients: `0x${string}`[] = [
       args.sellerEoa,
       env.FACILITATOR_FEE_EOA!,
       escrowRes.escrow,
     ]
-    const l4dBps = [L4D_SELLER_BPS, L4D_FACILITATOR_FEE_BPS, L4D_ESCROW_BPS]
+    let l4dBps = [L4D_SELLER_BPS, L4D_FACILITATOR_FEE_BPS, L4D_ESCROW_BPS]
+    if (args.bps && args.bps.length > 0) {
+      if (args.bps.length !== 3) {
+        throw new Error(
+          `--enable-l4d-escrow expects --bps to have exactly 3 values (seller, facilitator-fee, escrow). got ${args.bps.length}`,
+        )
+      }
+      const sum = args.bps.reduce((a, b) => a + b, 0)
+      if (sum !== 10_000) {
+        throw new Error(
+          `--bps must sum to 10000 basis points. got [${args.bps.join(',')}] = ${sum}`,
+        )
+      }
+      l4dBps = [...args.bps]
+    }
 
     const splitterRes = await step(4, 'Deploy Splitter via factory', async () => {
       const r = await deploySplitter(splitterClients, {
@@ -284,6 +303,20 @@ export async function runOnboard(
 
   const recipients = args.recipients ?? [args.sellerEoa]
   const bps        = args.bps        ?? [10_000]
+
+  // Match the L4d-side guard so legacy custom-bps paths fail fast with a
+  // friendly error instead of a low-level Splitter constructor revert.
+  if (recipients.length !== bps.length) {
+    throw new Error(
+      `--recipients and --bps must have the same length. got ${recipients.length} vs ${bps.length}`,
+    )
+  }
+  const legacySumBps = bps.reduce((a, b) => a + b, 0)
+  if (legacySumBps !== 10_000) {
+    throw new Error(
+      `--bps must sum to 10000 basis points. got [${bps.join(',')}] = ${legacySumBps}`,
+    )
+  }
 
   // Step 2 — deploy Splitter via factory
   const splitterRes = await step(2, 'Deploy Splitter via factory', async () => {

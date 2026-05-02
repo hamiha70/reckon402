@@ -140,14 +140,20 @@ Reckon402 ships:
 
 ## 7. Team & Contact
 
-`[TODO: fill in team member names, Telegram handles, X/Twitter handles]`
+**Solo author.** Reckon402 is a single-contributor submission — one
+builder shipped the contracts, the Cloudflare Workers stack, the
+AWS Lambda + KMS signing wrapper, the buyer/middleware/facilitator
+SDK packages, the onboarding orchestrator, the CCIP-Read gateway,
+and the demo frontend over the hackathon window.
 
-- **GitHub:** https://github.com/hamiha70/reckon402
-- **Live Demo:** https://app.reckon402.com
+- **Builder:** [@hamiha70](https://github.com/hamiha70) on GitHub
+- **Project repo:** https://github.com/hamiha70/reckon402
+- **Live demo:** https://app.reckon402.com
 - **Landing:** https://reckon402.com
 - **Facilitator:** https://facilitator.reckon402.com
 - **Gateway:** https://gateway.reckon402.com
-- **npm:** https://www.npmjs.com/org/reckon402
+- **Track pages:** https://reckon402.com/ens · https://reckon402.com/keeperhub
+- **npm org:** https://www.npmjs.com/org/reckon402
 
 ---
 
@@ -156,13 +162,15 @@ Reckon402 ships:
 - [x] `app.reckon402.com` frontend is live (Workers Assets + onboard-orchestrator)
 - [x] `reckon402.com` landing page live (Workers, redesigned with logo + arch diagram)
 - [x] `app.reckon402.com/contracts` smart contract reference page live
+- [x] `reckon402.com/ens` and `reckon402.com/keeperhub` prize-track pages live (HTML + JSON via `?format=json`)
 - [x] 5 npm packages shipped at `@0.1.0`: `@reckon402/types`, `@reckon402/buyer-sdk`, `@reckon402/middleware-hono`, `@reckon402/facilitator-client`, `@reckon402/erc-8004-client`
 - [x] `just test-e2e` (full-flow-l4b) passes green — settlement + ERC-8004 attestation loop confirmed
 - [x] `just onboard-l4d` runs end-to-end — 6/6 steps clean (canonical L4d demo flow used to provision seller11)
-- [ ] Add team names + contact handles to Section 7
+- [x] Section 7 reflects solo-author submission (no team placeholder)
 - [x] Add first live attestation tx hash to Section 4
 - [x] Add first full-flow settlement tx hash to Section 4
-- [ ] Retake all 5 screenshots (landing page changed; screenshot 5 shows bare JSON)
-- [ ] Record demo video (2:00–4:00 per ETHGlobal requirements); attach link
 - [x] Confirm live `x402.amount` via gateway and update Section 4 numbers if changed
-- [ ] Verify all Base Sepolia tx hashes still indexed on Basescan
+- [ ] Take 5 screenshots manually during demo recording (landing, onboard form, dashboard mid-flow, paid-call result, claim result)
+- [ ] Record demo video (2:00–4:00 per ETHGlobal requirements) against fresh `seller21.reckon402-test.eth` per `docs/demo-voiceover.md`; attach link
+- [ ] Verify all Base Sepolia tx hashes still indexed on Basescan (run before final submission)
+- [ ] After video: optionally cite the live `seller21` settle/claim tx hashes in Section 4 alongside the seller11 evidence

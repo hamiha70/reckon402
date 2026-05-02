@@ -5,9 +5,17 @@
 > MetaMask popup, no agent worker re-deploy between acts. Onboarding
 > (Act 2), paid call (Act 4), and claim (Act 5) each run from one button
 > press; the orchestrator does the on-chain work behind the scenes
-> using Infisical-piped wrangler secrets. Verified end-to-end against
-> `seller20` on 2026-05-02 (settle tx `0x30d498f2…0314ec`, claim tx
-> `0x2a205bf0…34f5cb75`).
+> using Infisical-piped wrangler secrets.
+>
+> **Recording target:** fresh `seller22.reckon402-test.eth` — onboarded
+> live in Act 2, used through Acts 3–5. The form already defaults to
+> `seller22` and `0.01 USDC` so Beat 2A is hit-record-and-go.
+>
+> **Verification reference:** `seller20` was the last verified
+> end-to-end run (2026-05-02, settle tx `0x30d498f2…0314ec`, claim tx
+> `0x2a205bf0…34f5cb75`). Used as the canonical example in the
+> Common substitutions table and as the dashboard's default agent
+> when a viewer opens a fresh tab post-recording.
 >
 > **Format.** Six acts, ~3:00 total. Each act lists the voiceover text and
 > the visual cue the operator should be on-screen for that beat. Voiceovers
@@ -52,8 +60,9 @@
 2. Pause on the empty onboarding form, scroll once across the field layout
    (ENS label, SellingAgent EOA, HTTPS endpoint, base price per call,
    on-chain Escrow toggle ON).
-3. Type the ENS label `seller20` into the first field (suffix
-   `.reckon402-test.eth` is appended automatically).
+3. The ENS label `seller22` is already prefilled (form default); the
+   suffix `.reckon402-test.eth` is appended automatically. No typing
+   required — just confirm and move on.
 
 **Voiceover.**
 > One form. ENS subname, the agent's wallet, the HTTPS endpoint that
@@ -80,13 +89,18 @@ visual centerpiece for this beat, no terminal switch needed. Expected
 elapsed times printed by the orchestrator next to each row:
 
 ```
-✓ Mint ENS subname               ~16s   subname=seller20.reckon402-test.eth + Etherscan link
-✓ Register ERC-8004 agentId      ~1.3s  agentId=5435 + Basescan link
-✓ Deploy Escrow via factory      ~0.4s  escrow=0xd2E7a2…7600 + Basescan link
-✓ Deploy Splitter via factory    ~1.4s  splitter=0xFff232bCa3… + Basescan link
+✓ Mint ENS subname               ~16s   subname=seller22.reckon402-test.eth + Etherscan link
+✓ Register ERC-8004 agentId      ~1.3s  agentId=<NEW> + Basescan link
+✓ Deploy Escrow via factory      ~0.4s  escrow=0x<NEW> + Basescan link
+✓ Deploy Splitter via factory    ~1.4s  splitter=0x<NEW> + Basescan link
 ✓ Set ENS records (gateway)      ~0.2s  records=13
 ✓ Seed gateway + transfer ENS    ~10s   ownership → 0xD53f…7b1f
 ```
+
+The `<NEW>` placeholders are the live values produced during the
+recording — the panel renders them with Basescan deep-links as each
+step completes. Copy them into the screen-record post-mortem if you
+want to cite them in the submission text later.
 
 When all six rows are green, the right-hand side cards populate:
 **Splitter recipients** (87% / 3% / 10%), **Risk-buffer release schedule**
@@ -109,10 +123,9 @@ new agentId.
 
 **Visual.**
 1. After Act 2 ends, click the dashboard link the form surfaces (or
-   navigate directly to `https://app.reckon402.com/#/agent/seller20.reckon402-test.eth`
-   — substitute your fresh ENS label).
+   navigate directly to `https://app.reckon402.com/#/agent/seller22.reckon402-test.eth`).
 2. Slow scroll top to bottom, pausing ~2 seconds on each panel:
-   - Header (price 0.01 USDC, agentId 5435, Splitter, Escrow, owner)
+   - Header (price 0.01 USDC, agentId from Act 2, Splitter, Escrow, owner)
    - Splitter recipients (87% / 3% / 10%)
    - ENS Text Records (collapsed bar — open it for ~3s to show 13 records)
    - Risk buffer (Escrow) — empty, attestations = 0, T0 active
@@ -281,16 +294,21 @@ Before pressing record:
    `/<label>/research` route. Whichever ENS the dashboard is viewing
    is the ENS the test call hits — no wrangler.toml edits or
    `just deploy-agent` between Act 2 and Act 4.
-5. **Pick the next free ENS label.** Probe with
+5. **Recording target ENS is `seller22`** — the form prefills it. If
+   you've already used `seller22` in a prior take, probe for the next
+   free label with
    `bash tools/integration-tests/resolve-l4a.sh --backend static --name
-   sellerN.reckon402-test.eth --key x402.amount` and pick the lowest `N`
-   that returns `UNKNOWN_NAME`. Substitute `sellerN` everywhere in this
-   script (see Common substitutions table).
-6. **Confirm the demo endpoints are live** before pressing record:
+   seller23.reckon402-test.eth --key x402.amount` and pick the lowest
+   `N` that returns `UNKNOWN_NAME`. Then bump the form default in
+   `apps/frontend/dist/index.html` and redeploy with
+   `just deploy-orchestrator` before pressing record so Beat 2A stays
+   no-typing.
+6. **Confirm the demo endpoints are live** against an EXISTING agent
+   (don't burn `seller22` on a smoke test):
    ```
    curl -s -X POST https://app.reckon402.com/demo/test-call \
      -H 'Content-Type: application/json' \
-     -d '{"ensName":"sellerN.reckon402-test.eth","query":"smoke"}' | jq .ok
+     -d '{"ensName":"seller20.reckon402-test.eth","query":"smoke"}' | jq .ok
    ```
    Expect `true`. If you get `503 demo_not_configured`, re-push
    `SELLER_PK` and `BUYER_DEMO_1_PK` via the wrangler-secret-put recipe
@@ -307,7 +325,7 @@ wiring), drop to terminal and run the equivalent commands:
 
 ```
 # Equivalent of Run Test Call (Act 4)
-SELLER_NAME=sellerN.reckon402-test.eth just fullflow-l4b
+SELLER_NAME=seller22.reckon402-test.eth just fullflow-l4b
 
 # Equivalent of Claim All (Act 5)
 infisical run --env dev --domain https://secrets.intentralabs.com -- \
@@ -317,31 +335,34 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- \
 Same on-chain artifacts; only the visual surface changes.
 
 If the **web form** misbehaves on the day (Act 2 path), the CLI fallback
-is `just onboard-l4d sellerN.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f` —
+is `just onboard-l4d seller22.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f` —
 same six steps, ~75s total.
 
 ---
 
 ## Common substitutions
 
-Pick a single fresh ENS label and use it for all six acts.
-`seller20` is the verified reference (settle tx
-`0x30d498f2…0314ec`, claim tx `0x2a205bf0…34f5cb75`).
+Recording target is `seller22` — the form already prefills it. The
+table below lists what the script names vs what the recording will
+produce live. `seller20` (settle tx `0x30d498f2…0314ec`, claim tx
+`0x2a205bf0…34f5cb75`) was the last verified end-to-end run and stays
+referenced in scripts and as the dashboard's default agent so anyone
+who opens a fresh tab post-recording lands on a populated dashboard.
 
 | Reference in script | Where it appears | Replace with |
 |---------------------|------------------|--------------|
-| `seller20.reckon402-test.eth` | All acts (form + dashboard + paid call) | the fresh ENS label |
-| `agentId 5435` | Act 2 progress panel + Act 3 dashboard header | new agentId from form step 2 |
-| `0xd2E7a2…7600` (Escrow) | Act 2 progress panel + Act 3 dashboard | new Escrow from form step 3 |
-| `0xFff232bCa3…` (Splitter) | Act 2 progress panel + Act 3 dashboard | new Splitter from form step 4 |
-| `0x30d498f2…0314ec` (settle tx) | Act 4 Basescan jump | new settle tx from Run Test Call response |
-| `0xd5ba94d2…fac3f87` (distribute tx) | Act 4 Basescan jump | parsed from receipt `reconcileNotes` |
-| `<attest>` (attest tx) | Act 4 Basescan jump | new `td_erc8004_tx` from receipt |
-| `0x2a205bf0…34f5cb75` (claim tx) | Act 5 Basescan jump | new tx from Claim All response |
+| `seller22.reckon402-test.eth` | All acts (form prefilled + dashboard + paid call) | leave as-is — that's the recording target |
+| `agentId from Act 2` | Act 2 progress panel + Act 3 dashboard header | new agentId rendered live in the panel |
+| `0x<NEW>` (Escrow) | Act 2 progress panel + Act 3 dashboard | new Escrow rendered live in the panel |
+| `0x<NEW>` (Splitter) | Act 2 progress panel + Act 3 dashboard | new Splitter rendered live in the panel |
+| `<settle tx>` | Act 4 Basescan jump | from Run Test Call response (`txHash`) |
+| `<distribute tx>` | Act 4 Basescan jump | parsed from receipt `reconcileNotes` |
+| `<attest tx>` | Act 4 Basescan jump | from receipt `td_erc8004_tx` |
+| `<claim tx>` | Act 5 Basescan jump | from Claim All response (`txHash`) |
 
 The price (`0.01 USDC`), the splits (87/3/10), the tier curve, and the
 seller EOA (`0xD53ffac42496d73B3Faf946786688a8454F57b1f`) stay the same
-across runs.
+across runs and are not substituted.
 
 ---
 

@@ -2,6 +2,8 @@ import { Hono, type Context } from 'hono'
 import { runOnboard, type OnboardArgs, type OnboardEnv, type OnboardStep } from '@reckon402/onboard'
 import type { Env } from './env.js'
 import { ProgressStore, generateOnboardId } from './progress-store.js'
+import { demoClaimHandler, demoClaimOptions } from './demo-claim.js'
+import { demoTestCallHandler, demoTestCallOptions } from './demo-test-call.js'
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -155,6 +157,21 @@ app.get('/receipts', async (c) => {
     return c.json({ error: 'receipts_fetch_failed', detail: (err as Error).message }, 502, CORS)
   }
 })
+
+// ─── Demo endpoints (server-side trigger surfaces for the dashboard) ────
+//
+// /demo/test-call: replaces the dashboard's KeeperHub workflow link with a
+// one-shot server-side x402 buyer flow. Pays from BUYER_DEMO_1.
+//
+// /demo/claim: replaces the dashboard's MetaMask-driven Escrow.withdrawAll
+// with a server-side broadcast signed by SELLER_PK.
+//
+// Both are publicly callable (rationale: hackathon demo, capped fund risk,
+// test-net only). See demo-claim.ts and demo-test-call.ts for details.
+app.options('/demo/test-call', demoTestCallOptions)
+app.post('/demo/test-call',    demoTestCallHandler)
+app.options('/demo/claim',     demoClaimOptions)
+app.post('/demo/claim',        demoClaimHandler)
 
 app.get('/onboard/:id/status', async (c) => {
   const id = c.req.param('id') ?? ''

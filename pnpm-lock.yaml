@@ -296,6 +296,9 @@ importers:
 
   workers/onboard-orchestrator:
     dependencies:
+      '@reckon402/buyer-sdk':
+        specifier: workspace:*
+        version: link:../../packages/buyer-sdk
       '@reckon402/onboard':
         specifier: workspace:*
         version: link:../../tools/onboard

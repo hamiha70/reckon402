@@ -39,6 +39,17 @@ export interface Env {
   RECKON402_ONBOARDING_PK:   string
   FACILITATOR_ADMIN_TOKEN:   string  // proxied server-side for /receipts endpoint
 
+  // Demo-mode hot keys for the dashboard's "Run Test Call" + "Claim All"
+  // buttons. Both are written into wrangler secrets via the standard
+  // Infisical-piped flow (`wrangler secret put X`). These let the demo
+  // recording flow trigger a full settlement and a withdraw without
+  // requiring the operator to import keys into MetaMask. Optional at
+  // the binding level so the worker still loads when the demo isn't
+  // configured; the demo-claim and demo-test-call handlers throw a
+  // clean 503 if a request lands without them.
+  SELLER_PK?:        string  // signs Escrow.withdrawAll() server-side
+  BUYER_DEMO_1_PK?:  string  // signs EIP-3009 transferWithAuthorization server-side
+
   // Static assets binding (Workers Assets)
   ASSETS?: { fetch: (req: Request) => Promise<Response> }
 }

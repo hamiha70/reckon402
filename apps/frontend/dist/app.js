@@ -22,9 +22,16 @@ const CFG = {
   BASESCAN_ADDR:     'https://sepolia.basescan.org/address/',
   ETHERSCAN_TX:      'https://sepolia.etherscan.io/tx/',
   ETHERSCAN_ADDR:    'https://sepolia.etherscan.io/address/',
-  // KeeperHub workflow (published 2026-05-02 — see AGENTS.md "L4 deployments")
-  KH_WORKFLOW_URL:   'https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9',
 }
+
+// Demo-mode flag: when true, "Run Test Call" and "Connect Wallet" + "Claim All"
+// route through orchestrator-hosted server-side endpoints (POST /demo/test-call
+// + POST /demo/claim) using SELLER_PK / BUYER_DEMO_1_PK from Infisical-piped
+// wrangler secrets. No MetaMask, no KH workflow round-trip — both flows fire
+// from a single button click and surface a real on-chain tx hash inline. See
+// workers/onboard-orchestrator/src/demo-{claim,test-call}.ts. Set false to
+// restore the original MetaMask + KH-link behavior.
+const DEMO_MODE = true
 
 // Reckon402-controlled EOAs that share the SellingAgent's Splitter recipient
 // list. Public addresses, safe to ship in client JS. Source: AGENTS.md §"On-chain
@@ -845,19 +852,78 @@ function renderCallLog(receipts, splitterAddr) {
   }
 }
 
-// "Run Test Call" opens the KeeperHub workflow in a new tab.
-$('#run-call-btn')?.addEventListener('click', () => {
-  window.open(CFG.KH_WORKFLOW_URL, '_blank')
-})
+// "Run Test Call" — server-side x402 buyer flow against the agent worker's
+// dynamic /:label/research route. POSTs the current dashboard's ENS to
+// /demo/test-call; the orchestrator does the GET → 402 → sign → GET-with-
+// header → 200 round-trip with BUYER_DEMO_1_PK and returns the receipt.
+//
+// We render the in-flight state inline (next to the button) and refresh
+// the dashboard a few seconds after settle so the new "Recent paid call"
+// row appears without waiting for the 3s heartbeat.
+async function runTestCall() {
+  if (!activeEns) return
+  const btn      = $('#run-call-btn')
+  const statusEl = $('#run-call-status')
+  if (btn) { btn.disabled = true; btn.textContent = 'Settling…' }
+  if (statusEl) {
+    statusEl.classList.remove('hidden')
+    statusEl.innerHTML = '<span class="text-gray-400">Signing EIP-3009 + waiting for Splitter.distribute…</span>'
+  }
+  try {
+    const res = await fetch(`${CFG.ORCHESTRATOR_BASE}/demo/test-call`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ensName: activeEns, query: 'demo call from dashboard' }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body.ok) {
+      const detail = body?.detail ?? body?.error ?? `HTTP ${res.status}`
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail))
+    }
+    const txLink = body.transferTx
+      ? `<a href="${CFG.BASESCAN_TX}${body.transferTx}" target="_blank" class="text-blue-400 underline">${trunc(body.transferTx, 8)}</a>`
+      : '(no tx)'
+    if (statusEl) {
+      statusEl.innerHTML =
+        `<span class="text-green-400">✓ settled:</span> ` +
+        `paymentId <span class="text-gray-300">${trunc(body.paymentId, 8)}</span> · ` +
+        `transfer tx ${txLink}`
+    }
+    // Refresh shortly so the new row + Escrow tier update land visibly.
+    setTimeout(refreshDashboard, 4_000)
+    setTimeout(refreshDashboard, 12_000)
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-red-400">test call failed:</span> ${escapeHtml(err?.message ?? String(err))}`
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Test Call' }
+  }
+}
+$('#run-call-btn')?.addEventListener('click', runTestCall)
 
 // ─── Wallet connect + claim ──────────────────────────────────────────────
-// We use raw `window.ethereum` so the page works with any EIP-1193 provider
-// (MetaMask, Rabby, OKX, …) without an SDK dependency. The connected
-// account drives the Claim button gate against IdentityRegistry.ownerOf.
+// Two paths gated on the DEMO_MODE flag at the top of this file:
+//
+//   DEMO_MODE = false (production / canonical L4d):
+//     "Connect Wallet" prompts MetaMask (or any EIP-1193 provider). The
+//     connected account drives the Claim button gate against
+//     IdentityRegistry.ownerOf(agentId). withdrawAll() is signed by the
+//     wallet via eth_sendTransaction.
+//
+//   DEMO_MODE = true (current — H-9 demo mode):
+//     "Connect Wallet" calls IdentityRegistry.ownerOf(agentId) directly
+//     and sets connectedAddress to the result, no wallet popup. The
+//     Claim button POSTs to /demo/claim, which the orchestrator signs
+//     server-side using SELLER_PK from a wrangler secret. Same on-chain
+//     effect (real Escrow.withdrawAll() tx, real seller EOA), no
+//     MetaMask ceremony in the recording.
 
 let connectedAddress = null
 
 async function connectWallet() {
+  if (DEMO_MODE) return connectWalletDemo()
+
   const eth = /** @type {any} */ (window).ethereum
   if (!eth) {
     alert('No EIP-1193 wallet detected. Install MetaMask, Rabby, or similar to claim.')
@@ -866,9 +932,6 @@ async function connectWallet() {
   try {
     const accounts = await eth.request({ method: 'eth_requestAccounts' })
     connectedAddress = accounts?.[0]?.toLowerCase() ?? null
-    // Auto-switch to Base Sepolia. Users on the wrong chain can't sign
-    // the withdraw, so we offer the switch up front rather than failing
-    // mid-claim.
     try {
       const cur = await eth.request({ method: 'eth_chainId' })
       if (cur !== BASE_SEPOLIA_CHAIN_ID_HEX) {
@@ -878,7 +941,6 @@ async function connectWallet() {
         })
       }
     } catch (err) {
-      // 4902 = chain not added → ask the wallet to add it
       if (err?.code === 4902) {
         await eth.request({
           method: 'wallet_addEthereumChain',
@@ -895,7 +957,6 @@ async function connectWallet() {
       }
     }
 
-    // Pick up provider-side account / chain changes without reloading.
     eth.on?.('accountsChanged', (accts) => {
       connectedAddress = accts?.[0]?.toLowerCase() ?? null
       refreshClaimGate()
@@ -904,6 +965,38 @@ async function connectWallet() {
   } catch (err) {
     console.error('wallet connect failed', err)
     alert(`Wallet connect failed: ${err?.message ?? err}`)
+    return
+  }
+  await refreshClaimGate()
+}
+
+// Demo-mode connect: read the agent NFT owner from on-chain and pretend
+// we're "connected" as that wallet. No popup, no chain switch, no event
+// subscriptions. The Claim button still gates on connectedAddress ===
+// nftOwner, so this can only succeed when the dashboard's agent NFT is
+// owned by the seller EOA whose key the orchestrator holds — which is
+// the L4d invariant after step 6 transfers ENS ownership to the seller.
+async function connectWalletDemo() {
+  const btn = $('#wallet-connect-btn')
+  if (!agentIdCached) {
+    if (btn) {
+      const original = btn.textContent
+      btn.textContent = 'Loading agent…'
+      setTimeout(() => { if (btn.textContent === 'Loading agent…') btn.textContent = original }, 1500)
+    }
+    return
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Connecting…' }
+  try {
+    connectedAddress = await readNftOwner(
+      CFG.BASE_SEPOLIA_RPC,
+      IDENTITY_REGISTRY_BASE_SEPOLIA,
+      agentIdCached,
+    )
+  } catch (err) {
+    console.error('demo connect: ownerOf failed', err)
+    if (btn) { btn.disabled = false; btn.textContent = 'Connect Wallet' }
+    alert(`Demo connect failed: ${err?.message ?? err}`)
     return
   }
   await refreshClaimGate()
@@ -1018,26 +1111,41 @@ async function refreshClaimGate() {
 
 async function claimAll() {
   if (!escrowAddrCached || !connectedAddress) return
-  const eth = /** @type {any} */ (window).ethereum
-  if (!eth) return
   const statusEl = $('#claim-status')
   statusEl?.classList.remove('hidden')
   statusEl.innerHTML = '<span class="text-gray-400">submitting tx…</span>'
 
   try {
-    const txHash = await eth.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: connectedAddress,
-        to:   escrowAddrCached,
-        data: SEL.withdrawAll,  // no args
-      }],
-    })
+    let txHash
+    if (DEMO_MODE) {
+      // Server-side broadcast via SELLER_PK. The orchestrator validates
+      // the escrow address shape and returns 502 on a viem broadcast
+      // error; we surface the upstream detail string verbatim.
+      const res = await fetch(`${CFG.ORCHESTRATOR_BASE}/demo/claim`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ escrowAddress: escrowAddrCached }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        throw new Error(body?.detail ?? body?.error ?? `HTTP ${res.status}`)
+      }
+      txHash = body.txHash
+    } else {
+      const eth = /** @type {any} */ (window).ethereum
+      if (!eth) return
+      txHash = await eth.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: connectedAddress,
+          to:   escrowAddrCached,
+          data: SEL.withdrawAll,
+        }],
+      })
+    }
     statusEl.innerHTML =
       `<span class="text-green-400">✓ tx submitted:</span> ` +
       `<a href="${CFG.BASESCAN_TX}${txHash}" target="_blank" class="text-blue-400 underline">${trunc(txHash, 8)}</a>`
-    // Poll the dashboard refresh shortly so the new totalWithdrawn lands
-    // visibly without waiting for the 3s heartbeat.
     setTimeout(refreshDashboard, 4_000)
   } catch (err) {
     statusEl.innerHTML = `<span class="text-red-400">claim failed:</span> ${escapeHtml(err?.message ?? String(err))}`

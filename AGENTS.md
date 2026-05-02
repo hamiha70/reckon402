@@ -136,6 +136,34 @@ cheaper than debugging mid-build.
   the probe entirely. Hard probes (`infisical`, `cf`, `aws`, `rpc`,
   `kh`, `d1`, `funded`) must stay green at every layer transition;
   do not document quirks that the suite is silently tolerating.
+- **Never push past a red gate.** At every spec → implement → verify
+  step in the cadence, if the test suite or deploy fails, stop the
+  orchestration, report state, and decide whether to roll back to
+  the previous tag. Anchor each layer with annotated rollback tags
+  (e.g. `L4d-pre-onchain-baseline`, `L4d-contracts-green`,
+  `L4d-strategy-deployed`) so reverts are byte-precise. Never silently
+  patch around a red gate to keep the chain moving.
+- **Demo scope is locked in `docs/demo-design.md`; reviewers do not
+  cut it.** Adversarial reviews of implementation plans
+  (`docs/implementation-plan.md` and successors) stay in the
+  implementation-correctness lane: ordering bugs, hidden dependencies,
+  silent-failure modes, missing steps. They MUST NOT propose dropping
+  demo features, tabs, narrative beats, or sponsor surfaces under
+  the banner of "what to cut for the time budget" — that decision
+  belongs to the operator and is already locked. Findings about
+  demo flow defects (silent failures, broken paths) are in scope;
+  scope-cut recommendations are not.
+- **Comparative analyses with private repos are confined to
+  `tmp/comparison/`.** When asked to compare reckon402 with a private
+  repo (e.g. the `~/Projects/x402commit/` org), all output files
+  live ONLY under `reckon402/tmp/comparison/` (must be gitignored;
+  verify before writing). Proprietary terminology from the private
+  side (e.g. `RCO`, `Lockbox`, `Defection Monitor`, internal product
+  names, parent-org KMS aliases) NEVER enters `AGENTS.md`, `specs/`,
+  any source file, any README, or any commit-bound file. When a
+  comparative lesson is actionable for reckon402, it is restated in
+  reckon402's public vocabulary in the same paragraph it is
+  introduced. No git ops on either repo from inside this workflow.
 
 ## Secrets and hydration (v1)
 

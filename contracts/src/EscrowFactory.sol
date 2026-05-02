@@ -30,7 +30,7 @@ contract EscrowFactory {
         address indexed escrow,
         bytes32 indexed salt,
         address          facilitatorClient,
-        uint8[]          tierThresholds,
+        uint64[]         tierThresholds,
         uint16[]         tierReleaseBps,
         string           tag1,
         string           tag2
@@ -69,7 +69,7 @@ contract EscrowFactory {
     function createEscrow(
         uint256          agentId,
         address          facilitatorClient,
-        uint8[]   memory tierThresholds,
+        uint64[]  memory tierThresholds,
         uint16[]  memory tierReleaseBps,
         string    memory tag1,
         string    memory tag2,
@@ -132,7 +132,7 @@ contract EscrowFactory {
     function predictAddress(
         uint256          agentId,
         address          facilitatorClient,
-        uint8[]   memory tierThresholds,
+        uint64[]  memory tierThresholds,
         uint16[]  memory tierReleaseBps,
         string    memory tag1,
         string    memory tag2,

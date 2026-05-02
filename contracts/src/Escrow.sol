@@ -36,7 +36,9 @@ contract Escrow is ReentrancyGuard {
 
     // Tier curve, pinned per Escrow at deploy. Stored as plain dynamic
     // arrays + two strings; constructor validates monotonicity + bounds.
-    uint8[]  private _tierThresholds;
+    // Threshold type is uint64 to match ReputationRegistry.getSummary's
+    // return type (avoids implicit casts during ramp evaluation).
+    uint64[] private _tierThresholds;
     uint16[] private _tierReleaseBps;
     string   private _tag1;
     string   private _tag2;
@@ -54,7 +56,7 @@ contract Escrow is ReentrancyGuard {
         address indexed reputationRegistry,
         uint256          agentId,
         address          facilitatorClient,
-        uint8[]          tierThresholds,
+        uint64[]         tierThresholds,
         uint16[]         tierReleaseBps,
         string           tag1,
         string           tag2
@@ -75,7 +77,7 @@ contract Escrow is ReentrancyGuard {
         address          reputationRegistry_,
         uint256          agentId_,
         address          facilitatorClient_,
-        uint8[]   memory tierThresholds_,
+        uint64[]  memory tierThresholds_,
         uint16[]  memory tierReleaseBps_,
         string    memory tag1_,
         string    memory tag2_
@@ -251,7 +253,7 @@ contract Escrow is ReentrancyGuard {
         external
         view
         returns (
-            uint8[]  memory thresholds,
+            uint64[] memory thresholds,
             uint16[] memory releaseBpsArr,
             string   memory tag1Val,
             string   memory tag2Val

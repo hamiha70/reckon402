@@ -56,7 +56,7 @@ constructor(
     address reputationRegistry_,    // ERC-8004 ReputationRegistry on this chain
     uint256 agentId_,               // immutable; binds this Escrow to one NFT
     address facilitatorClient_,     // EOA whose feedback drives the tier ramp
-    uint8[]  memory tierThresholds_, // monotonically increasing attestation counts
+    uint64[] memory tierThresholds_, // monotonically increasing attestation counts (uint64 matches ReputationRegistry.getSummary return type)
     uint16[] memory tierReleaseBps_, // BPS each ≤ 10_000, monotonically non-decreasing
     string  memory tag1_,           // "payment"
     string  memory tag2_            // "x402-settlement"
@@ -84,7 +84,7 @@ Public surface:
 | `withdrawableNow() returns (uint256)` | view | `releasedAmount > totalWithdrawn ? releasedAmount - totalWithdrawn : 0` |
 | `withdraw(uint256 amount)` | nonReentrant | owner-only; reverts if amount > available |
 | `withdrawAll() returns (uint256 amount)` | nonReentrant | owner-only; pulls full `withdrawableNow()` |
-| `tierConfig() returns (uint8[], uint16[], string, string)` | view | exposes tier curve for off-chain UI |
+| `tierConfig() returns (uint64[], uint16[], string, string)` | view | exposes tier curve for off-chain UI |
 | `getStats() returns (...)` | view | dashboard helper: returns all 7 counters in one call |
 
 Errors:
@@ -128,8 +128,8 @@ Public surface:
 
 | Function | Purpose |
 |----------|---------|
-| `createEscrow(uint256 agentId, address facilitatorClient, uint8[] tierThresholds, uint16[] tierReleaseBps, string tag1, string tag2, bytes32 salt) returns (address)` | Deploy a new Escrow. Records `escrowOfAgent[agentId]` and `isDeployed[escrow]`. Reverts on duplicate agentId or duplicate salt. |
-| `predictAddress(uint256 agentId, address facilitatorClient, uint8[] tierThresholds, uint16[] tierReleaseBps, string tag1, string tag2, bytes32 salt) returns (address)` | Read-only CREATE2 prediction. Used by orchestrator to pre-compute the Escrow address BEFORE deploy (so it can be wired into the Splitter's recipients[2] in the same onboarding run). |
+| `createEscrow(uint256 agentId, address facilitatorClient, uint64[] tierThresholds, uint16[] tierReleaseBps, string tag1, string tag2, bytes32 salt) returns (address)` | Deploy a new Escrow. Records `escrowOfAgent[agentId]` and `isDeployed[escrow]`. Reverts on duplicate agentId or duplicate salt. |
+| `predictAddress(uint256 agentId, address facilitatorClient, uint64[] tierThresholds, uint16[] tierReleaseBps, string tag1, string tag2, bytes32 salt) returns (address)` | Read-only CREATE2 prediction. Used by orchestrator to pre-compute the Escrow address BEFORE deploy (so it can be wired into the Splitter's recipients[2] in the same onboarding run). |
 | `isDeployed(address) returns (bool)` | mapping: was this address minted by us? |
 | `escrowOfAgent(uint256 agentId) returns (address)` | mapping: which Escrow serves this agentId? |
 
@@ -141,7 +141,7 @@ event EscrowCreated(
     address indexed escrow,
     bytes32 indexed salt,
     address          facilitatorClient,
-    uint8[]          tierThresholds,
+    uint64[]         tierThresholds,
     uint16[]         tierReleaseBps,
     string           tag1,
     string           tag2

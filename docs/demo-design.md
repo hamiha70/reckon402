@@ -76,24 +76,26 @@ Form fields (pre-filled for the demo):
 
 Click **[Deploy]**.
 
-#### Step B — Progress panel (~60s, 5 steps with real on-chain links)
+#### Step B — Progress panel (~75s, 6 steps with real on-chain links)
 
 ```
-✓ Mint ENS subname          → Etherscan link (Ethereum Sepolia)
-✓ Deploy Splitter via factory → Basescan link (Base Sepolia)
-✓ Register ERC-8004 agentId  → Basescan link (Base Sepolia)
-✓ Set ENS records (bootstrap) → gateway /records link
+✓ Mint ENS subname                    → Etherscan link (Ethereum Sepolia)
+✓ Register ERC-8004 agentId           → Basescan link (Base Sepolia)
+✓ Deploy per-agent Escrow (CREATE2)   → Basescan link (Base Sepolia)
+✓ Deploy Splitter via factory         → Basescan link (Base Sepolia)
+✓ Set ENS records (bootstrap)         → gateway /records link
 ✓ Seed gateway + transfer ENS ownership → Etherscan link
 ```
 
-After step 5 completes, auto-navigate to `#/agent/seller9.reckon402-test.eth`.
+After step 6 completes, auto-navigate to `#/agent/seller9.reckon402-test.eth`.
 
-> "60 seconds. ENS subname on Ethereum. Splitter lockbox on Base. ERC-8004 identity on Base. Twelve ENS text records written, signed, verified. The platform provisioned it — but never owned it. The ENS name and agentId transferred to the seller's wallet at the end of onboarding. The platform cannot turn this agent's records against it."
+> "About a minute. ENS subname on Ethereum. ERC-8004 identity on Base. A per-agent Escrow contract at a deterministic CREATE2 address. A Splitter routing 87 percent to the seller, 3 percent to the facilitator, 10 percent into the agent's own Escrow on every settlement. Twelve ENS text records written, signed, verified. The platform provisioned all of this — but never owned it. The ENS name and agentId transferred to the seller's wallet at the end of onboarding. The platform cannot turn this agent's records against it."
 
 **Ownership model (why this is true):**
-- ENS subname: platform holds it only during steps 1–4 (bootstrap window), step 5 transfers to seller EOA
+- ENS subname: platform holds it only during steps 1–5 (bootstrap window), step 6 transfers to seller EOA
 - ERC-8004 agentId: seller's key calls `register()` directly → mints to seller as msg.sender, no transfer step
-- Splitter: CREATE2-deployed with seller EOA as primary recipient
+- Per-agent Escrow: CREATE2-deployed at a deterministic address bound to the seller's agentId; tier strategy is `LinearMonotonicTierStrategy v1` (immutable once set)
+- Splitter: CREATE2-deployed via factory with seller EOA as primary recipient and the per-agent Escrow as the 10% recipient
 
 #### Step C — Agent dashboard
 

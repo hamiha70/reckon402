@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # demo-e2e.sh — Reckon402 testnet dress-rehearsal e2e demo script.
 #
-# Runs a three-call sequence demonstrating ERC-8004 reputation growth
-# and tier-based discount pricing on Base Sepolia.
+# Runs a two-call sequence demonstrating the L4d closed loop on Base Sepolia:
+# every confirmed x402 settlement writes an ERC-8004 attestation that is
+# readable by every downstream agent.
 #
-# Call 1 — Baseline: buyer calls agent → 402 → pays → CONFIRMED receipt.
-# Call 2 — Reputation write: verify ERC-8004 attestation written
-#           (attestations row in D1 + facilitator receipt has td_erc8004_tx).
-# Call 3 — Price tier: re-resolve seller ENS via gateway, confirm
-#           x402.amount is lower than Call 1 baseline.
+# Call 1 — Settlement: buyer calls agent → 402 → signs PaymentPayload via
+#           @reckon402/buyer-sdk → pays → 200 + CONFIRMED receipt.
+# Call 2 — Reputation write: verify the ERC-8004 attestation tx landed for
+#           that paymentId (attestations row in D1 + facilitator receipt has
+#           td_erc8004_tx).
+#
+# Note: this script does NOT exercise the L4c gateway-pricing layer — the
+# canonical H-9 narrative leads with the L4d on-chain Escrow as the trust
+# signal's economic mechanism. See docs/canonical-narrative.md.
 #
 # Usage (secrets from Infisical):
 #   infisical run --env dev --domain https://secrets.intentralabs.com -- \
@@ -74,28 +79,10 @@ info "Artifacts:   $ARTIFACT_DIR"
 : "${SPLITTER_ADDRESS:?SPLITTER_ADDRESS missing}"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CALL 1 — Baseline settlement
+# CALL 1 — Settlement
 # ──────────────────────────────────────────────────────────────────────────────
 
-step "1/8" "Snapshot baseline x402.amount via ENS gateway (erc8004 backend)"
-BEFORE_JSON="$ARTIFACT_DIR/c1-before-amount.json"
-set +e
-bash "$INTEGRATION_DIR/resolve-l4a.sh" \
-  --backend erc8004 \
-  --gateway "$GATEWAY_URL" \
-  --name "$SELLER_NAME" \
-  --key x402.amount 2>&1 | tee "$BEFORE_JSON"
-RESOLVE_EXIT=$?
-set -e
-BEFORE_AMOUNT=$(grep -oE 'Decoded value: [0-9]+' "$BEFORE_JSON" | head -1 \
-  | grep -oE '[0-9]+$' || echo "UNKNOWN")
-if [ "$BEFORE_AMOUNT" = "UNKNOWN" ]; then
-  warn "Could not parse x402.amount from gateway; proceeding with UNKNOWN baseline"
-else
-  info "  x402.amount BASELINE = $BEFORE_AMOUNT ($(echo "scale=4; $BEFORE_AMOUNT / 1000000" | bc) USDC)"
-fi
-
-step "2/8" "GET /research WITHOUT payment header — expect 402"
+step "1/5" "GET /research WITHOUT payment header — expect 402"
 STATUS_402=$(curl -s -o "$ARTIFACT_DIR/c1-402-body.json" \
   -D "$ARTIFACT_DIR/c1-402-headers.txt" \
   -w "%{http_code}" \
@@ -105,7 +92,7 @@ info "  HTTP $STATUS_402"
 [ "$STATUS_402" = "402" ] || die "Expected HTTP 402, got $STATUS_402"
 pass "  402 gate active"
 
-step "3/8" "Sign PaymentPayload via @reckon402/buyer-sdk"
+step "2/5" "Sign PaymentPayload via @reckon402/buyer-sdk"
 PAYMENT_SIG=$(node "$INTEGRATION_DIR/buyer-sign-l3.mjs" \
   2> "$ARTIFACT_DIR/c1-buyer-sign.stderr")
 PAYMENT_ID=$(grep "paymentId=" "$ARTIFACT_DIR/c1-buyer-sign.stderr" \
@@ -119,7 +106,7 @@ info "  paymentId = $PAYMENT_ID"
 info "  nonce     = $NONCE"
 pass "  PaymentPayload signed"
 
-step "4/8" "GET /research WITH payment — expect 200 + CONFIRMED state"
+step "3/5" "GET /research WITH payment — expect 200 + CONFIRMED state"
 warn "  Waiting for two on-chain txs (may take 15–60s)..."
 STATUS_200=$(curl -s -o "$ARTIFACT_DIR/c1-200-body.json" \
   -D "$ARTIFACT_DIR/c1-200-headers.txt" \
@@ -149,7 +136,7 @@ info "  Basescan: https://sepolia.basescan.org/tx/$TX_HASH"
 # CALL 2 — Reputation write verification
 # ──────────────────────────────────────────────────────────────────────────────
 
-step "5/8" "Verify ERC-8004 attestation written (poll receipt for td_erc8004_tx)"
+step "4/5" "Verify ERC-8004 attestation written (poll receipt for td_erc8004_tx)"
 MAX_WAIT=90
 WAITED=0
 RECEIPT_JSON="$ARTIFACT_DIR/c2-receipt.json"
@@ -177,47 +164,10 @@ pass "  ERC-8004 attestation confirmed"
 info "  Basescan (attestation): https://sepolia.basescan.org/tx/$TD_TX"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CALL 3 — Price tier discount
-# ──────────────────────────────────────────────────────────────────────────────
-
-step "6/8" "Wait 3s for gateway cache-invalidate to propagate"
-sleep 3
-
-step "7/8" "Re-resolve x402.amount via ENS gateway — expect lower price after attestation"
-AFTER_JSON="$ARTIFACT_DIR/c3-after-amount.json"
-set +e
-bash "$INTEGRATION_DIR/resolve-l4a.sh" \
-  --backend erc8004 \
-  --gateway "$GATEWAY_URL" \
-  --name "$SELLER_NAME" \
-  --key x402.amount 2>&1 | tee "$AFTER_JSON"
-set -e
-AFTER_AMOUNT=$(grep -oE 'Decoded value: [0-9]+' "$AFTER_JSON" | head -1 \
-  | grep -oE '[0-9]+$' || echo "UNKNOWN")
-info "  x402.amount AFTER = $AFTER_AMOUNT"
-
-if [[ "$BEFORE_AMOUNT" =~ ^[0-9]+$ ]] && [[ "$AFTER_AMOUNT" =~ ^[0-9]+$ ]]; then
-  BEFORE_USDC=$(echo "scale=6; $BEFORE_AMOUNT / 1000000" | bc)
-  AFTER_USDC=$(echo "scale=6; $AFTER_AMOUNT / 1000000" | bc)
-  info "  BEFORE: ${BEFORE_AMOUNT} μUSDC (${BEFORE_USDC} USDC)"
-  info "  AFTER:  ${AFTER_AMOUNT} μUSDC (${AFTER_USDC} USDC)"
-  if [ "$AFTER_AMOUNT" -lt "$BEFORE_AMOUNT" ]; then
-    DISCOUNT=$(echo "scale=2; (1 - $AFTER_AMOUNT / $BEFORE_AMOUNT) * 100" | bc)
-    pass "  Price tier discount engaged: ${BEFORE_AMOUNT} → ${AFTER_AMOUNT} (${DISCOUNT}% off)"
-  elif [ "$AFTER_AMOUNT" -eq "$BEFORE_AMOUNT" ]; then
-    warn "  Same price tier (BEFORE=$BEFORE_AMOUNT == AFTER=$AFTER_AMOUNT). Tier threshold not yet crossed on this agent."
-  else
-    warn "  AFTER ($AFTER_AMOUNT) > BEFORE ($BEFORE_AMOUNT) — unexpected. Check gateway cache invalidation."
-  fi
-else
-  warn "  Could not compare amounts (BEFORE=$BEFORE_AMOUNT AFTER=$AFTER_AMOUNT); verify manually."
-fi
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Summary
 # ──────────────────────────────────────────────────────────────────────────────
 
-step "8/8" "Write summary artifact"
+step "5/5" "Write summary artifact"
 SUMMARY_FILE="$ARTIFACT_DIR/summary.md"
 cat > "$SUMMARY_FILE" <<EOF
 # Demo e2e — $STAMP
@@ -231,8 +181,6 @@ cat > "$SUMMARY_FILE" <<EOF
 | paymentId | \`$PAYMENT_ID\` |
 | settlement tx | \`$TX_HASH\` |
 | attestation tx | \`$TD_TX\` |
-| x402.amount BEFORE | \`${BEFORE_AMOUNT:-UNKNOWN}\` |
-| x402.amount AFTER  | \`${AFTER_AMOUNT:-UNKNOWN}\` |
 | Basescan (settlement) | https://sepolia.basescan.org/tx/$TX_HASH |
 | Basescan (attestation) | https://sepolia.basescan.org/tx/$TD_TX |
 EOF

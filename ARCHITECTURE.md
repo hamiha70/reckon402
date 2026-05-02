@@ -123,7 +123,7 @@ signing classes enforce separate write authority:
 | `x402.erc8004.registry` | Reckon402 | Registry addresses are protocol-level |
 | `x402.erc8004.agent_id` | Reckon402 | agentId minted on the identity contract by Reckon402 |
 | `x402.amount` | SellingAgent | SellingAgent sets their own price |
-| `x402.pricing` | SellingAgent | Tier discount strategy hint |
+| `x402.pricing` | SellingAgent | Tier-pricing strategy hint (L4c legacy parallel layer) |
 | `x402.endpoint` | SellingAgent | SellingAgent controls their service endpoint |
 | `x402.attestation` | SellingAgent | Optional per-merchant write opt-in |
 | `x402.yield` | SellingAgent | Revenue-share config |

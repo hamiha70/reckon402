@@ -1555,3 +1555,20 @@ on first need). Each open question gets a Q-XX identifier and a
 disposition (resolved / deferred / blocking). When resolved, the
 disposition is rolled back into the relevant spec and the open-question
 file is closed (deleted in the same commit that lands the resolution).
+
+## Learned User Preferences
+
+- On large design pivots, mirror the proposal back in technical-contract terms and present 2-4 sharp forks before touching code; if the user skips the questions, pick reasonable defaults that honor their stated constraints and ship the smallest viable scope that tells the new story.
+- Treat user time estimates for in-scope Solidity + Foundry work as credible (1-2 hours for a contract refactor is realistic); push back on smart-contract scope on design grounds, not on feasibility.
+- Wrap every operator-facing test, healthz, smoke, and redeploy command behind a `just` recipe; "how do I run X with just?" must always have an answer rather than a raw `pnpm` / `forge` / `cast` / `curl` chain.
+- For library, SDK, or CLI questions (KH, ENS, viem, hono, wrangler, foundry), consult `LLM_friendly_tech_docs/`, the `context7` MCP, the repo's `tools/` and `recipes/` priors, and the relevant CLI's `--help` before reaching for web search.
+- For pre-existing `.js` files in `apps/frontend/`, prefer adding `// @ts-check` plus a minimal `tsconfig.json` over rewriting the surface; catching last-minute bugs via type narrowing is the explicit priority.
+- Position the KeeperHub skill as MCP-first (KH team office-hour signal), with the workflow node / skill form as a secondary surface.
+- Treat short user replies such as "go" or a skipped clarifying-question block as approval for the smallest-scope concrete plan just outlined; do not re-ask the same forks.
+
+## Learned Workspace Facts
+
+- KeeperHub publishing canonical path is the local `kh` CLI (binary at `~/.linuxbrew/bin/kh`, authenticated as `hamiha70` / org `d9dca912-bb60-41b5-a727-ee5060c2d3b1`). Two-step publish: `kh workflow create --name <n> --nodes <json> [--description <d>] --json` → `kh workflow go-live <id> --name <n> --json`. There is no indexed raw HTTP API; do not invent `POST /api/workflows/...` endpoints.
+- `kh action get <plugin>/<slug>` returns `action not found`; enumerate a plugin's actions with `kh plugin get <name> --json` (returns human labels like `"HTTP Request"`, not slugs).
+- `kh workflow get <id> --json` fails on featured KH templates with a `WorkflowDetail.publicTags` JSON-schema drift between CLI and server; create/go-live on owned workflows is unaffected.
+- The published "Reckon402 ResearchAgent" KH workflow (`5b5bx18671fappzbchqt9`) is a manual-trigger discovery anchor only; the executable flow lives in `recipes/kh-workflow.json`. The custom `reckon402-buyer` node type is NOT a registered KH plugin — executable KH-native nodes would require a registered plugin or a hand-composed `System / HTTP Request` chain calling `signing.reckon402.com/sign` then `agent.reckon402.com/research`.

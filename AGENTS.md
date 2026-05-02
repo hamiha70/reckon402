@@ -953,7 +953,7 @@ Shipped at tag `demo-infra-green`.
 | Dashboard source | `demo/index.html` (vanilla HTML + Tailwind CDN; no build step) |
 | Demo e2e script | `scripts/demo-e2e.sh` |
 | KH platform runbook | `tools/deploy/kh-platform-runbook.md` |
-| KH workflow URL | _TODO: paste after manual publish at app.keeperhub.com_ |
+| KH workflow URL | `https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9` (published 2026-05-02 via `kh workflow create` + `kh workflow go-live`; visibility=public, manual-trigger node only — see `tools/deploy/kh-platform-runbook.md` Results) |
 
 ### CF Pages deploy status
 

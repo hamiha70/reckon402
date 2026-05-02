@@ -5,21 +5,31 @@ secrets := "tools/with-secrets.sh"
 # Print a human-readable summary of key recipes
 help:
     @echo "Reckon402 — key recipes:"
-    @echo "  just test-e2e               Run full end-to-end test (payment + attestation)"
-    @echo "  just test-payment           Run L3 payment settlement test only"
-    @echo "  just onboard <ens> <eoa>    Onboard a new SellingAgent (5 steps)"
-    @echo "  just balance                Check EOA balances"
-    @echo "  just tail-facilitator       Stream facilitator worker logs"
-    @echo "  just tail-agent             Stream agent worker logs"
-    @echo "  just deploy-landing         Deploy reckon402.com landing Worker"
-    @echo "  just deploy-agent           Deploy agent.reckon402.com Worker"
-    @echo "  just deploy-facilitator     Deploy facilitator.reckon402.com Worker"
-    @echo "  just deploy-gateway         Deploy gateway.reckon402.com Worker (production)"
-    @echo "  just deploy-gateway-staging Deploy gateway-staging.reckon402.com Worker"
-    @echo "  just deploy-orchestrator    Deploy app.reckon402.com Worker (bundles apps/frontend/dist as assets)"
-    @echo "  just deploy-all             Deploy all six production Workers in sequence"
-    @echo "  just fork-tests-all         Run L3 + L4d Foundry fork tests vs live Base Sepolia"
-    @echo "  just healthz-all            Probe /healthz on every worker + cast-call every L4d contract"
+    @echo ""
+    @echo "  Pre-submission gates (no on-chain spend):"
+    @echo "    just preflight-submission Run all idempotent gates: vitest + forge + typecheck + healthz-all + fork-tests-all"
+    @echo "    just healthz-all          Probe /healthz on every worker + cast-call every L4d contract"
+    @echo "    just fork-tests-all       Run L3 + L4d Foundry fork tests vs live Base Sepolia"
+    @echo ""
+    @echo "  Live integration smokes (REAL gas + USDC, mutates on-chain state):"
+    @echo "    just fullflow-l4b         Live settle + ERC-8004 attestation roundtrip (alias: test-e2e)"
+    @echo "    just fullflow-l3          Live L3 settle roundtrip (alias: test-payment)"
+    @echo "    just fullflow-l4c-onboard 6-step L4d onboard against live Sepolia (alias: test-onboard)"
+    @echo ""
+    @echo "  Onboarding + ops:"
+    @echo "    just onboard <ens> <eoa>    Onboard a new SellingAgent (5 steps)"
+    @echo "    just balance                Check EOA balances"
+    @echo "    just tail-facilitator       Stream facilitator worker logs"
+    @echo "    just tail-agent             Stream agent worker logs"
+    @echo ""
+    @echo "  Deploys (per-Worker):"
+    @echo "    just deploy-landing         Deploy reckon402.com landing Worker"
+    @echo "    just deploy-agent           Deploy agent.reckon402.com Worker"
+    @echo "    just deploy-facilitator     Deploy facilitator.reckon402.com Worker"
+    @echo "    just deploy-gateway         Deploy gateway.reckon402.com Worker (production)"
+    @echo "    just deploy-gateway-staging Deploy gateway-staging.reckon402.com Worker"
+    @echo "    just deploy-orchestrator    Deploy app.reckon402.com Worker (frontend assets bundled)"
+    @echo "    just deploy-all             Deploy all six production Workers in sequence"
 
 # Show available recipes
 default:
@@ -149,6 +159,41 @@ fork-tests-all: fork-test-l3 fork-test-l4d
 # Sepolia. Exits 0 ONLY if every probe is green.
 healthz-all:
     {{secrets}} bash tools/integration-tests/healthz-all.sh
+
+# Run EVERY idempotent pre-submission gate. Safe to run repeatedly —
+# nothing here writes on-chain state or burns gas. Order is hot-to-
+# cold (fastest gate first) so a regression surfaces early:
+#
+#   1. pnpm test         — 362 vitest cases, full TS workspace (~15s)
+#   2. forge test        — 109 Foundry cases, offline (~10s)
+#   3. pnpm typecheck    — frontend // @ts-check (~3s)
+#   4. just healthz-all  — 15 live HTTP + cast call probes (~5s)
+#   5. just fork-tests-all — L3 + L4d Foundry fork tests against live
+#                            Base Sepolia (~60s)
+#
+# What this DOES NOT include (intentional — these mutate on-chain
+# state and cost gas; running them must stay an explicit operator
+# decision):
+#   - just fullflow-l4b           (settles + writes attestation)
+#   - just fullflow-l4c-onboard   (mints ENS + ERC-8004 agentId)
+#   - just fullflow-l4c-factory   (settles a payment)
+#   - just fullflow-l3            (settles a payment)
+#
+# A failure in any step exits non-zero and skips the rest. The full
+# pre-submission protocol is documented in docs/test-posture-h-9.md §9.
+preflight-submission:
+    @echo "==> [1/5] pnpm test (vitest workspace)"
+    pnpm test
+    @echo "==> [2/5] forge test (offline Foundry suite)"
+    cd contracts && forge test
+    @echo "==> [3/5] pnpm typecheck (frontend // @ts-check)"
+    pnpm typecheck
+    @echo "==> [4/5] healthz-all (live HTTP + on-chain reads)"
+    just healthz-all
+    @echo "==> [5/5] fork-tests-all (Foundry vs live Base Sepolia)"
+    just fork-tests-all
+    @echo ""
+    @echo "==> preflight-submission: GREEN. Mutating gates (fullflow-l4b etc.) NOT run — call manually."
 
 # Deploy reckon402.com landing Worker (no package.json — uses npx)
 deploy-landing:

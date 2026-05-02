@@ -7,7 +7,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:dev": "wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest"
   },

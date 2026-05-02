@@ -2,11 +2,10 @@
   "name": "@reckon402/frontend",
   "version": "0.0.1",
   "private": true,
-  "description": "Reckon402 L4c onboarding + dashboard frontend (vanilla TS + fetch polling). Served as static assets by the onboard-orchestrator Worker.",
+  "description": "Reckon402 L4c onboarding + dashboard frontend (hand-edited vanilla HTML/JS in dist/, no build step). Served as static assets bundled into the onboard-orchestrator Worker — deploy via `just deploy-orchestrator` (NOT a separate Worker).",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "node scripts/build.mjs --watch"
+    "deploy": "echo 'apps/frontend has no standalone deploy. The dist/ directory is bundled into the onboard-orchestrator Worker via Workers Assets — run `just deploy-orchestrator` to ship UI changes to app.reckon402.com.' && exit 1"
   }
 }

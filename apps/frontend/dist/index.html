@@ -64,34 +64,65 @@
         </label>
 
         <label class="block">
-          <span class="text-xs text-gray-400 block mb-1">Base amount (atomic USDC — e.g. 100000 = 0.10 USDC)</span>
-          <input name="amount" required pattern="[0-9]+"
+          <span class="text-xs text-gray-400 block mb-1">Base price per call (USDC)</span>
+          <input name="amount" required pattern="[0-9]+(\.[0-9]+)?" inputmode="decimal"
             class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-100 font-mono text-sm"
-            value="100000" />
+            value="0.10" />
+          <span class="text-xs text-gray-600 block mt-1">Charged to the buyer for every paid call. Constant — does not vary with seller reputation.</span>
         </label>
 
-        <!-- Revenue split (hardcoded, non-editable) -->
+        <!-- ERC-8004 identity disclosure -->
         <div class="bg-gray-950 border border-gray-800 rounded p-3">
-          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Revenue split (hardcoded)</div>
-          <div class="space-y-1 text-xs font-mono text-gray-400">
-            <div class="flex justify-between"><span>0xD53f… <span class="text-gray-600">(seller)</span></span><span class="text-green-300">97%</span></div>
-            <div class="flex justify-between"><span>0x0A02… <span class="text-gray-600">(platform)</span></span><span class="text-gray-300">2%</span></div>
-            <div class="flex justify-between"><span>0x66C2… <span class="text-gray-600">(deployer)</span></span><span class="text-gray-300">1%</span></div>
+          <div class="flex items-center justify-between">
+            <div class="text-xs text-gray-500 uppercase tracking-wider">ERC-8004 identity</div>
+            <div class="text-[10px] text-gray-500">v1 · new agent only</div>
+          </div>
+          <div class="text-xs text-gray-300 mt-2 leading-snug">
+            We mint a fresh <span class="font-mono text-green-300">agentId</span> NFT on Base Sepolia
+            (IdentityRegistry <a href="https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e" target="_blank" class="text-blue-400 underline font-mono">0x8004…BD9e</a>)
+            and transfer it to your SellingAgent EOA. The agentId is the on-chain handle every settlement
+            attestation is keyed to.
+          </div>
+          <div class="text-[10px] text-gray-600 mt-2 leading-snug">
+            Bring-your-own-agentId (link an existing 8004 record instead of minting a new one) is a v1.5 path.
           </div>
         </div>
 
-        <!-- Discount tiers (hardcoded, non-editable) -->
+        <!-- Revenue split (hardcoded, non-editable) -->
         <div class="bg-gray-950 border border-gray-800 rounded p-3">
-          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Trust-based discount tiers</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">On-chain Splitter recipients</div>
+          <div class="space-y-1 text-xs font-mono text-gray-400">
+            <div class="flex justify-between"><span>0xD53f… <span class="text-gray-600">(seller, paid immediately)</span></span><span class="text-green-300">87%</span></div>
+            <div class="flex justify-between"><span>0x0A02… <span class="text-gray-600">(facilitator + deployer fee)</span></span><span class="text-gray-300">3%</span></div>
+            <div class="flex justify-between"><span>0x66C2… <span class="text-gray-600">(risk / claims-contestation buffer)</span></span><span class="text-amber-300">10%</span></div>
+          </div>
+          <div class="text-[10px] text-gray-600 mt-2 leading-snug">
+            Splits are immutable per agent. The 3% facilitator slot is constant across reputation.
+            The 10% buffer accrues in the risk-buffer EOA on-chain and is conceptually released back to the
+            seller as the agent's settlement-attestation count grows (see schedule below).
+          </div>
+        </div>
+
+        <!-- Risk-buffer release schedule (hardcoded, non-editable) -->
+        <div class="bg-gray-950 border border-gray-800 rounded p-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Risk-buffer release schedule</div>
           <table class="w-full text-xs font-mono">
-            <thead><tr class="text-gray-600"><th class="text-left py-0.5">Attestations</th><th class="text-left py-0.5">Tier</th><th class="text-right py-0.5">Discount</th></tr></thead>
+            <thead><tr class="text-gray-600"><th class="text-left py-0.5">Attestations</th><th class="text-left py-0.5">Tier</th><th class="text-right py-0.5">Buffer released to seller</th></tr></thead>
             <tbody class="text-gray-400">
-              <tr><td>0+</td><td>base</td><td class="text-right">—</td></tr>
-              <tr><td>1+</td><td class="text-amber-300">bronze</td><td class="text-right text-green-300">-5%</td></tr>
-              <tr><td>3+</td><td class="text-gray-200">silver</td><td class="text-right text-green-300">-10%</td></tr>
-              <tr><td>10+</td><td class="text-yellow-300">gold</td><td class="text-right text-green-300">-15%</td></tr>
+              <tr><td>0+</td><td class="text-gray-400">T0 — new</td><td class="text-right text-gray-500">0%</td></tr>
+              <tr><td>1+</td><td class="text-slate-200">T1 — first-call</td><td class="text-right text-slate-200">5%</td></tr>
+              <tr><td>3+</td><td class="text-blue-200">T2 — active</td><td class="text-right text-blue-200">15%</td></tr>
+              <tr><td>10+</td><td class="text-cyan-200">T3 — reliable</td><td class="text-right text-cyan-200">30%</td></tr>
+              <tr><td>30+</td><td class="text-teal-200">T4 — established</td><td class="text-right text-teal-200">50%</td></tr>
+              <tr><td>100+</td><td class="text-emerald-200">T5 — trusted</td><td class="text-right text-emerald-200">70%</td></tr>
+              <tr><td>300+</td><td class="text-green-200">T6 — proven</td><td class="text-right text-green-200">85%</td></tr>
+              <tr><td>1000+</td><td class="text-green-100">T7 — veteran</td><td class="text-right text-green-300">100%</td></tr>
             </tbody>
           </table>
+          <div class="text-[10px] text-gray-600 mt-2 leading-snug">
+            Exponentially-spaced tiers, gentler drawdown than the v0 four-step ramp.
+            Higher trust = more of the escrowed buffer is claimable. Buyer-facing price never changes.
+          </div>
         </div>
 
         <button type="submit"
@@ -104,6 +135,34 @@
       <div id="progress-panel" class="hidden mt-6 bg-gray-900 border border-gray-800 rounded-lg p-6">
         <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-3">Onboarding progress</h3>
         <ol id="progress-steps" class="space-y-2 text-sm"></ol>
+
+        <!-- Agent-mint result card (shown once step 3 lands the agentId) -->
+        <div id="agent-mint-card" class="hidden mt-5 bg-gray-950 border border-green-800 rounded p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-green-400 text-lg">✓</span>
+            <div class="text-xs uppercase tracking-wider text-green-300 font-bold">ERC-8004 identity minted</div>
+          </div>
+          <dl class="grid grid-cols-[110px_1fr] gap-y-1 text-xs font-mono">
+            <dt class="text-gray-500">agentId</dt>
+            <dd id="mint-agent-id" class="text-green-200 font-bold text-base">—</dd>
+            <dt class="text-gray-500">owner</dt>
+            <dd id="mint-owner" class="text-gray-200 break-all">—</dd>
+            <dt class="text-gray-500">chain</dt>
+            <dd class="text-gray-200">Base Sepolia (84532)</dd>
+            <dt class="text-gray-500">contract</dt>
+            <dd class="text-gray-200">
+              <a href="https://sepolia.basescan.org/address/0x8004A818BFB912233c491871b3d84c89A494BD9e"
+                 target="_blank" class="text-blue-400 underline">IdentityRegistry 0x8004…BD9e</a>
+            </dd>
+            <dt class="text-gray-500">tx</dt>
+            <dd id="mint-tx" class="text-gray-200">—</dd>
+          </dl>
+          <div class="text-[10px] text-gray-600 mt-3 leading-snug">
+            Every paid settlement for this agent will write a <span class="font-mono">NewFeedback</span>
+            event keyed to this agentId. The dashboard's attestation count tracks those events 1:1.
+          </div>
+        </div>
+
         <div id="progress-error" class="hidden mt-4 text-red-400 text-sm"></div>
       </div>
     </div>
@@ -154,18 +213,33 @@
       </details>
 
       <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
-        <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-3">Trust tier</h3>
+        <h3 class="text-sm uppercase tracking-wider text-gray-500 mb-3">Risk buffer (escrow)</h3>
         <div class="mb-4 flex items-center gap-3">
           <span class="text-3xl font-bold tabular-nums" id="trust-count">0</span>
           <span class="text-gray-500 text-sm">attestations</span>
           <span id="trust-badge" class="ml-auto px-3 py-1 rounded text-xs font-bold bg-gray-700 text-gray-300">no tier</span>
         </div>
+        <dl class="grid grid-cols-2 gap-2 text-sm mb-4">
+          <dt class="text-gray-500">Per-call buffer</dt>
+          <dd id="buffer-per-call" class="font-mono text-gray-200">—</dd>
+          <dt class="text-gray-500">Total accrued</dt>
+          <dd id="buffer-accrued" class="font-mono text-amber-200">—</dd>
+          <dt class="text-gray-500">Released to seller</dt>
+          <dd id="buffer-released" class="font-mono text-gray-200">—</dd>
+          <dt class="text-gray-500">Claimable now</dt>
+          <dd id="buffer-claimable" class="font-mono text-green-300 font-bold">—</dd>
+        </dl>
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-gray-500 tracking-wider">
-            <tr><th class="text-left py-1">Count</th><th class="text-left py-1">Tier</th><th class="text-right py-1">Price</th></tr>
+            <tr><th class="text-left py-1">Attestations</th><th class="text-left py-1">Tier</th><th class="text-right py-1">% buffer released</th></tr>
           </thead>
           <tbody id="tier-table" class="font-mono"></tbody>
         </table>
+        <div class="text-[10px] text-gray-600 mt-3 leading-snug">
+          v1 ships display-only escrow: the 10% buffer slice from every settlement lands in the risk-buffer EOA on-chain.
+          The "claimable" amount above is the off-chain accounting view of what the seller has earned back.
+          On-chain claim contract is v1.5.
+        </div>
       </div>
 
       <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">

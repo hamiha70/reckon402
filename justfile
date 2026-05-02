@@ -5,12 +5,19 @@ secrets := "tools/with-secrets.sh"
 # Print a human-readable summary of key recipes
 help:
     @echo "Reckon402 — key recipes:"
-    @echo "  just test-e2e          Run full end-to-end test (payment + attestation)"
-    @echo "  just test-payment      Run L3 payment settlement test only"
-    @echo "  just onboard <ens> <eoa>  Onboard a new SellingAgent (5 steps)"
-    @echo "  just balance           Check EOA balances"
-    @echo "  just tail-facilitator  Stream facilitator worker logs"
-    @echo "  just tail-agent        Stream agent worker logs"
+    @echo "  just test-e2e               Run full end-to-end test (payment + attestation)"
+    @echo "  just test-payment           Run L3 payment settlement test only"
+    @echo "  just onboard <ens> <eoa>    Onboard a new SellingAgent (5 steps)"
+    @echo "  just balance                Check EOA balances"
+    @echo "  just tail-facilitator       Stream facilitator worker logs"
+    @echo "  just tail-agent             Stream agent worker logs"
+    @echo "  just deploy-landing         Deploy reckon402.com landing Worker"
+    @echo "  just deploy-agent           Deploy agent.reckon402.com Worker"
+    @echo "  just deploy-facilitator     Deploy facilitator.reckon402.com Worker"
+    @echo "  just deploy-gateway         Deploy gateway.reckon402.com Worker (production)"
+    @echo "  just deploy-gateway-staging Deploy gateway-staging.reckon402.com Worker"
+    @echo "  just deploy-orchestrator    Deploy app.reckon402.com Worker (bundles apps/frontend/dist as assets)"
+    @echo "  just deploy-all             Deploy all six production Workers in sequence"
 
 # Show available recipes
 default:
@@ -26,11 +33,11 @@ balance:
 
 # Stream live logs from the facilitator Worker (wrangler tail)
 tail-facilitator:
-    {{secrets}} bash -c 'wrangler tail reckon402-facilitator-prod --format pretty'
+    {{secrets}} bash -c 'cd workers/facilitator && pnpm exec wrangler tail reckon402-facilitator --format pretty'
 
 # Stream live logs from the agent Worker (wrangler tail)
 tail-agent:
-    {{secrets}} bash -c 'wrangler tail reckon402-agent-prod --format pretty'
+    {{secrets}} bash -c 'cd workers/agent && pnpm exec wrangler tail reckon402-agent --format pretty'
 
 # Run the live end-to-end L3 integration test on Base Sepolia
 fullflow-l3:
@@ -91,6 +98,48 @@ onboard ensName sellerEoa endpoint='https://agent.reckon402.com/research' amount
 # and 08B orchestrator + gateway admin routes live.
 fullflow-l4c-onboard:
     {{secrets}} bash tools/integration-tests/run-l4c-onboard.sh
+
+# Deploy reckon402.com landing Worker (no package.json — uses npx)
+deploy-landing:
+    {{secrets}} bash -c 'cd workers/landing && npx wrangler deploy'
+
+# Deploy agent.reckon402.com Worker
+deploy-agent:
+    {{secrets}} bash -c 'cd workers/agent && pnpm run deploy'
+
+# Deploy facilitator.reckon402.com Worker
+deploy-facilitator:
+    {{secrets}} bash -c 'cd workers/facilitator && pnpm run deploy'
+
+# Notes on gateway deploys: production and staging are separate recipes
+# because staging deploy is an explicit operator action (it re-warms caches
+# and may flush in-flight CCIP-Read responses), not a side-effect of
+# `just deploy-all`.
+
+# Deploy gateway.reckon402.com Worker (production env)
+deploy-gateway:
+    {{secrets}} bash -c 'cd gateway && pnpm run deploy'
+
+# Deploy gateway-staging.reckon402.com Worker (staging env)
+deploy-gateway-staging:
+    {{secrets}} bash -c 'cd gateway && pnpm run deploy:staging'
+
+# Note on app.reckon402.com: there is NO separate `deploy-frontend` recipe.
+# apps/frontend has no standalone Worker — its dist/ is bundled as Workers
+# Assets into the onboard-orchestrator Worker, so all UI changes ship via
+# `just deploy-orchestrator`. apps/frontend/wrangler.jsonc is vestigial.
+
+# Deploy app.reckon402.com Worker (orchestrator + bundled frontend assets)
+deploy-orchestrator:
+    {{secrets}} bash -c 'cd workers/onboard-orchestrator && pnpm run deploy'
+
+# Notes on deploy-all order: read-side (landing, gateway) first; write-side
+# (agent, facilitator, orchestrator) last. Minimises the window where an
+# in-flight buyer call could hit a stale downstream during a multi-worker
+# rollout.
+
+# Deploy all six production Workers in sequence (landing, gateway, agent, facilitator, orchestrator)
+deploy-all: deploy-landing deploy-gateway deploy-agent deploy-facilitator deploy-orchestrator
 
 # Readable aliases
 test-e2e: fullflow-l4b

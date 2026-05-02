@@ -73,7 +73,7 @@ export default {
         <div class="pl-9 text-gray-200">https://agent.reckon402.com/research</div>
         <div class="pl-4 text-gray-500">HTTP/2 <span class="text-green-400 font-bold">200</span> OK&nbsp;
           <span class="text-green-400">✓ settled on-chain in 3s</span>
-          <span class="text-gray-600"> · agentId=1 · tier=<span class="text-amber-400">gold</span> · price=<span class="text-green-400">0.0722 USDC</span></span>
+          <span class="text-gray-600"> · agentId=1 · tier=<span class="text-amber-400">gold</span> · risk-fee=<span class="text-green-400">0%</span> · routed=<span class="text-green-400">0.0850 USDC</span></span>
         </div>
         <div class="pl-4 text-gray-600">x-reckon-tx: 0xa1b2c3d4&hellip;</div>
         <div class="text-green-400 terminal-cursor text-xs mt-1"></div>
@@ -146,10 +146,11 @@ export default {
 
         <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-5 space-y-2">
           <div class="text-amber-400 text-xl">🔗</div>
-          <div class="text-gray-100 font-semibold text-sm">Trust closes the loop</div>
+          <div class="text-gray-100 font-semibold text-sm">Risk fee drops as trust is earned</div>
           <div class="text-gray-500 text-xs leading-relaxed">
             Every settled payment writes an ERC-8004 attestation on-chain.
-            Next request reads the updated tier via ENS CCIP-Read — price drops automatically.
+            Reckon402's risk engine reads it back via ENS CCIP-Read and reduces
+            its routing fee — automatically, from on-chain data, no trusted intermediary.
           </div>
         </div>
 

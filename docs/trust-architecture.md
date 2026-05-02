@@ -1,12 +1,15 @@
 # Reckon402 trust architecture
 
-Status: written 2026-05-02 alongside the L4d on-chain Escrow ship. This
-document captures three structural questions raised at the Q-09-* gate
-and pins their dispositions. It is intended for judges and
-implementers who need to understand WHY the Reckon402 trust signals
-look the way they do — not just WHAT they are.
+Status: written 2026-05-02 alongside the L4d on-chain Escrow ship.
+Section 4 added 2026-05-02 (post-deployment review on
+`L4d-end-to-end-green`) to record why the Splitter's direct recipient
+slots are NOT NFT-bound, only the Escrow is. This document captures
+the structural questions raised at the Q-09-* gate and pins their
+dispositions. It is intended for judges and implementers who need to
+understand WHY the Reckon402 trust signals look the way they do — not
+just WHAT they are.
 
-The three questions:
+The four questions:
 
 1. **Sybil / spam mitigation** — how does the Escrow ignore attestations
    that aren't from a genuine settlement?
@@ -16,6 +19,9 @@ The three questions:
 3. **Contract-readable ENS records** — can a contract read the
    `x402.*` text records served by the gateway? How are those records
    authenticated against forgery?
+4. **Asymmetric NFT-binding** — why does the per-agent Escrow gate
+   withdrawals on `IdentityRegistry.ownerOf(agentId)`, while the
+   direct seller / facilitator-fee slots in the Splitter do NOT?
 
 ---
 
@@ -218,6 +224,108 @@ name to those on-chain anchors.
 
 ---
 
+## 4. Why direct Splitter recipients are NOT NFT-bound
+
+The L4d Escrow gates `withdrawAll()` on
+`IERC721(identityRegistry).ownerOf(agentId) == msg.sender` so funds
+that accumulate in the Escrow follow the agent's NFT around an
+ownership change. A natural follow-up question: should the Splitter's
+two **direct** recipient slots — slot 0 (seller payout) and slot 1
+(facilitator fee) — also be NFT-bound, so the seller can never
+"orphan" their direct earnings by transferring the NFT without
+updating the Splitter?
+
+**No, by design.** This is an asymmetry, and it is intentional. The
+load-bearing distinction is **hold vs forward**:
+
+| Recipient | Funds path | NFT-binding needed? |
+|--|--|--|
+| Splitter slot 0 (seller) | `transfer()` — funds leave the contract immediately | No |
+| Splitter slot 1 (facilitator fee) | `transfer()` — funds leave the contract immediately | No |
+| Splitter slot 2 (per-agent Escrow) | `transfer()` to Escrow, which **holds** until tier-gated `withdraw()` | Yes — gated at the Escrow |
+
+The principle: contracts that **hold** funds (`balanceOf > 0`)
+between settlement events need an authority check at withdrawal
+time. Contracts that only **forward** funds at settlement time
+don't have a "withdrawal" operation in the first place — the
+recipient is paid by `Splitter.distribute()` itself, which anyone
+can call (it's deliberately permissionless to keep settlement
+non-blocking).
+
+For the seller payout slot, the seller has already chosen their
+custody at deploy time — they signed up with a specific EOA and
+that EOA receives 87% of every settlement directly. Adding an
+NFT-owner indirection here would mean:
+
+1. **Worse UX.** The seller's preferred custody might be a multisig,
+   a Safe, an exchange deposit address, or a hardware wallet — none
+   of which need to be the same address that holds the agent's
+   IdentityRegistry NFT. Forcing them to align is friction.
+
+2. **No security gain.** A malicious party who steals the NFT can
+   already drain the Escrow (which is the design). They can also
+   re-target future settlements via signed ENS record writes (the
+   `x402.splitter` record). The direct seller slot for *past*
+   settlements is by definition already paid out and not at risk.
+
+3. **Substantial new contract surface.** Every Splitter
+   `distribute()` call would need to read the IdentityRegistry,
+   adding ~3 000 gas per settlement and creating a hard dependency
+   on the Identity contract being healthy at settlement time. A
+   bug or pause on IdentityRegistry would freeze every settlement
+   for every agent. Today the Splitter is a clean immutable
+   primitive with zero external reads at distribution time.
+
+The asymmetry is also defensible from a "who custodies what" lens:
+
+- The Escrow's role is to act as a **trust ramp**: a portion of every
+  settlement is locked, then released back to the agent's NFT-owner
+  as on-chain attestations grow. The whole point of that mechanism
+  is "pay the current legitimate operator of this agent" — which is
+  exactly the NFT owner.
+- The seller payout slot's role is "pay the seller". The seller is
+  whoever the operator decided to designate at deploy time. That
+  designation is itself an identity claim: by signing the
+  `createSplitter()` call, the operator picked an address. If they
+  want to migrate that designation later, the cost is one Splitter
+  redeploy + ENS-record update, which is a per-agent operation, not
+  a per-settlement operation.
+
+### When would we revisit?
+
+If the SellingAgent business model evolves so that ownership-of-
+agent-NFT is the canonical "who owns the revenue stream" semantic
+(Path B in `specs/01-eoa-topology.md`'s Q-01-5), the Splitter's
+direct slots would migrate to NFT-binding alongside the Escrow.
+That's a v2 reckon402 platform direction — not a hackathon-scope
+change. We surface it here so the asymmetry is recorded as an
+explicit decision rather than an oversight.
+
+### Migration cost (recorded for completeness)
+
+If we *did* want to NFT-bind the seller slot tomorrow:
+
+- **Contract changes**: ~25 LOC. New `SellerPayoutForwarder.sol` that
+  reads `ownerOf(agentId)` and forwards to that address; deploy one
+  per agent through `SplitterFactory` alongside the Splitter. Could
+  also be done as a Splitter ABI extension (`recipientResolver`
+  interface), but that breaks immutability claims.
+- **Frontend / orchestrator changes**: substantial — the dashboard's
+  "seller" recipient label would now require a live owner-lookup; the
+  onboarding flow would need a "redirect-payouts" UI for NFT
+  transfers; `tools/onboard/src/orchestrator.ts` would need to write
+  the forwarder address (not the seller EOA) into the Splitter at
+  step 4.
+- **New attack surface**: every settlement now reads
+  IdentityRegistry. If that contract pauses, every Reckon402
+  settlement halts.
+
+The cost equation skews toward "leave it as a v2 platform
+direction"; the Escrow's NFT-binding is sufficient for the
+hackathon-scope trust story.
+
+---
+
 ## Summary table
 
 | Concern | Where the load-bearing protection lives | Reckon402's contribution |
@@ -225,6 +333,7 @@ name to those on-chain anchors.
 | Sybil on attestation count | `ReputationRegistry.giveFeedback` derives `clientAddress` from `msg.sender` | Pin `facilitatorClient` + `(tag1, tag2)` in the Escrow constructor; Escrow reads only attestations matching that tuple |
 | Bypass risk (Escrow ignoring ERC-8004 entirely) | `Escrow.attestationCount()` reads via cross-contract STATICCALL | One source of truth for the public reputation count; Escrow is a thin pricing layer above it |
 | Forged ENS records | Gateway-signed CCIP-Read responses + Reckon402Resolver signer recovery + ENS-owner ACL on writes | Gateway is the signing oracle; ENS is never consulted by a contract for authority decisions |
+| Direct Splitter recipients change of custody | Operator-signed Splitter redeploy + ENS-record update | Splitter is immutable + permissionless `distribute()`; "hold" funds get NFT-bound (Escrow), "forward" funds do not (seller payout slot) |
 
 These dispositions are pinned in:
 

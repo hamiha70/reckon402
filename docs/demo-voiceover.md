@@ -1,13 +1,15 @@
 # Reckon402 Demo Voiceover Script
 
-> **Status:** drafted 2026-05-02 H-9 sprint, mirrors the L4d Escrow narrative
-> from `docs/canonical-narrative.md`. Onboarding (Act 2) drives the live
-> web-form path on `app.reckon402.com` — verified end-to-end against
-> `seller20` on 2026-05-02 (commit `1feb949`, viem nonceManager fix).
-> The paid-call flow (Act 4) mirrors the live `seller19` run captured in
-> `tools/integration-tests/results-full-flow-l4b-2026-05-02T20-24-05Z.md`.
+> **Status:** updated 2026-05-02 (post H-9). All six acts drive from a
+> single browser tab on `app.reckon402.com` — no terminal switch, no
+> MetaMask popup, no agent worker re-deploy between acts. Onboarding
+> (Act 2), paid call (Act 4), and claim (Act 5) each run from one button
+> press; the orchestrator does the on-chain work behind the scenes
+> using Infisical-piped wrangler secrets. Verified end-to-end against
+> `seller20` on 2026-05-02 (settle tx `0x30d498f2…0314ec`, claim tx
+> `0x2a205bf0…34f5cb75`).
 >
-> **Format.** Six acts, ~3:30 total. Each act lists the voiceover text and
+> **Format.** Six acts, ~3:00 total. Each act lists the voiceover text and
 > the visual cue the operator should be on-screen for that beat. Voiceovers
 > are recorded separately and synced to the screen capture in post — the
 > operator does not have to deliver them live.
@@ -106,66 +108,63 @@ new agentId.
 ## Act 3 — The dashboard (30s)
 
 **Visual.**
-1. Open `https://app.reckon402.com/#/agent/seller19.reckon402-test.eth`.
+1. After Act 2 ends, click the dashboard link the form surfaces (or
+   navigate directly to `https://app.reckon402.com/#/agent/seller20.reckon402-test.eth`
+   — substitute your fresh ENS label).
 2. Slow scroll top to bottom, pausing ~2 seconds on each panel:
-   - Header (price 0.10 USDC, agentId 5421, Splitter, Escrow, owner)
+   - Header (price 0.01 USDC, agentId 5435, Splitter, Escrow, owner)
    - Splitter recipients (87% / 3% / 10%)
-   - ENS Text Records (collapsed bar — open it for ~3s to show 12 records)
+   - ENS Text Records (collapsed bar — open it for ~3s to show 13 records)
    - Risk buffer (Escrow) — empty, attestations = 0, T0 active
    - Recent paid calls — "no calls yet"
 
 **Voiceover.**
 > This is the agent's dashboard. Per-agent Splitter, per-agent Escrow,
-> twelve signed ENS text records served from a CCIP-Read gateway. Right
-> now the agent has zero attestations — tier T0 — so the Escrow would
-> hold one hundred percent of the buffer if any payment landed. Nothing
-> has paid this agent yet. Let's change that.
+> thirteen signed ENS text records served from a CCIP-Read gateway.
+> Right now the agent has zero attestations — tier T0 — so the Escrow
+> would hold one hundred percent of the buffer if any payment landed.
+> Nothing has paid this agent yet. Let's change that.
 
 ---
 
-## Act 4 — A paid call (60s)
+## Act 4 — A paid call (45s)
 
-### Beat 4A — Trigger from the buyer (15s)
+### Beat 4A — Trigger from the dashboard (10s)
 
 **Visual.**
-1. Switch to terminal (keep dashboard tab open in background for next beat).
-2. Type and run:
-   `SELLER_NAME=seller19.reckon402-test.eth just fullflow-l4b`
-3. Let the steps stream:
-   ```
-   [1/6] GET /research WITHOUT payment header -> expect 402
-   [2/6] Sign PaymentPayload via @reckon402/buyer-sdk
-   [3/6] GET /research WITH payment -> expect 200
-   ```
-4. Pause briefly on `HTTP 200 tx=0xa46f...af6c state=CONFIRMED`.
+1. Stay on the dashboard tab. No terminal switch.
+2. Click the **Run Test Call** button (top right, blue).
+3. The status line beneath the buttons reads
+   `Signing EIP-3009 + waiting for Splitter.distribute…` for ~3 seconds,
+   then flips to
+   `✓ settled: paymentId 0x1974fb43… · transfer tx 0x30d498f2…`.
 
 **Voiceover.**
-> An x402 buyer hits the agent. First call comes back 402 Payment
-> Required with the price and the destination Splitter. The buyer SDK
-> signs an EIP-3009 transferWithAuthorization for one tenth of a USDC,
+> One button. The orchestrator hits the agent worker, gets back a 402
+> Payment Required with the price and the destination Splitter, signs
+> an EIP-3009 transferWithAuthorization for one hundredth of a USDC,
 > retries with the signed payment header, and the facilitator settles
-> on Base Sepolia.
+> on Base Sepolia. End-to-end in about three seconds.
 
-### Beat 4B — What landed on-chain (35s)
+### Beat 4B — What landed on-chain (25s)
 
 **Visual.**
-1. Switch to dashboard tab.
-2. Wait ~5 seconds for the next 3-second poll cycle.
-3. The "Recent paid calls" table now has one row with three transaction
+1. Wait ~5 seconds for the next 3-second poll cycle on the dashboard.
+2. The "Recent paid calls" table now has one row with three transaction
    hashes: settle, distribute, attest.
-4. Click the **settle tx** (blue, leftmost). New tab on
-   `sepolia.basescan.org/tx/0xa46f...af6c`.
-5. Scroll to the "ERC-20 Tokens Transferred" section so the three lines
-   are visible: 0.087 → seller, 0.003 → facilitator, 0.010 → Splitter.
-6. Switch back to the dashboard tab.
-7. Click the **distribute tx** (amber, middle column). New tab on
-   `sepolia.basescan.org/tx/0x1f2f...5299`.
-8. Scroll to "ERC-20 Tokens Transferred" so the Splitter → Escrow
-   transfer line is visible (0.010 USDC).
-9. Switch back to the dashboard tab.
-10. Click the **attest tx** (green, rightmost). New tab on
-    `sepolia.basescan.org/tx/0x1d27...b4bc`.
-11. Briefly highlight the `NewFeedback` event in the logs.
+3. Click the **settle tx** (blue, leftmost). New tab on
+   `sepolia.basescan.org/tx/0x30d498f2…0314ec`.
+4. Scroll to the "ERC-20 Tokens Transferred" section so the three lines
+   are visible: 0.0087 → seller, 0.0003 → facilitator, 0.0010 → Splitter.
+5. Switch back to the dashboard tab.
+6. Click the **distribute tx** (amber, middle column). New tab on
+   `sepolia.basescan.org/tx/0xd5ba94d2…fac3f87`.
+7. Scroll to "ERC-20 Tokens Transferred" so the Splitter → Escrow
+   transfer line is visible (0.0010 USDC).
+8. Switch back to the dashboard tab.
+9. Click the **attest tx** (green, rightmost). New tab on
+   `sepolia.basescan.org/tx/<attest>`.
+10. Briefly highlight the `NewFeedback` event in the logs.
 
 **Voiceover.**
 > Three transactions land. The first is the USDC transfer — the buyer
@@ -183,9 +182,9 @@ new agentId.
 **Visual.**
 1. Switch back to the dashboard tab.
 2. Pause on the Risk Buffer panel — attestation count now reads `1`,
-   T1 row is highlighted, `Total deposited 0.0100 USDC`,
-   `Currently held 0.0095 USDC`, `Released to seller 5%`,
-   `Withdrawable now 0.000500 USDC`.
+   T1 row is highlighted, `Total deposited 0.0010 USDC`,
+   `Currently held 0.000950 USDC`, `Released to seller 5%`,
+   `Withdrawable now 0.000050 USDC`.
 
 **Voiceover.**
 > The dashboard reads it back. One attestation. Tier walks from T0 to
@@ -195,44 +194,45 @@ new agentId.
 
 ---
 
-## Act 5 — Claim (35s)
+## Act 5 — Claim (25s)
 
-### Beat 5A — Connect wallet (15s)
+### Beat 5A — Connect wallet (10s)
 
 **Visual.**
-1. Click the **Connect Wallet** button (top right of dashboard).
-2. MetaMask popup, select the seller account
-   (`0xD53ffac42496d73B3Faf946786688a8454F57b1f` — pre-imported).
-3. Approve.
-4. Pause on the dashboard so the viewer sees:
-   - Wallet status row appears: `connected: 0xD53f...7b1f`
+1. Click the **Connect Wallet** button (top right of dashboard, amber).
+2. No popup — the dashboard reads `IdentityRegistry.ownerOf(agentId)`
+   directly and "connects" as that address. About one RPC round-trip
+   (~500ms).
+3. Pause so the viewer sees:
+   - Wallet status row appears: `connected: 0xD53f…7b1f`
    - Owner flag turns green: `✓ owner of agent NFT — can claim`
    - Claim row label changes from "Connect wallet to claim" to
-     `Withdraw 0.000500 USDC to 0xD53f...7b1f`, button enabled, label `Claim All`.
+     `Withdraw 0.000050 USDC to 0xD53f…7b1f`, button enabled, label `Claim All`.
 
 **Voiceover.**
-> The seller connects their wallet. The dashboard runs an `eth_call` to
-> IdentityRegistry.ownerOf, sees the connected address holds the agent's
-> NFT, and unlocks the Claim button. Withdraw is NFT-bound — only the
-> account that owns the agent's IdentityRegistry token can authorize it.
+> The dashboard runs an eth_call to IdentityRegistry.ownerOf, sees the
+> agent's NFT owner, and unlocks the Claim button. Withdraw is NFT-bound
+> — only the account that owns the agent's IdentityRegistry token can
+> authorize it. The orchestrator holds the seller's hot key for this
+> demo so the click goes straight to settlement; in production, this is
+> where the agent's owner would sign with their own wallet.
 
-### Beat 5B — Claim (20s)
+### Beat 5B — Claim (15s)
 
 **Visual.**
 1. Click **Claim All**.
-2. MetaMask popup → Confirm. Show the calldata field briefly: `0x853828b6`
-   (the `withdrawAll()` selector, no args).
-3. After signing, the dashboard's claim status line shows:
-   `submitted tx 0x...` with a Basescan link.
-4. Click the link, new Basescan tab on the withdraw transaction.
-5. Scroll to "ERC-20 Tokens Transferred" so the Escrow → seller line is
-   visible (0.000500 USDC).
-6. Switch back to dashboard tab.
-7. Wait one poll cycle (~3s).
-8. Risk Buffer panel updates: `Currently held 0.0095 USDC` (unchanged
+2. The claim status line beneath the row reads `submitting tx…` for
+   about a second, then flips to `✓ tx submitted: 0x2a205bf0…34f5cb75`
+   with a Basescan link.
+3. Click the link, new Basescan tab on the withdraw transaction.
+4. Scroll to "ERC-20 Tokens Transferred" so the Escrow → seller line is
+   visible (0.000050 USDC).
+5. Switch back to dashboard tab.
+6. Wait one poll cycle (~3s).
+7. Risk Buffer panel updates: `Currently held 0.000950 USDC` (unchanged
    for now since only the released slice was withdrawn),
    `Withdrawable now 0.000000 USDC`,
-   `Total withdrawn 0.000500 USDC`.
+   `Total withdrawn 0.000050 USDC`.
 
 **Voiceover.**
 > One transaction, no calldata arguments — `withdrawAll`. The Escrow
@@ -260,75 +260,88 @@ new agentId.
 
 Before pressing record:
 
-1. **Browser windows.** Three tabs prepared:
+1. **Browser windows.** Two tabs prepared:
    - `reckon402.com` (Act 1)
-   - `app.reckon402.com` — onboarding form, fields pre-typed except the
-     ENS label which is typed live in Beat 2A (Acts 2, 3, 4, 5)
-   - Blank tab for Basescan jumps (Acts 4, 5)
-2. **Terminal.** One window for Act 4 only, `just` and `infisical` ready,
-   working dir at repo root, font size bumped 1–2 steps for readability.
-3. **MetaMask.** Seller account
-   (`0xD53ffac42496d73B3Faf946786688a8454F57b1f`) imported and visible in
-   the account list. `BASE_SEPOLIA_RPC_PRIMARY` configured on Base Sepolia
-   (chainId 84532). Account funded with at least 0.005 ETH for gas.
-4. **Pick the next free ENS label.** Probe with
+   - `app.reckon402.com` — onboarding form, all fields ready except the
+     ENS label which is typed live in Beat 2A (Acts 2, 3, 4, 5).
+     Basescan jumps in Acts 4 and 5 open in fresh tabs from dashboard
+     links — no pre-prepared blank tab needed.
+2. **No terminal.** All six acts run from the browser. The
+   onboarding form drives Act 2; the **Run Test Call** button in the
+   dashboard header drives Act 4; the **Connect Wallet** + **Claim All**
+   buttons drive Act 5. The orchestrator (server-side) signs everything,
+   using `RECKON402_ONBOARDING_PK` for onboarding gas, `BUYER_DEMO_1_PK`
+   for the test buyer call, and `SELLER_PK` for `Escrow.withdrawAll()`.
+3. **No MetaMask.** The dashboard's wallet connect is hardwired to the
+   agent NFT owner returned by `IdentityRegistry.ownerOf(agentId)` — no
+   provider popup, no chain switch. (`apps/frontend/dist/app.js` →
+   `DEMO_MODE = true`. Set false to restore the real EIP-1193 path.)
+4. **No agent worker re-point.** The agent worker resolves price /
+   Splitter / asset from the gateway per request via the dynamic
+   `/<label>/research` route. Whichever ENS the dashboard is viewing
+   is the ENS the test call hits — no wrangler.toml edits or
+   `just deploy-agent` between Act 2 and Act 4.
+5. **Pick the next free ENS label.** Probe with
    `bash tools/integration-tests/resolve-l4a.sh --backend static --name
    sellerN.reckon402-test.eth --key x402.amount` and pick the lowest `N`
    that returns `UNKNOWN_NAME`. Substitute `sellerN` everywhere in this
    script (see Common substitutions table).
-5. **Re-point agent worker.** Edit `workers/agent/wrangler.toml` to point
-   `SELLER_ENS`, `SPLITTER_ADDRESS`, `AMOUNT` at the fresh agent's values
-   from the form's progress panel, and redeploy: `just deploy-agent`. (The
-   form path provisions the seller's contracts; the agent worker still
-   has to know which Splitter to point its 402 challenge at.)
-6. **Confirm `just fullflow-l4b` is green** with `SELLER_NAME=<fresh>`
-   before pressing record. If it fails, do not record — debug first.
-7. **Tail.** Optionally keep `just tail-facilitator` running in a
-   background terminal so any silent failure shows up.
+6. **Confirm the demo endpoints are live** before pressing record:
+   ```
+   curl -s -X POST https://app.reckon402.com/demo/test-call \
+     -H 'Content-Type: application/json' \
+     -d '{"ensName":"sellerN.reckon402-test.eth","query":"smoke"}' | jq .ok
+   ```
+   Expect `true`. If you get `503 demo_not_configured`, re-push
+   `SELLER_PK` and `BUYER_DEMO_1_PK` via the wrangler-secret-put recipe
+   in `tools/deploy/secrets-l4d.md` (TODO once that file exists).
+7. **Tail.** Optionally keep `just tail-facilitator` and
+   `just tail-orchestrator` running in background terminals (off-screen)
+   so any silent failure shows up.
 
-### Plan B — CLI fallback if the form misbehaves on the day
+### Plan B — CLI fallback if the demo endpoints misbehave on the day
 
-The form path landed in commit `1feb949` (viem `nonceManager` injected
-into the orchestrator's wallet clients). It's been verified end-to-end
-against `seller20`. If the form mis-fires during recording (RPC
-flakiness, factor-of-two slower than expected, etc.), the CLI path is a
-drop-in alternative: drop Act 2 visuals to a terminal and run
+If the `/demo/test-call` or `/demo/claim` endpoint regresses during
+recording (e.g. wrangler secret expired or a deploy reverted the demo
+wiring), drop to terminal and run the equivalent commands:
 
 ```
-just onboard-l4d sellerN.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f
+# Equivalent of Run Test Call (Act 4)
+SELLER_NAME=sellerN.reckon402-test.eth just fullflow-l4b
+
+# Equivalent of Claim All (Act 5)
+infisical run --env dev --domain https://secrets.intentralabs.com -- \
+  bash -c 'cast send <ESCROW_ADDR> "withdrawAll()" --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" --private-key "$SELLER_PK"'
 ```
 
-Same six steps, same on-chain artifacts, ~75s total. The voiceover for
-Beat 2C reads the same — only the visual changes.
+Same on-chain artifacts; only the visual surface changes.
+
+If the **web form** misbehaves on the day (Act 2 path), the CLI fallback
+is `just onboard-l4d sellerN.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f` —
+same six steps, ~75s total.
 
 ---
 
 ## Common substitutions
 
-Act 2 (onboarding) references `seller20` (the verified web-form run).
-Act 3–5 reference `seller19` (the verified paid-call run). For a fresh
-recording, substitute as follows:
+Pick a single fresh ENS label and use it for all six acts.
+`seller20` is the verified reference (settle tx
+`0x30d498f2…0314ec`, claim tx `0x2a205bf0…34f5cb75`).
 
 | Reference in script | Where it appears | Replace with |
 |---------------------|------------------|--------------|
-| `seller20.reckon402-test.eth` | Act 2 (onboarding form) | the fresh ENS label being onboarded |
-| `agentId 5435` | Act 2 progress panel | new agentId from form step 2 |
-| `0xd2E7a2…7600` (Escrow) | Act 2 progress panel | new Escrow address from form step 3 |
-| `0xFff232bCa3…` (Splitter) | Act 2 progress panel | new Splitter address from form step 4 |
-| `seller19.reckon402-test.eth` | Acts 3, 4, 5 (dashboard + paid call) | the same fresh ENS label as Act 2 |
-| `agentId 5421` | Act 3 dashboard header | new agentId (matches Act 2) |
-| `0x96A8B60c…dE56` (Splitter) | Act 3 dashboard | new Splitter (matches Act 2) |
-| `0x8E7cd755…B9C5` (Escrow) | Act 3 dashboard | new Escrow (matches Act 2) |
-| `0xa46f…af6c` (settle tx) | Act 4 Basescan jump | new settle tx from `fullflow-l4b` |
-| `0x1f2f…5299` (distribute tx) | Act 4 Basescan jump | parsed from receipt `reconcileNotes` |
-| `0x1d27…b4bc` (attest tx) | Act 4 Basescan jump | new `td_erc8004_tx` from receipt |
+| `seller20.reckon402-test.eth` | All acts (form + dashboard + paid call) | the fresh ENS label |
+| `agentId 5435` | Act 2 progress panel + Act 3 dashboard header | new agentId from form step 2 |
+| `0xd2E7a2…7600` (Escrow) | Act 2 progress panel + Act 3 dashboard | new Escrow from form step 3 |
+| `0xFff232bCa3…` (Splitter) | Act 2 progress panel + Act 3 dashboard | new Splitter from form step 4 |
+| `0x30d498f2…0314ec` (settle tx) | Act 4 Basescan jump | new settle tx from Run Test Call response |
+| `0xd5ba94d2…fac3f87` (distribute tx) | Act 4 Basescan jump | parsed from receipt `reconcileNotes` |
+| `<attest>` (attest tx) | Act 4 Basescan jump | new `td_erc8004_tx` from receipt |
+| `0x2a205bf0…34f5cb75` (claim tx) | Act 5 Basescan jump | new tx from Claim All response |
 
-The price (`0.10 USDC` for the seller19 paid-call run, `0.01 USDC` for
-the seller20 onboarding form demo), the splits (87/3/10), the tier
-curve, and the seller EOA stay the same across runs. **Pick a single
-fresh seller label and use it for all six acts** — the script's mixed
-seller references above are an artifact of the two separate verification
-runs, not the recording target.
+The price (`0.01 USDC`), the splits (87/3/10), the tier curve, and the
+seller EOA (`0xD53ffac42496d73B3Faf946786688a8454F57b1f`) stay the same
+across runs.
 
 ---
 

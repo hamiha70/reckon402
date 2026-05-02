@@ -25,11 +25,58 @@ app.get('/', (c) =>
     'reckon402 demo research agent\n' +
     'Layer: L3 (x402 paywall via our Facilitator)\n' +
     'Try: GET /research?q=your+question  (requires PAYMENT-SIGNATURE header)\n' +
-    'Health: GET /health\n',
+    'Health: GET /healthz\n',
   ),
 )
 
-app.get('/health', (c) => c.json({ status: 'ok', layer: 'L3' }))
+/**
+ * GET /healthz — agent worker health probe.
+ *
+ * Reports the worker's *configured* posture so a sweep over every
+ * Reckon402 surface can detect drift (wrong env vars after a deploy,
+ * etc.). Does NOT do an outbound fetch on the configured facilitator
+ * URL — that would create a healthz fan-out where the agent's healthz
+ * depends on the facilitator's healthz, blowing up the cycle. The
+ * facilitator has its own probe.
+ *
+ * `/health` (no z) is preserved as a deprecated alias for any external
+ * monitor pinned to the older path; new monitors should hit /healthz.
+ */
+function healthBody(c: { env: Env }) {
+  const env = c.env
+  // Treat any non-empty string with the right shape as "configured".
+  // The point is to catch missing env vars on a misdeploy, not to
+  // certify on-chain liveness — `cast call` and the L4d fork test do
+  // that elsewhere (see docs/test-posture-h-9.md §4).
+  const isAddr = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s ?? '')
+  const isUrl  = (s: string) => /^https?:\/\//.test(s ?? '')
+  const checks: Record<string, { ok: boolean; reason?: string }> = {
+    network:          { ok: !!env.NETWORK },
+    usdc_address:     { ok: isAddr(env.USDC_ADDRESS), reason: !isAddr(env.USDC_ADDRESS) ? 'malformed' : undefined },
+    splitter_address: { ok: isAddr(env.SPLITTER_ADDRESS), reason: !isAddr(env.SPLITTER_ADDRESS) ? 'malformed' : undefined },
+    amount:           { ok: /^[0-9]+$/.test(env.AMOUNT ?? '') },
+    facilitator_url:  { ok: isUrl(env.FACILITATOR_URL) },
+    seller_ens:       { ok: typeof env.SELLER_ENS === 'string' && env.SELLER_ENS.length > 0 },
+  }
+  const allOk = Object.values(checks).every((c) => c.ok)
+  return {
+    status:    allOk ? 'ok' : 'degraded',
+    layer:     'L3',
+    checks,
+    config: {
+      network:           env.NETWORK,
+      usdc_address:      env.USDC_ADDRESS,
+      splitter_address:  env.SPLITTER_ADDRESS,
+      amount:            env.AMOUNT,
+      seller_ens:        env.SELLER_ENS,
+      facilitator_url:   env.FACILITATOR_URL,
+    },
+    timestamp: Date.now(),
+  }
+}
+app.get('/healthz', (c) => c.json(healthBody({ env: c.env }), 200))
+// Deprecated alias kept for backward compat with any external monitor.
+app.get('/health',  (c) => c.json(healthBody({ env: c.env }), 200))
 
 // Mount the paywall per-request so env bindings are read from c.env
 // (Cloudflare Workers pattern — env is only available inside the fetch handler).

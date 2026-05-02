@@ -19,6 +19,7 @@ help:
     @echo "  just deploy-orchestrator    Deploy app.reckon402.com Worker (bundles apps/frontend/dist as assets)"
     @echo "  just deploy-all             Deploy all six production Workers in sequence"
     @echo "  just fork-tests-all         Run L3 + L4d Foundry fork tests vs live Base Sepolia"
+    @echo "  just healthz-all            Probe /healthz on every worker + cast-call every L4d contract"
 
 # Show available recipes
 default:
@@ -140,6 +141,14 @@ fork-test-l3:
 # Run BOTH fork suites in sequence. Useful as a pre-submission gate to
 # prove the contracts integrate end-to-end with live registries.
 fork-tests-all: fork-test-l3 fork-test-l4d
+
+# Pre-submission unified health probe. Hits /healthz on every Reckon402
+# Cloudflare Worker + AWS Lambda, then `cast call`s every L4d on-chain
+# contract on Base Sepolia (EscrowFactory, TierStrategy, SplitterFactory,
+# seller11 Splitter + Escrow) and the Reckon402Resolver on Ethereum
+# Sepolia. Exits 0 ONLY if every probe is green.
+healthz-all:
+    {{secrets}} bash tools/integration-tests/healthz-all.sh
 
 # Deploy reckon402.com landing Worker (no package.json — uses npx)
 deploy-landing:

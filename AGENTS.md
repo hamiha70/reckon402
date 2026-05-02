@@ -1423,8 +1423,11 @@ Single-page status report at `docs/test-posture-h-9.md`. Snapshot:
 - All deployed L4d contracts re-verified live at H-9 via `cast call`
   against Base Sepolia.
 
-Re-run: `pnpm test && cd contracts && forge test && pnpm typecheck`
-for offline gate; `just fork-tests-all` for live-fork gate.
+      Re-run: `pnpm test && cd contracts && forge test && pnpm typecheck`
+       for offline gate; `just fork-tests-all` for live-fork gate;
+       `just healthz-all` for the live HTTP + on-chain pre-submission
+       sweep (15 probes across 6 Workers, 1 Lambda, 6 Base Sepolia
+       contracts, 1 Ethereum Sepolia contract).
 
 ## L4d demo agent (seller11, canonical, locked)
 

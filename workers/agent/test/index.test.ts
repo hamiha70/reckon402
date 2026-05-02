@@ -7,6 +7,7 @@ const TEST_ENV = {
   SPLITTER_ADDRESS: '0x1111111111111111111111111111111111111111',
   AMOUNT:           '10000',
   FACILITATOR_URL:  'https://facilitator.reckon402.com/x402',
+  SELLER_ENS:       'seller-test.reckon402-test.eth',
 }
 
 const fetchApp = (path: string, init?: RequestInit) =>
@@ -19,11 +20,49 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('GET /health', () => {
-  it('returns 200 with ok status at layer L3', async () => {
+describe('GET /healthz', () => {
+  it('returns 200 ok with full env-config probe shape on /healthz', async () => {
+    const res = await fetchApp('/healthz')
+    expect(res.status).toBe(200)
+    const body = await res.json() as {
+      status: string
+      layer: string
+      checks: Record<string, { ok: boolean; reason?: string }>
+      config: Record<string, string>
+    }
+    expect(body.status).toBe('ok')
+    expect(body.layer).toBe('L3')
+    expect(Object.keys(body.checks).sort()).toEqual([
+      'amount', 'facilitator_url', 'network', 'seller_ens', 'splitter_address', 'usdc_address',
+    ])
+    for (const [_k, v] of Object.entries(body.checks)) expect(v.ok).toBe(true)
+    expect(body.config.splitter_address).toBe(TEST_ENV.SPLITTER_ADDRESS)
+    expect(body.config.seller_ens).toBe(TEST_ENV.SELLER_ENS)
+  })
+
+  it('aliases legacy /health to the same handler shape (backward compat)', async () => {
     const res = await fetchApp('/health')
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ status: 'ok', layer: 'L3' })
+    const body = await res.json() as { status: string; layer: string }
+    expect(body.status).toBe('ok')
+    expect(body.layer).toBe('L3')
+  })
+
+  it('reports degraded when SPLITTER_ADDRESS is malformed', async () => {
+    const broken = { ...TEST_ENV, SPLITTER_ADDRESS: 'not-an-address' }
+    const res = await worker.fetch(
+      new Request('https://agent.reckon402.com/healthz'),
+      broken as never,
+      {} as never,
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json() as {
+      status: string
+      checks: { splitter_address: { ok: boolean; reason?: string } }
+    }
+    expect(body.status).toBe('degraded')
+    expect(body.checks.splitter_address.ok).toBe(false)
+    expect(body.checks.splitter_address.reason).toBe('malformed')
   })
 })
 

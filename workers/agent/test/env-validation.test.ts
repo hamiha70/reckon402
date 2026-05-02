@@ -24,6 +24,7 @@ const BASE_ENV = {
   SPLITTER_ADDRESS: '0x1111111111111111111111111111111111111111',
   AMOUNT:           '10000',
   FACILITATOR_URL:  'https://facilitator.reckon402.com/x402',
+  SELLER_ENS:       'seller-test.reckon402-test.eth',
 }
 
 const VALID_PAYMENT_HEADER = btoa(JSON.stringify({

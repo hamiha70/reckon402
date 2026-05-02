@@ -17,9 +17,10 @@ This document is the single answer to the H-9 review question
 |---|---|---|
 | Foundry (default offline) | **109/109** | 7 contract suites + 1 invariant + 3 fork (skipped offline) |
 | Foundry (forked Base Sepolia) | **109/109 incl. live-fork bodies** | `just fork-tests-all` |
-| Vitest (default offline) | **360 passed / 3 skipped** | 13 packages, full workspace |
+| Vitest (default offline) | **362 passed / 3 skipped** | 13 packages, full workspace (agent +2 healthz tests) |
 | Vitest (live-RPC) | **3/3 of the skipped pass** under hydration | `infisical run -- pnpm vitest …` |
 | Live integration shell | `fullflow-l4b` × 5 + L4c-onboard × 1 + L4c-factory × 2 | seeded all on-chain state for the demo |
+| Live healthz sweep (NEW) | **15/15 PASS** end-to-end | `just healthz-all` — 6 Workers + 1 Lambda + 7 on-chain `cast call` probes |
 
 Forge coverage on the new on-chain L4d Escrow surface (Escrow,
 EscrowFactory, LinearMonotonicTierStrategy, Splitter, SplitterFactory,
@@ -311,11 +312,40 @@ This is exactly the "trust ramp" demo arc.
 
 ---
 
-## 8. How to re-run everything
+## 8. Live healthz sweep (`just healthz-all`)
+
+Pre-submission unified probe that hits every Reckon402 production
+surface — six Cloudflare Workers, the AWS Lambda, and seven on-chain
+contracts (six on Base Sepolia, one on Ethereum Sepolia) — in a single
+shell run. Exits 0 only when every check is green.
+
+| Section | Probes | What it asserts |
+|---|---:|---|
+| Cloudflare Workers `/healthz` | 6 | `agent`, `facilitator`, `gateway`-prod, `gateway`-staging, `app` (orchestrator), `reckon402.com` (landing) all 200 with `status=ok`/`ok=true` body |
+| AWS Lambda `/healthz` | 2 | `signing.reckon402.com` 200 + KMS-reachable + `signer_eoa` matches the canonical buyer-signer (`0x46bbb05a…84305`) |
+| Base Sepolia `cast call` | 6 | `EscrowFactory` immutables (token + identity + reputation), `TierStrategy` v1 curve unchanged, `SplitterFactory.token()` matches USDC, seller11 `Splitter.getAllRecipients()` shape, seller11 `Escrow.agentId()` + `tierStrategy` pinned, `EscrowFactory.isDeployed[escrow]` AND `escrowOfAgent[5423] == escrow` |
+| Ethereum Sepolia `cast call` | 1 | `Reckon402Resolver.owner()` returns the canonical signer-rotation owner |
+| **TOTAL** | **15** | All green at H-9 |
+
+Last run (2026-05-02 13:28 CET): **15/15 PASS**. Implementation:
+`tools/integration-tests/healthz-all.sh`. Source of truth for
+expected addresses / curve values is hard-coded in the script and
+mirrors the AGENTS.md "L4d on-chain deployments" + "L4a deployments"
+tables — drift in either direction (deploy new contract, AGENTS.md
+missed update, or vice versa) makes the sweep RED.
+
+The agent worker exposes a richer probe shape than at L3: `/healthz`
+returns each configured env var with an `{ ok, reason }` per-check
+field so a misdeploy that strips `SPLITTER_ADDRESS` or `SELLER_ENS`
+shows as `degraded` rather than silently 200-OK.
+
+---
+
+## 9. How to re-run everything
 
 ```bash
 # Default offline suite (~25s on a warm pnpm cache)
-pnpm test                                # 360/360 vitest + 3 skipped
+pnpm test                                # 362/362 vitest + 3 skipped
 cd contracts && forge test               # 109/109 forge + 3 fork skipped
 pnpm typecheck                           # frontend ts-check (0 errors)
 
@@ -328,6 +358,9 @@ just fork-tests-all                      # both fork suites against live Base Se
 just fullflow-l4b                        # full settlement + attestation roundtrip
 just fullflow-l4c-factory                # L4c per-agent Splitter resolution
 just fullflow-l4c-onboard                # 6-step L4c onboard against live Sepolia
+
+# Pre-submission unified gate (NEW)
+just healthz-all                         # 15/15 across Workers + Lambda + on-chain
 ```
 
 `forge coverage --ir-minimum --report summary` prints the line/branch

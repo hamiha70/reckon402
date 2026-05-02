@@ -1,5 +1,18 @@
 export default {
-  fetch() {
+  fetch(request) {
+    // Tiny router: serve JSON on /healthz so monitoring (and the
+    // Reckon402 sweep `just healthz-all`) can probe the landing
+    // surface without false positives. Without this, every URL
+    // returned the landing HTML — including /healthz — which gave a
+    // misleading 200 "OK" with non-JSON body.
+    const url = new URL(request.url);
+    if (url.pathname === '/healthz') {
+      return new Response(
+        JSON.stringify({ status: 'ok', surface: 'landing', timestamp: Date.now() }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+
     const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="56" height="56" role="img" aria-label="Reckon402 logo">
   <title>Reckon402</title>
   <path d="M14 28 L26 40 L50 16" fill="none" stroke="#22D67B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>

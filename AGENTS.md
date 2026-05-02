@@ -1254,52 +1254,77 @@ SellingAgent keys return 403.
 
 ## L4d on-chain Escrow (v1, locked)
 
-Shipped 2026-05-02. EscrowFactory + first probe Escrow live on Base
-Sepolia. Closes the on-chain story for the risk-buffer slice of every
-settlement: the Splitter sends a fixed BPS slice (10% in v1) to a
-per-agent Escrow, and the agent's NFT owner withdraws subject to a
-tier curve that reads on-chain attestation count from the
-ReputationRegistry.
+Shipped 2026-05-02. EscrowFactory + LinearMonotonicTierStrategy +
+first probe Escrow live on Base Sepolia. Closes the on-chain story
+for the risk-buffer slice of every settlement: the Splitter sends a
+fixed BPS slice (10% in v1) to a per-agent Escrow, and the agent's
+NFT owner withdraws subject to a **pluggable tier strategy** that
+reads on-chain attestation count from the ReputationRegistry.
 
 **Canonical reproducible tags:**
 - `L4d-pre-onchain-baseline` (`8a468ec`) — pre-L4d state, demo intact;
   rollback target if L4d work needs to be unwound.
-- `L4d-contracts-green` (`b2ab6ef`) — contracts compile + 46 tests
-  green from a fresh clone, no live chain footprint yet.
-- `L4d-deployed` (this section) — EscrowFactory + probe Escrow live
-  on Base Sepolia; constructor sanity reads + non-owner revert smoke
-  both green.
+- `L4d-contracts-green` (`b2ab6ef`) — initial contracts (pre-pluggable)
+  compiled + 46 tests green from a fresh clone, no live chain
+  footprint at that point.
+- `L4d-strategy-green` (`4a42c84`) — pluggable `ITierStrategy`
+  refactor (Q-09-5 resolved in v1); 57 L4d tests / 106 full-suite
+  tests green from a fresh clone.
+- `L4d-strategy-deployed` (this section) — EscrowFactory +
+  LinearMonotonicTierStrategy + probe Escrow live on Base Sepolia
+  with the pluggable shape; sanity reads + non-owner revert smoke
+  green.
 
-### Contract addresses (Base Sepolia)
+### Contract addresses (Base Sepolia, canonical)
 
 | Item | Value |
 |------|-------|
-| EscrowFactory address | `0xb57ada3c2edffb5ce250b495d16d47e120d33d8b` |
-| Factory deploy tx | `0xc5826f3485b8ec4388c6e9ccf8b12f1257797ab0b66a9fbf222d8db37a2ff8f2` |
-| Factory deploy block | 40970567 |
-| Factory deploy gas | 2_347_208 |
+| **EscrowFactory** | `0xb06998682bd716e0864257b3ac3aa1fc4cc64589` |
+| Factory deploy tx | `0x248161a136d997dd82fa184bdceac5cb4c512ac2d253d9a70735d9170b692318` |
+| Factory deploy block | 40971225 |
+| Factory deploy gas | 1_750_822 |
 | Factory deploy signer | `0x66c2858d9a8605957c516a77262eb66ee6be113c` (KMS `alias/reckon402/mainnet/deployer/evm`) |
-| Probe Escrow (agentId=1) | `0x4f79aA82E7cf4e09Be9add4Df61887d270cFD95E` |
-| Probe Escrow tx | `0xe92f34cdb59129ff20ff589a34a76c34dd1c9a6e0752a0ac7695424ba1c2be66` |
-| Probe Escrow block | 40970580 |
+| **LinearMonotonicTierStrategy (v1 default)** | `0xc498155bc4a2e4ba979ad5797298107c63b26c4e` |
+| Strategy deploy tx | `0x43292eb658e3f062c6d59f44991775012b8d3349d9477b96db575414af8526fb` |
+| Strategy deploy block | 40971225 |
+| Strategy deploy gas | 601_592 |
+| Strategy deploy signer | same KMS deployer as factory |
+| **Probe Escrow (agentId=1)** | `0xEa8BEd2bEE679276F78DeCa49eE8B531f0ADaF78` |
+| Probe Escrow tx | `0x280deaaa61df32f32a71c23e8b9f5f97646ea5557e6a034e991a1b885a63dffa` |
+| Probe Escrow block | 40971241 |
 | Probe Escrow signer | `0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455` (`RECKON402_DEPLOYER_PK`; factory has no admin so anyone may call `createEscrow`) |
 | Token (USDC, all Escrows) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | IdentityRegistry (8004) | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | ReputationRegistry (8004) | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
 
-### v1 default tier curve (passed by orchestrator + probe)
+### Stale (superseded — do NOT use)
+
+The first L4d deploy on 2026-05-02 used the old (pre-pluggable)
+Escrow constructor shape. Those addresses are kept on-chain as
+immutable evidence under the historical `L4d-deployed` tag but MUST
+NOT be referenced by orchestrator (E2), frontend (E3), or any
+upstream consumer:
+
+| Item | Address | Status |
+|------|---------|--------|
+| EscrowFactory v1 (stale) | `0xb57ada3c2edffb5ce250b495d16d47e120d33d8b` | NOT USED |
+| Probe Escrow v1 (stale) | `0x4f79aA82E7cf4e09Be9add4Df61887d270cFD95E` | NOT USED |
+
+### v1 default tier curve (held in the strategy contract, NOT in Escrow)
 
 ```
 thresholds = [0, 1, 3, 10, 30, 100, 300, 1000]
 releaseBps = [0, 500, 1500, 3000, 5000, 7000, 8500, 10000]
-tag1       = "payment"
-tag2       = "x402-settlement"
+tag1       = "payment"          (held in Escrow, per-agent)
+tag2       = "x402-settlement"  (held in Escrow, per-agent)
 facilitatorClient = 0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455
 ```
 
-The Escrow constructor enforces strict-monotonic thresholds and
-non-decreasing releaseBps, each ≤ 10_000. Different agents can use
-different curves at deploy without contract changes.
+The strategy contract validates strict-monotonic thresholds and
+non-decreasing releaseBps (each ≤ 10_000) at its own deploy time.
+The Escrow trusts whatever `ITierStrategy` address is supplied at
+construction. Different agents can be wired to different strategies;
+strategies can be shared across many Escrows.
 
 ### Smoke results (probe Escrow, 2026-05-02)
 
@@ -1308,8 +1333,10 @@ different curves at deploy without contract changes.
 | `owner()`               | `0x21fdEd74C901129977B8e28C2588595163E1e235` | Current IdentityRegistry NFT owner of agentId=1 |
 | `agentId()`             | 1                                        | matches constructor |
 | `facilitatorClient()`   | `0x0A0228E6...c455`                      | matches L4b1 facilitator EOA |
+| `tierStrategy()`        | `0xc498155b...26c4e`                     | matches deployed v1 default strategy |
+| `tag1()` / `tag2()`     | `"payment"` / `"x402-settlement"`        | matches constructor |
 | `attestationCount()`    | 16                                       | live read of L4b1 attestations from ReputationRegistry on Base Sepolia |
-| `releasedBps()`         | 3000 (= 30%)                             | T3 tier at 16 attestations (between thresholds 10 and 30) |
+| `releasedBps()`         | 3000 (= 30%)                             | T3 tier at 16 attestations — full delegation chain `Escrow → Strategy → ReputationRegistry` round-trips |
 | `totalDeposited()`      | 0                                        | Escrow is brand-new; no settlements have flowed |
 | `currentlyHeld()`       | 0                                        | matches |
 | `totalWithdrawn`        | 0                                        | matches |
@@ -1320,17 +1347,22 @@ different curves at deploy without contract changes.
 - Spec: `specs/09-l4d-escrow.md`
 - Deploy log: `contracts/deploy-logs/escrow-factory-base-sepolia-2026-05-02.md`
 - Runbook: `tools/deploy/deploy-l4d.md`
-- Deploy script (KMS-signed, Node + viem): `tools/deploy/deploy-escrow-factory.mjs`
+- Deploy script (KMS-signed, Node + viem; deploys both contracts): `tools/deploy/deploy-escrow-factory.mjs`
 - Local-test deploy script (Foundry, no KMS): `contracts/script/DeployEscrowFactory.s.sol`
-- Contracts: `contracts/src/Escrow.sol`, `contracts/src/EscrowFactory.sol`, `contracts/src/interfaces/{IIdentityRegistry,IReputationRegistry}.sol`
-- Tests: `contracts/test/Escrow.t.sol` (32 cases), `contracts/test/EscrowFactory.t.sol` (14 cases incl. 256-run fuzz)
+- Contracts: `contracts/src/Escrow.sol`, `contracts/src/EscrowFactory.sol`,
+  `contracts/src/LinearMonotonicTierStrategy.sol`,
+  `contracts/src/interfaces/{IIdentityRegistry,IReputationRegistry,ITierStrategy}.sol`
+- Tests: `contracts/test/Escrow.t.sol` (26 cases),
+  `contracts/test/EscrowFactory.t.sol` (14 cases incl. 256-run fuzz),
+  `contracts/test/LinearMonotonicTierStrategy.t.sol` (17 cases incl. 256-run fuzz)
 
-### Forge: 95/95 from a fresh clone
+### Forge: 106/106 from a fresh clone
 
-39 pre-L4d (Splitter + invariant + SplitterFactory + SplitterFork +
-Reckon402Resolver) + 46 L4d (32 Escrow + 14 EscrowFactory). Vitest:
-unchanged from `L4c-onboarding-green` since L4d ships no worker code
-in this layer (E2 onboarding integration is the next layer).
+49 pre-L4d (Splitter + invariant + SplitterFactory + SplitterFork +
+Reckon402Resolver) + 57 L4d (26 Escrow + 14 EscrowFactory + 17
+LinearMonotonicTierStrategy). Vitest: unchanged from
+`L4c-onboarding-green` since L4d ships no worker code in this layer
+(E2 onboarding integration is the next layer).
 
 ### Forward-compat / next layers
 
@@ -1339,32 +1371,40 @@ in this layer (E2 onboarding integration is the next layer).
   setting ENS records. New ENS record `x402.escrow`. Splitter
   recipients change from `[seller, facilitator-fee, facilitator-EOA-as-buffer]`
   to `[seller, facilitator-fee, predictedEscrowAddr]` once
-  `ENABLE_L4D_ESCROW="true"` is set on the orchestrator.
+  `ENABLE_L4D_ESCROW="true"` is set on the orchestrator. Orchestrator
+  passes `tierStrategy=<v1 default>` for every onboarding in v1.
 - **E3 (frontend)** — `window.ethereum` connect + NFT-owner gating +
   `Claim` button calls `Escrow.withdraw` via wallet directly. Three
-  counters fed by `Escrow.getStats()` (one eth_call).
+  counters fed by `Escrow.getStats()` (one eth_call). Tier table
+  rendered by querying `tierStrategy() → strategy.config()` (two
+  eth_calls, both cacheable).
 - **E4 (e2e)** — onboard `seller10.reckon402-test.eth` via the new
   flow. Fund some attestations through `full-flow-l4b.sh` to ramp
   the tier. MetaMask-import the seller PK, click Claim, verify
   on-chain. Tag `L4d-end-to-end-green`.
 
-### Q-09-* open questions (deferred)
+### Q-09-* dispositions
 
-- **Q-09-5 (pluggable `ITierStrategy`):** v1.5 polish — extract the
-  tier-evaluator into a separate strategy contract, plug-in style.
-  Current shape (constructor arrays) is one external call away from
-  this refactor.
-- **Q-09-6 (sybil floor — documented for judges):** ReputationRegistry
-  derives `clientAddress` from `msg.sender` at write time, NOT a
-  parameter. Combined with the Escrow's `getSummary(agentId,
-  [facilitatorClient], tag1, tag2)` filter, only the holder of the
-  facilitator's private key can produce attestations the Escrow
-  counts. Closed.
-- **Q-09-7 (CCIP-Read off-chain ENS unreadable from contract):** the
-  Escrow does not and cannot read ENS text records served via
+- **Q-09-5 (pluggable `ITierStrategy`):** RESOLVED in v1. The Escrow
+  holds NO tier math; it delegates every `releasedBps()` read to a
+  pinned `ITierStrategy` contract. v1 ships
+  `LinearMonotonicTierStrategy` whose evaluation is byte-identical
+  to the pre-refactor inline walk. Strategy address is part of the
+  Escrow's CREATE2 init-code hash. Test
+  `EscrowFactoryTest.test_createEscrow_distinctStrategies_deployIndependently`
+  locks the invariant.
+- **Q-09-6 (sybil floor — closed):** ReputationRegistry derives
+  `clientAddress` from `msg.sender` at write time, NOT a parameter.
+  Combined with the Escrow's `getSummary(agentId, [facilitatorClient],
+  tag1, tag2)` filter, only the holder of the facilitator's private
+  key can produce attestations the Escrow counts. Sybil cost = the
+  cost of compromising the facilitator KMS key.
+- **Q-09-7 (CCIP-Read off-chain ENS unreadable from contract — closed):**
+  the Escrow does not and cannot read ENS text records served via
   CCIP-Read. All tier-relevant inputs come from on-chain registries
   (IdentityRegistry for owner, ReputationRegistry for count). ENS
-  records are off-chain-only metadata. Closed.
+  records are off-chain-only metadata served by the gateway worker.
+  See `docs/trust-architecture.md` for the architecture rationale.
 
 ## Open questions
 

@@ -303,3 +303,43 @@ endpoint that already serves the dashboard.
   internal accounting per agentId. Not a hackathon issue.
 - **No directory page** (`#/dashboard` listing all agents) shipped in
   L4d. Pinned as v1.5.
+- **Q-09-5 (pluggable tier strategy):** the v1 Escrow has the tier curve
+  PARAMETERS (thresholds + bps arrays) in the constructor, but the
+  evaluation FUNCTION is hardcoded as a linear walk through the array.
+  v1.5 will extract the evaluator behind an `ITierStrategy` interface:
+
+  ```solidity
+  interface ITierStrategy {
+      function evaluate(uint256 agentId, uint64 attestationCount)
+          external view returns (uint16 releaseBps);
+  }
+  ```
+
+  Escrow stores `address public immutable tierStrategy` and calls
+  `ITierStrategy(tierStrategy).evaluate(...)` on every `releasedBps()`
+  read. v1 ships a `LinearMonotonicStrategy(thresholds[], bps[])`
+  whose behaviour is byte-identical to today's inline walk. Future
+  strategies can be bonding curves, chain-specific schedules, or
+  agent-class-specific shapes. Each Escrow is pinned to one strategy
+  at deploy — not upgradable — but new agents onboarded later can
+  pick a newer strategy. Refactor cost: ~30 LOC + new strategy
+  contract + tests; deferred to L4d-end-to-end-green polish.
+
+- **Q-09-6 (sybil floor on tier counts):** ReputationRegistry's
+  `giveFeedback` derives `clientAddress` from `msg.sender`, NOT from
+  a parameter. Combined with the Escrow's `getSummary(agentId,
+  [facilitatorClient], tag1, tag2)` filter, this is a structural
+  sybil floor: only the holder of the facilitator's private key can
+  produce attestations the Escrow counts. Random EOAs CAN call
+  `giveFeedback` for the same agent + tags, but they land under
+  their own `clientAddress` and are filtered out. Documented for
+  judges' benefit — not an open question, just a property to make
+  visible.
+
+- **Q-09-7 (smart-contract reads of ENS):** the Escrow does NOT and
+  CANNOT read any `x402.*` text record from ENS — Reckon402's ENS
+  resolver is CCIP-Read off-chain (per L4a₁), and EIP-3668 is
+  wallet-side only. All tier-relevant data the Escrow needs lives
+  on-chain in registries it can call directly (ReputationRegistry
+  for counts, IdentityRegistry for ownership). ENS text records are
+  for off-chain discovery only (buyer SDK, gateway worker, dashboard).

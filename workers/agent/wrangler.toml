@@ -30,3 +30,10 @@ AMOUNT           = "100000"                                        # 0.10 USDC
 FACILITATOR_URL  = "https://facilitator.reckon402.com/x402"
 SPLITTER_ADDRESS = "0x96A8B60c4C5511FA6381c5460a892db519e5dE56"
 SELLER_ENS       = "seller19.reckon402-test.eth"
+
+# Gateway flat-records endpoint for the dynamic /:label/research route.
+# Lets one agent worker serve many onboarded SellingAgents — the ENS label
+# in the URL drives a runtime gateway lookup of x402.{splitter,amount,asset}
+# without needing a per-seller wrangler redeploy. See workers/agent/src/index.ts
+# resolveSeller() for the lookup contract.
+GATEWAY_BASE_URL = "https://gateway.reckon402.com"

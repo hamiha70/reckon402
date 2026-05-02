@@ -25,6 +25,7 @@ const BASE_ENV = {
   AMOUNT:           '10000',
   FACILITATOR_URL:  'https://facilitator.reckon402.com/x402',
   SELLER_ENS:       'seller-test.reckon402-test.eth',
+  GATEWAY_BASE_URL: 'https://gateway.reckon402.com',
 }
 
 const VALID_PAYMENT_HEADER = btoa(JSON.stringify({

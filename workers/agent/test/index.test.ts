@@ -8,6 +8,7 @@ const TEST_ENV = {
   AMOUNT:           '10000',
   FACILITATOR_URL:  'https://facilitator.reckon402.com/x402',
   SELLER_ENS:       'seller-test.reckon402-test.eth',
+  GATEWAY_BASE_URL: 'https://gateway.reckon402.com',
 }
 
 const fetchApp = (path: string, init?: RequestInit) =>
@@ -31,13 +32,14 @@ describe('GET /healthz', () => {
       config: Record<string, string>
     }
     expect(body.status).toBe('ok')
-    expect(body.layer).toBe('L3')
+    expect(body.layer).toBe('L3+L4d')
     expect(Object.keys(body.checks).sort()).toEqual([
-      'amount', 'facilitator_url', 'network', 'seller_ens', 'splitter_address', 'usdc_address',
+      'amount', 'facilitator_url', 'gateway_url', 'network', 'seller_ens', 'splitter_address', 'usdc_address',
     ])
     for (const [_k, v] of Object.entries(body.checks)) expect(v.ok).toBe(true)
     expect(body.config.splitter_address).toBe(TEST_ENV.SPLITTER_ADDRESS)
     expect(body.config.seller_ens).toBe(TEST_ENV.SELLER_ENS)
+    expect(body.config.gateway_base_url).toBe(TEST_ENV.GATEWAY_BASE_URL)
   })
 
   it('aliases legacy /health to the same handler shape (backward compat)', async () => {
@@ -45,7 +47,7 @@ describe('GET /healthz', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as { status: string; layer: string }
     expect(body.status).toBe('ok')
-    expect(body.layer).toBe('L3')
+    expect(body.layer).toBe('L3+L4d')
   })
 
   it('reports degraded when SPLITTER_ADDRESS is malformed', async () => {

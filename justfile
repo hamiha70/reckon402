@@ -199,6 +199,12 @@ preflight-submission:
 deploy-landing:
     {{secrets}} bash -c 'cd workers/landing && npx wrangler deploy'
 
+# Deploy demo.reckon402.com static dashboard (CF Pages).
+# KNOWN RISK: the CF API token may lack Pages:Edit scope; if this fails with a
+# permissions error follow demo/DEPLOY.md for the manual one-time setup.
+deploy-demo:
+    {{secrets}} bash -c 'npx wrangler pages deploy demo/ --project-name reckon402-demo'
+
 # Deploy agent.reckon402.com Worker
 deploy-agent:
     {{secrets}} bash -c 'cd workers/agent && pnpm run deploy'

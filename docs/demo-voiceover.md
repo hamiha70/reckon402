@@ -1,11 +1,13 @@
 # Reckon402 Demo Voiceover Script
 
 > **Status:** drafted 2026-05-02 H-9 sprint, mirrors the L4d Escrow narrative
-> from `docs/canonical-narrative.md`. Recorded against the live `seller19`
-> run captured in
+> from `docs/canonical-narrative.md`. Onboarding (Act 2) drives the live
+> web-form path on `app.reckon402.com` — verified end-to-end against
+> `seller20` on 2026-05-02 (commit `1feb949`, viem nonceManager fix).
+> The paid-call flow (Act 4) mirrors the live `seller19` run captured in
 > `tools/integration-tests/results-full-flow-l4b-2026-05-02T20-24-05Z.md`.
 >
-> **Format.** Five acts, ~3:30 total. Each act lists the voiceover text and
+> **Format.** Six acts, ~3:30 total. Each act lists the voiceover text and
 > the visual cue the operator should be on-screen for that beat. Voiceovers
 > are recorded separately and synced to the screen capture in post — the
 > operator does not have to deliver them live.
@@ -41,52 +43,63 @@
 
 ## Act 2 — Onboarding (50s)
 
-### Beat 2A — The form (10s)
+### Beat 2A — The form (15s)
 
 **Visual.**
 1. Browser tab on `https://app.reckon402.com`.
 2. Pause on the empty onboarding form, scroll once across the field layout
-   (ENS label, EOA, endpoint, base price, on-chain Escrow toggle ON).
+   (ENS label, SellingAgent EOA, HTTPS endpoint, base price per call,
+   on-chain Escrow toggle ON).
+3. Type the ENS label `seller20` into the first field (suffix
+   `.reckon402-test.eth` is appended automatically).
 
 **Voiceover.**
-> One form. ENS subname, the agent's wallet, the HTTPS endpoint, the base
-> price per call. The Escrow option is on by default — that's the new piece.
+> One form. ENS subname, the agent's wallet, the HTTPS endpoint that
+> serves paid requests, the base price per call. The on-chain Escrow
+> toggle is on by default — that's the new piece. No keys typed in the
+> browser; the platform's onboarding wallet pays the gas and signs the
+> seven on-chain transactions.
 
-### Beat 2B — Why we run it from the CLI (10s)
+### Beat 2B — Submit (5s)
 
 **Visual.**
-1. Switch to terminal.
-2. Type but don't yet run:
-   `just onboard-l4d seller19.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f`
+1. Click the green **Deploy SellingAgent** button.
+2. The "Onboarding progress" panel below the form transitions from
+   `submitting…` to a six-line checklist with rotating spinners.
 
 **Voiceover.**
-> The form executes the same six-step flow, but Cloudflare Workers cap
-> background work at thirty seconds and ours runs longer than that. So for
-> the demo we drive it from the CLI — same code, no Worker timeout.
+> One click.
 
-### Beat 2C — Run + commentary (30s)
+### Beat 2C — Six steps stream into the panel (30s)
 
 **Visual.**
-1. Hit enter on the `just onboard-l4d` command.
-2. Let the six step lines stream past in the terminal:
-   ```
-   ✓ Mint ENS subname            seller19.reckon402-test.eth
-   ✓ Register ERC-8004 agentId   id=5421
-   ✓ Deploy per-agent Escrow     0x8E7cd7551BF5cb13D2e527cFC8eC2Ad8AB6BB9C5
-   ✓ Deploy Splitter via factory 0x96A8B60c4C5511FA6381c5460a892db519e5dE56
-   ✓ Set ENS records             12 records signed + cached
-   ✓ Transfer ENS ownership      → 0xD53f...7b1f
-   ```
-3. When the script prints the dashboard URL, hover it but don't click yet.
+Let the six steps complete in the live progress panel — the panel is the
+visual centerpiece for this beat, no terminal switch needed. Expected
+elapsed times printed by the orchestrator next to each row:
+
+```
+✓ Mint ENS subname               ~16s   subname=seller20.reckon402-test.eth + Etherscan link
+✓ Register ERC-8004 agentId      ~1.3s  agentId=5435 + Basescan link
+✓ Deploy Escrow via factory      ~0.4s  escrow=0xd2E7a2…7600 + Basescan link
+✓ Deploy Splitter via factory    ~1.4s  splitter=0xFff232bCa3… + Basescan link
+✓ Set ENS records (gateway)      ~0.2s  records=13
+✓ Seed gateway + transfer ENS    ~10s   ownership → 0xD53f…7b1f
+```
+
+When all six rows are green, the right-hand side cards populate:
+**Splitter recipients** (87% / 3% / 10%), **Risk-buffer release schedule**
+(T0–T7 tier curve), and **ERC-8004 IDENTITY MINTED** card showing the
+new agentId.
 
 **Voiceover.**
-> Six steps. ENS subname on Ethereum Sepolia. ERC-8004 identity on Base
-> Sepolia. A per-agent Escrow contract at a deterministic CREATE2 address.
-> A Splitter routing 87 percent to the seller, 3 percent to the
-> facilitator, 10 percent into the agent's own Escrow on every settlement.
-> Twelve ENS text records signed and served via CCIP-Read. The platform
-> provisioned all of this. It never owned it — the ENS name and agentId
-> transferred to the seller's wallet in the last step.
+> Six steps. ENS subname on Ethereum Sepolia. ERC-8004 identity NFT
+> minted on Base Sepolia. A per-agent Escrow contract at a deterministic
+> CREATE2 address — keyed to the agentId so the address is predictable
+> before deployment. A Splitter routing 87 percent to the seller, 3
+> percent to the facilitator, 10 percent into the agent's own Escrow on
+> every settlement. Thirteen ENS text records signed and seeded into the
+> CCIP-Read gateway. ENS ownership transferred to the seller's wallet.
+> The platform provisioned all of this; it never owned it.
 
 ---
 
@@ -247,45 +260,75 @@
 
 Before pressing record:
 
-1. **Browser windows.** Three tabs prepared: `reckon402.com`,
-   `app.reckon402.com/#/agent/seller19.reckon402-test.eth`, blank tab for
-   Basescan jumps.
-2. **Terminal.** One window, `just` and `infisical` ready, working dir at
-   repo root, font size bumped 1–2 steps for readability.
+1. **Browser windows.** Three tabs prepared:
+   - `reckon402.com` (Act 1)
+   - `app.reckon402.com` — onboarding form, fields pre-typed except the
+     ENS label which is typed live in Beat 2A (Acts 2, 3, 4, 5)
+   - Blank tab for Basescan jumps (Acts 4, 5)
+2. **Terminal.** One window for Act 4 only, `just` and `infisical` ready,
+   working dir at repo root, font size bumped 1–2 steps for readability.
 3. **MetaMask.** Seller account
    (`0xD53ffac42496d73B3Faf946786688a8454F57b1f`) imported and visible in
    the account list. `BASE_SEPOLIA_RPC_PRIMARY` configured on Base Sepolia
    (chainId 84532). Account funded with at least 0.005 ETH for gas.
-4. **Fresh agent.** Run a NEW `just onboard-l4d sellerN.reckon402-test.eth …`
-   on the morning of the recording so the dashboard starts at zero
-   attestations / Total deposited 0. The script in this doc references
-   `seller19` — substitute the fresh label everywhere.
+4. **Pick the next free ENS label.** Probe with
+   `bash tools/integration-tests/resolve-l4a.sh --backend static --name
+   sellerN.reckon402-test.eth --key x402.amount` and pick the lowest `N`
+   that returns `UNKNOWN_NAME`. Substitute `sellerN` everywhere in this
+   script (see Common substitutions table).
 5. **Re-point agent worker.** Edit `workers/agent/wrangler.toml` to point
-   `SELLER_ENS`, `SPLITTER_ADDRESS`, `AMOUNT` at the fresh agent and
-   redeploy: `just deploy-agent`.
+   `SELLER_ENS`, `SPLITTER_ADDRESS`, `AMOUNT` at the fresh agent's values
+   from the form's progress panel, and redeploy: `just deploy-agent`. (The
+   form path provisions the seller's contracts; the agent worker still
+   has to know which Splitter to point its 402 challenge at.)
 6. **Confirm `just fullflow-l4b` is green** with `SELLER_NAME=<fresh>`
    before pressing record. If it fails, do not record — debug first.
 7. **Tail.** Optionally keep `just tail-facilitator` running in a
    background terminal so any silent failure shows up.
 
+### Plan B — CLI fallback if the form misbehaves on the day
+
+The form path landed in commit `1feb949` (viem `nonceManager` injected
+into the orchestrator's wallet clients). It's been verified end-to-end
+against `seller20`. If the form mis-fires during recording (RPC
+flakiness, factor-of-two slower than expected, etc.), the CLI path is a
+drop-in alternative: drop Act 2 visuals to a terminal and run
+
+```
+just onboard-l4d sellerN.reckon402-test.eth 0xD53ffac42496d73B3Faf946786688a8454F57b1f
+```
+
+Same six steps, same on-chain artifacts, ~75s total. The voiceover for
+Beat 2C reads the same — only the visual changes.
+
 ---
 
 ## Common substitutions
 
-The script references the seller19 run literally. For a fresh recording:
+Act 2 (onboarding) references `seller20` (the verified web-form run).
+Act 3–5 reference `seller19` (the verified paid-call run). For a fresh
+recording, substitute as follows:
 
-| Reference in script | Replace with |
-|---------------------|--------------|
-| `seller19.reckon402-test.eth` | the new ENS label |
-| `agentId 5421` | the new agentId from onboarding step 2 |
-| `0x96A8B60c…dE56` (Splitter) | new Splitter address from step 4 |
-| `0x8E7cd755…B9C5` (Escrow) | new Escrow address from step 3 |
-| `0xa46f…af6c` (settle tx) | new settle tx from `fullflow-l4b` |
-| `0x1f2f…5299` (distribute tx) | parsed from receipt `reconcileNotes` |
-| `0x1d27…b4bc` (attest tx) | new `td_erc8004_tx` from receipt |
+| Reference in script | Where it appears | Replace with |
+|---------------------|------------------|--------------|
+| `seller20.reckon402-test.eth` | Act 2 (onboarding form) | the fresh ENS label being onboarded |
+| `agentId 5435` | Act 2 progress panel | new agentId from form step 2 |
+| `0xd2E7a2…7600` (Escrow) | Act 2 progress panel | new Escrow address from form step 3 |
+| `0xFff232bCa3…` (Splitter) | Act 2 progress panel | new Splitter address from form step 4 |
+| `seller19.reckon402-test.eth` | Acts 3, 4, 5 (dashboard + paid call) | the same fresh ENS label as Act 2 |
+| `agentId 5421` | Act 3 dashboard header | new agentId (matches Act 2) |
+| `0x96A8B60c…dE56` (Splitter) | Act 3 dashboard | new Splitter (matches Act 2) |
+| `0x8E7cd755…B9C5` (Escrow) | Act 3 dashboard | new Escrow (matches Act 2) |
+| `0xa46f…af6c` (settle tx) | Act 4 Basescan jump | new settle tx from `fullflow-l4b` |
+| `0x1f2f…5299` (distribute tx) | Act 4 Basescan jump | parsed from receipt `reconcileNotes` |
+| `0x1d27…b4bc` (attest tx) | Act 4 Basescan jump | new `td_erc8004_tx` from receipt |
 
-The price (`0.10 USDC`), the splits (87/3/10), the tier curve, and the
-seller EOA stay the same across runs.
+The price (`0.10 USDC` for the seller19 paid-call run, `0.01 USDC` for
+the seller20 onboarding form demo), the splits (87/3/10), the tier
+curve, and the seller EOA stay the same across runs. **Pick a single
+fresh seller label and use it for all six acts** — the script's mixed
+seller references above are an artifact of the two separate verification
+runs, not the recording target.
 
 ---
 

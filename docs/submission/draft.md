@@ -116,15 +116,23 @@ Note: live zkTLS is not shipping for this hackathon. A feasibility spike (`docs/
 
 The core submission. Reckon402 is a settlement-attestation primitive for agent commerce. The demo shows a SellingAgent onboarded in ~60 seconds and a BuyingAgent accumulating reputation across sequential paid calls — on-chain, verifiable, no mocks.
 
-### ENS — Best ENS Integration for AI Agents + Most Creative Use
+### ENS — Best ENS Integration for AI Agents + Most Creative Use of ENS
 
 **Track page: https://reckon402.com/ens** (browseable summary + on-chain evidence; `?format=json` for the raw record)
 
-ENS is not cosmetic here. `seller11.reckon402-test.eth` is the SellingAgent's identity AND the on-chain anchor that wires every settlement into the per-agent Escrow + tier-strategy contracts. The buyer-facing price (`x402.amount`) stays constant; what walks with on-chain reputation is how much of the Escrow buffer the seller can *withdraw*. The CCIP-Read resolver returns the live ERC-8004 attestation count for the agent, and the configured `ITierStrategy` recomputes the released BPS in the agent's Escrow on every read. ENSIP-25 text records (`x402.erc8004.registry`, `x402.erc8004.agent_id`, `x402.escrow`) are written at onboarding, creating the canonical ENS↔ERC-8004↔Escrow binding. The gateway-enforced ACL makes SellingAgent text-record ownership meaningful: the SellingAgent's EOA must sign any write to `x402.amount`, `x402.pricing`, `x402.attestation`, or `x402.endpoint`. The platform cannot change these records without the SellingAgent's key.
+Reckon402 applies for both ENS sub-prizes ($2,500 each):
 
-### KeeperHub — Best Integration + Builder Feedback Bounty
+**(1) Best ENS Integration for AI Agents — identity that does real work.** `seller11.reckon402-test.eth` is the SellingAgent's identity AND the on-chain anchor that wires every settlement into the per-agent Escrow + tier-strategy contracts. The CCIP-Read resolver (`Reckon402Resolver` on Ethereum Sepolia) implements EIP-3668 Pattern A — `msg.sender` encoded into `callData` — so vanilla `viem` and `wagmi` clients resolve without any Reckon402-specific code. The same ENS name returns endpoint, price, splitter address, escrow address, ERC-8004 agentId, and attestation opt-in. The gateway-enforced ACL makes SellingAgent text-record ownership meaningful: the SellingAgent's EOA must sign any write to `x402.amount`, `x402.pricing`, `x402.attestation`, or `x402.endpoint`. The platform cannot change these records without the SellingAgent's key.
+
+**(2) Most Creative Use of ENS — ENS as the dynamic coordination anchor for on-chain Escrow.** The buyer-facing price (`x402.amount`) stays constant; what walks with on-chain reputation is how much of the per-agent Escrow buffer the seller can *withdraw*. The CCIP-Read resolver reads the live ERC-8004 attestation count for the agent on every resolution, passes it through a pluggable `ITierStrategy` contract, and recomputes the released BPS in the agent's Escrow live. ENSIP-25 text records (`x402.erc8004.registry`, `x402.erc8004.agent_id`, `x402.escrow`) are written at onboarding, creating the canonical ENS↔ERC-8004↔Escrow binding. A wallet-name becomes a reputation-driven coordination mechanism for funds custody — the same name resolves into a different withdrawable BPS as the agent earns it. This is ENS doing something past pure name-to-address lookup: dynamic, on-chain, reputation-conditioned record behavior.
+
+### KeeperHub — Best Use of KeeperHub (Focus Area 2: Payments) + Builder Feedback Bounty
 
 **Track page: https://reckon402.com/keeperhub** (browseable summary + the four builder-feedback gaps inline; `?format=json` for the raw record)
+
+Reckon402 applies for both KH prizes — the $4,500 main pool (Best Use of KeeperHub, Focus Area 2: Payments) and the $500 Builder Feedback Bounty.
+
+**Live KH workflow (Focus Area 2):** [`https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9`](https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9) — a public KH workflow that uses the Reckon402 stack as an autonomous x402 buyer end-to-end. Trigger → KH-native HTTP step calls `agent.reckon402.com/research` → 402 Payment Required → `@reckon402/buyer-sdk` constructs the EIP-3009 transferWithAuthorization → `signing.reckon402.com/sign` (AWS Lambda + KMS) signs the typed-data → re-request with `X-Payment` → facilitator settles on Base Sepolia → 10% deposits into the per-agent Escrow → ERC-8004 attestation written. KH-native primitives throughout; no glue scripts.
 
 Reckon402 ships:
 - **`@reckon402/kh-skill`** (`packages/kh-skill/`, workspace stub at `@0.1.0`, marked private as a post-hackathon stub): a KeeperHub workflow node reference implementation that wraps `@reckon402/buyer-sdk`. Demonstrates Focus Area 2 (Payments) — KeeperHub workflows paying x402-priced APIs autonomously.

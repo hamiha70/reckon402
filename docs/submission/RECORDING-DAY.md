@@ -87,6 +87,27 @@ char counts.
 If Hono / Cloudflare D1 aren't in the dropdown, add via the "other
 technologies" free-text field.
 
+### Prize-structure callouts (don't lose half the eligible $$$ to a misread)
+
+ETHGlobal surfaces ENS and KeeperHub as one $5,000 row each on the
+prize selector. Each is actually **two independent prizes** judged
+separately. Reckon402 qualifies for both halves of both:
+
+| Sponsor | Sub-prize 1 | Sub-prize 2 |
+|---------|-------------|-------------|
+| **ENS** ($5K) | Best ENS Integration for AI Agents — $2,500 | Most Creative Use of ENS — $2,500 |
+| **KeeperHub** ($5K) | Best Use of KH (Focus Area 2: Payments) — $4,500 | Builder Feedback Bounty — $500 |
+
+The ENS justification field in `form-ready.md` is rewritten to hit
+both sub-prizes explicitly (identity-that-does-real-work + dynamic
+escrow-tier anchor). The KH justification calls out Focus Area 2 +
+points to `FEEDBACK.md` for the bounty. Don't shorten those —
+they're sized to land both.
+
+**Do not add a 3rd sponsor partner.** Slot is open but the remaining
+options (0G, Uniswap, Gensyn AXL) all need integrations we don't ship
+— a stretch claim hurts credibility on the two strong fits we have.
+
 ### Image uploads
 
 | Slot | File | Path |

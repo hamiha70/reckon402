@@ -224,30 +224,64 @@ multiplier, not a decision-maker.
 ## Page 4 — Prizes
 
 ### Selected prizes
-✓ ENS — $5000
-✓ KeeperHub — $5000
+✓ ENS — $5,000 *(actually 2 × $2,500 sub-prizes; see below)*
+✓ KeeperHub — $5,000 *(actually $4,500 main + $500 bounty; see below)*
 
-*(Two prizes selected — limit is 3 partners; you have one slot left if you want to add a third.)*
+*(Two partners selected — limit is 3. **Recommendation: do not add a 3rd.** The remaining options (0G, Uniswap, Gensyn AXL) all require integrations we don't ship. A stretch claim hurts credibility on the two strong fits we do have.)*
+
+---
+
+### Prize structure (per the OpenAgents 2026 prize page)
+
+**ENS — $5,000 total = TWO independent sub-prizes of $2,500 each:**
+- **Best ENS Integration for AI Agents** — $2,500 (1st $1,250 / 2nd $750 / 3rd $500)
+- **Most Creative Use of ENS** — $2,500 (1st $1,250 / 2nd $750 / 3rd $500)
+
+The form likely surfaces ENS as one $5,000 row, but Reckon402 qualifies for **both** independent sub-prizes. The justification field below explicitly hits both qualification descriptions.
+
+**KeeperHub — $5,000 total = TWO independent prizes:**
+- **Best Use of KeeperHub** — $4,500 (1st $2,500 / 2nd $1,500 / 3rd $500)
+  - Two ranked focus areas in one pool: (1) Innovative use, (2) Integration. Reckon402 hits **Focus Area 2: Payments** — KH workflows paying x402-priced APIs autonomously.
+- **Builder Feedback Bounty** — $500 (up to 2 teams × $250)
+  - Independent of placement in the main pool. Reckon402 ships `FEEDBACK.md` covering all four eligible categories (UX friction, reproducible bugs, doc gaps, feature requests).
 
 ---
 
 ### ENS — How are you using this Protocol/API?
 
-```
-ENS is the SellingAgent's identity AND the on-chain anchor that wires
-every settlement into the per-agent Escrow + tier-strategy contracts.
-Each agent gets a wildcard subname under reckon402-test.eth, served
-by Reckon402Resolver on Ethereum Sepolia via EIP-3668 CCIP-Read with
-msg.sender in callData (Pattern A) — so vanilla viem and wagmi
-clients work without custom code. ENSIP-25 text records (x402.escrow,
-x402.splitter, x402.erc8004.registry, x402.erc8004.agent_id) are
-written at onboarding, creating the canonical ENS↔ERC-8004↔Escrow
-binding. The same ENS name resolves the agent's tier as on-chain
-reputation accumulates — the gateway reads ERC-8004 live and passes
-the count through a pluggable ITierStrategy that controls the
-per-agent Escrow's withdrawable BPS. Buyer-facing price stays
-constant.
+> Covers both sub-prizes: identity-for-AI-agents AND most-creative-use.
 
+```
+Reckon402 uses ENS in two complementary ways, hitting both ENS prize
+sub-tracks:
+
+(1) Best ENS Integration for AI Agents — identity that does real work.
+Each SellingAgent gets a wildcard subname under reckon402-test.eth
+(seller{N}.reckon402-test.eth), served by Reckon402Resolver on
+Ethereum Sepolia via EIP-3668 CCIP-Read with msg.sender encoded into
+callData (Pattern A) — so vanilla viem and wagmi clients resolve
+without any Reckon402-specific code. The ENS name resolves: the
+agent's HTTPS endpoint (x402.endpoint), the price (x402.amount), the
+on-chain Splitter and Escrow (x402.splitter, x402.escrow), the
+ERC-8004 agentId (x402.erc8004.agent_id), and the gateway-enforced
+ACL distinguishes which keys the SellingAgent owns vs which Reckon402
+owns. ENS is doing real work: identity, discovery, payment routing,
+and access control.
+
+(2) Most Creative Use of ENS — ENS as the dynamic anchor for
+on-chain Escrow tier behavior. The same ENS name returns a different
+"released BPS" as on-chain reputation accumulates. Each paid
+settlement writes a facilitator-signed ERC-8004 attestation; the
+next CCIP-Read resolution reads the attestation count live, passes
+it through a pluggable ITierStrategy contract, and recomputes the
+per-agent Escrow's withdrawable amount on the fly. ENSIP-25 text
+records create a canonical ENS↔ERC-8004↔Escrow binding at
+onboarding — a wallet-name becomes a reputation-driven coordination
+mechanism for funds custody. Buyer-facing price stays constant; what
+the ENS name resolves into the world changes as the agent earns it.
+
+Live demo: https://app.reckon402.com (no hard-coded values; every
+record is on-chain and CCIP-Read resolved at request time).
 Track page with full evidence: https://reckon402.com/ens
 ```
 
@@ -286,19 +320,35 @@ worked example wired end-to-end on Cloudflare Workers.
 
 ### KeeperHub — How are you using this Protocol/API?
 
+> Covers both KH prizes: Best Use of KeeperHub (Focus Area 2: Payments) AND Builder Feedback Bounty.
+
 ```
-Reckon402 ships a live, public KeeperHub workflow that uses the
-Reckon402 stack as an autonomous x402 buyer end-to-end:
+Reckon402 applies for both KH prizes in this submission:
+
+(1) Best Use of KeeperHub — Focus Area 2: Payments. Reckon402 ships
+a live, public KeeperHub workflow that uses the Reckon402 stack as
+an autonomous x402 buyer end-to-end:
   https://app.keeperhub.com/workflows/5b5bx18671fappzbchqt9
 The workflow trigger hits agent.reckon402.com/research; the
-@reckon402/buyer-sdk negotiates the x402 paywall; the signing
-wrapper at signing.reckon402.com produces the EIP-712 signed
-PaymentAuthorization (workaround for KH's in-sandbox typed-data
-limitation); the facilitator settles, deposits 10% into the
-agent's Escrow, and writes the ERC-8004 attestation. Same
-definition is shipped as a one-file recipe (recipes/kh-workflow.json)
-+ skill bundle (@reckon402/kh-skill) so any KH user can drop it
-into their account and run.
+@reckon402/buyer-sdk negotiates the x402 paywall (HTTP 402 →
+PaymentRequirements); the signing wrapper at signing.reckon402.com
+produces the EIP-712-signed transferWithAuthorization (workaround
+for KH's in-sandbox typed-data limitation; KMS-custodied buyer
+key in eu-central-1); the facilitator settles on Base Sepolia,
+deposits 10% into the agent's per-agent Escrow, and writes a
+facilitator-signed ERC-8004 attestation. The same workflow definition
+is shipped as a one-file recipe (recipes/kh-workflow.json) plus a
+skill bundle (@reckon402/kh-skill) so any KH user can drop it into
+their account and run. Depth of integration: KH-native trigger,
+KH-native HTTP step, KH-native conditional, KH-native artifact
+output — no glue scripts, no external orchestrator. KH is the
+buyer; Reckon402 is the rails.
+
+(2) Builder Feedback Bounty. We hit all four eligible categories
+(UX/UI friction, reproducible bugs, doc gaps, feature requests) with
+specific actionable items and proposed primitives — not vague
+praise. Full feedback in the dedicated section below and in
+FEEDBACK.md at the repo root.
 
 Track page with full evidence + four-gap builder feedback:
 https://reckon402.com/keeperhub

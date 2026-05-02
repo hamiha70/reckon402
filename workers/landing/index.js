@@ -112,16 +112,17 @@ export default {
     .arch-box .dim { color: #374151; }
     .arch-box .blue { color: #60a5fa; }
     .arch-box .amber { color: #fbbf24; }
+    .arch-box .purpl { color: #c4b5fd; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
     .npm-badge { display: inline-flex; align-items: center; gap: 6px; background: #111827; border: 1px solid #1f2937; border-radius: 6px; padding: 3px 10px; font-size: 11px; color: #9ca3af; text-decoration: none; }
     .npm-badge:hover { border-color: #374151; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen px-4 py-12">
-  <div class="max-w-4xl mx-auto space-y-12">
+  <div class="max-w-6xl mx-auto space-y-12">
 
     <!-- HERO -->
-    <header class="space-y-4 pb-6 border-b border-gray-800">
+    <header class="space-y-5 pb-8 border-b border-gray-800">
       <div class="flex items-center gap-5">
         <div class="shrink-0">${logoSvg}</div>
         <div>
@@ -130,9 +131,11 @@ export default {
           </h1>
         </div>
       </div>
-      <p class="text-2xl font-bold text-white leading-tight">Agent commerce with memory.</p>
-      <p class="text-gray-400 text-sm leading-relaxed max-w-3xl">Every x402 settlement writes ERC-8004 reputation. Every ENS lookup reads it back. The trust signal drives history-aware behavior — for this hackathon, a per-agent on-chain Escrow that holds funds against future claims and releases as on-chain reputation grows.</p>
-      <div class="flex flex-col sm:flex-row gap-3 pt-2">
+      <h2 class="text-3xl sm:text-4xl font-bold text-white leading-tight tracking-tight">Agent commerce with memory.</h2>
+      <p class="text-gray-300 text-base leading-relaxed max-w-2xl">
+        Every x402 settlement writes ERC-8004 reputation. Every ENS lookup reads it back.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 pt-1">
         <a href="https://app.reckon402.com"
            class="bg-green-500 hover:bg-green-400 text-gray-950 font-bold py-3 px-8 rounded-lg text-center text-sm transition-colors">
           Launch App
@@ -145,91 +148,252 @@ export default {
       </div>
     </header>
 
-    <!-- PROBLEM -->
-    <section>
-      <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-4">The two open problems</h2>
-      <p class="text-gray-300 text-sm leading-relaxed max-w-3xl">Agent commerce isn’t ready for prime time. The individual standards exist — x402 negotiates payment in HTTP, ENS gives agents names, ERC-8004 tracks identity and reputation on-chain, USDC settles. None of them close the loop, so two sets of open problems pile up. <strong class="text-white">The first is trust:</strong> a buying agent paying a seller it has never met has no verifiable on-chain history to read, no escrow to hold against bad delivery, no path to revoke a payment, no mechanism to price-adjust by counterparty, no primitive for investable agents or optimistic service handling. <strong class="text-white">The second is privacy and economics:</strong> every payment is a public datapoint, and per-call gas overhead breaks sub-cent pricing. Both sets need new primitives. Reckon402 builds the first.</p>
-    </section>
-
-    <!-- SOLUTION -->
-    <section>
-      <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-4">What we built</h2>
-      <div class="space-y-4 text-gray-300 text-sm leading-relaxed max-w-3xl">
-        <p>Reckon402 closes that first loop. Every confirmed x402 payment writes an ERC-8004 reputation attestation, signed by the facilitator, on-chain. Every subsequent ENS resolution reads that history back through CCIP-Read and returns a <strong class="text-white">trust signal</strong> — a verifiable count of past settlements between the same parties. Downstream code can bind that signal to any history-aware behavior: tier-adjusted price, risk-weighted routing, optimistic-vs-strict service handling, investable-agent revenue claims.</p>
-        <p>For this hackathon we pick the single most consistently underbuilt behavior: <strong class="text-white">claims and revocation after settlement</strong>. A portion of every payment flows into a per-agent on-chain Escrow. The Escrow’s release schedule is parameterized by the same trust signal: low reputation → small fraction released, large buffer held against future claims; high reputation → most of the payment flows through immediately. Funds release as on-chain reputation grows, NFT-bound to the agent’s IdentityRegistry token so the buffer transfers with ownership.</p>
+    <!-- INTRO: problem + closed loop, side by side -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">The problem</h2>
+        <p class="text-gray-300 text-sm leading-relaxed mb-3">
+          x402, ENS, ERC-8004, USDC — none of them closes the loop. A buyer
+          paying a seller it has never met has:
+        </p>
+        <ul class="text-gray-300 text-sm leading-relaxed space-y-2 list-none">
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>no on-chain history to read</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>no escrow held against bad delivery</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>no path to revoke a payment</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>no primitive for risk-weighted routing or investable revenue claims</span></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">The closed loop</h2>
+        <p class="text-gray-300 text-sm leading-relaxed mb-3">
+          Reckon402 closes it.
+        </p>
+        <ul class="text-gray-300 text-sm leading-relaxed space-y-2 list-none">
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>Every x402 payment writes a facilitator-signed ERC-8004 attestation on-chain</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>Every ENS resolution reads it back through CCIP-Read — a verifiable <strong class="text-white">trust signal</strong></span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>The signal drives a <strong class="text-white">per-agent on-chain Escrow</strong>: low reputation holds a buffer, high reputation releases the payment</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">›</span><span>Escrow is NFT-bound to IdentityRegistry — the buffer follows ownership</span></li>
+        </ul>
       </div>
     </section>
 
-    <!-- LIVE STATUS -->
-    <section>
-      <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Live services</h2>
-      <div class="flex flex-wrap gap-6 text-xs text-gray-400">
-        <span class="flex items-center gap-2">
-          <span id="dot-facilitator" class="dot bg-gray-600"></span>
-          facilitator.reckon402.com
-        </span>
-        <span class="flex items-center gap-2">
-          <span id="dot-gateway" class="dot bg-gray-600"></span>
-          gateway.reckon402.com
-        </span>
-        <span class="flex items-center gap-2">
-          <span id="dot-signing" class="dot bg-gray-600"></span>
-          signing.reckon402.com
-        </span>
+    <!-- BUILT / COMING NEXT -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Built in this hackathon</h2>
+        <ul class="text-gray-300 text-sm leading-relaxed space-y-2 list-none">
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">+</span><span>Facilitator-signed ERC-8004 attestation on every confirmed settlement</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">+</span><span>CCIP-Read ENS gateway that returns the trust count</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">+</span><span><code class="text-green-300 bg-gray-900 px-1 rounded">SplitterFactory</code> + <code class="text-green-300 bg-gray-900 px-1 rounded">EscrowFactory</code> with per-agent contracts</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">+</span><span>Pluggable, parameterized <code class="text-green-300 bg-gray-900 px-1 rounded">ITierStrategy</code> curve</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">+</span><span>NFT-bound withdraw — Escrow follows IdentityRegistry ownership</span></li>
+          <li class="flex gap-2"><span class="text-green-400 shrink-0">+</span><span>Fork-tested against live ERC-8004 contracts on Base Sepolia</span></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Coming next</h2>
+        <ul class="text-gray-300 text-sm leading-relaxed space-y-2 list-none">
+          <li class="flex gap-2"><span class="text-amber-400 shrink-0">›</span><span>Buyer-side proof-of-non-delivery (zkTLS via Reclaim Protocol)</span></li>
+          <li class="flex gap-2"><span class="text-amber-400 shrink-0">›</span><span>Negative attestation that unlocks Escrow withdrawal back to the buyer</span></li>
+          <li class="flex gap-2"><span class="text-amber-400 shrink-0">›</span><span>Other history-aware adaptations are consumer-side and drop in directly: tier pricing, risk-weighted routing, optimistic-vs-strict handling, investable-agent revenue claims</span></li>
+        </ul>
       </div>
     </section>
 
     <!-- ARCHITECTURE -->
     <section>
       <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Architecture</h2>
-      <div class="arch-box">
-<span class="hl">BuyingAgent</span> ──── PAYMENT-SIGNATURE ──► <span class="hl">Agent Worker</span> <span class="dim">(Hono + withX402)</span>
-                                              │
-                                    POST /x402/settle
-                                              │
-                                    <span class="blue">Facilitator Worker</span> ──► <span class="amber">Base Sepolia</span>
-                                              │              ├─ USDC transferWithAuthorization
-                                              │              ├─ Splitter.distribute <span class="dim">(87% seller / 3% facilitator / 10% Escrow)</span>
-                                              │              └─ ReputationRegistry.giveFeedback
-                                              │
-                                    <span class="blue">ENS Gateway</span> <span class="dim">(CCIP-Read)</span> ◄── next request reads tier
-                                              │
-                                    <span class="hl">Reckon402Resolver</span> <span class="dim">(ETH Sepolia)</span>
-                                    <span class="dim">▲ subnames: seller{N}.reckon402-test.eth</span></div>
-    </section>
+      <p class="text-gray-400 text-xs leading-relaxed max-w-3xl mb-4">
+        Two flows. <strong class="text-white">Onboarding</strong> happens once per
+        SellingAgent and provisions ENS, ERC-8004, Splitter and Escrow.
+        <strong class="text-white">Purchase</strong> happens per HTTP call and
+        feeds the trust loop.
+        <span class="text-amber-400">Base Sepolia</span> hosts the value rails;
+        <span class="text-purple-300">Ethereum Sepolia</span> hosts the ENS namespace.
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-    <!-- STATS -->
-    <section>
-      <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Test posture</h2>
-      <div class="grid grid-cols-3 gap-4">
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
-          <div class="text-3xl font-bold text-green-400">362</div>
-          <div class="text-xs text-gray-500 mt-1">Vitest tests passing</div>
-        </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
-          <div class="text-3xl font-bold text-amber-400">109</div>
-          <div class="text-xs text-gray-500 mt-1">Forge tests passing</div>
-        </div>
-        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
-          <div class="text-3xl font-bold text-blue-400">15/15</div>
-          <div class="text-xs text-gray-500 mt-1">healthz probes green</div>
-        </div>
+        <div class="arch-box">
+<span class="blue">ONBOARDING</span> <span class="dim">— one-time per SellingAgent</span>
+
+Operator runs:
+   <span class="hl">just onboard-l4d</span> &lt;ens&gt; &lt;eoa&gt;     <span class="dim">CLI</span>
+   <span class="hl">app.reckon402.com</span>                  <span class="dim">form UI</span>
+                <span class="dim">│</span>
+                <span class="dim">▼</span>
+   <span class="hl">onboard-orchestrator</span> drives 6 steps:
+
+   1. ENS subname mint
+        seller{N}.reckon402-test.eth
+        <span class="purpl">on Ethereum Sepolia</span>
+
+   2. ERC-8004 agentId register
+        <span class="hl">IdentityRegistry</span>.newAgent
+        <span class="amber">on Base Sepolia</span>
+
+   3. <span class="hl">EscrowFactory</span>.createEscrow <span class="dim">(CREATE2)</span>
+        per-agent Escrow, agentId-keyed
+        wired to v1 <span class="hl">TierStrategy</span>
+
+   4. <span class="hl">SplitterFactory</span>.createSplitter <span class="dim">(CREATE2)</span>
+        recipients <span class="dim">=</span> [seller, fac-fee, Escrow]
+        BPS        <span class="dim">=</span> [ 8700,    300,   1000 ]
+
+   5. Sign + write ENS records via gateway
+        <span class="dim">x402.splitter   x402.escrow</span>
+        <span class="dim">x402.amount     x402.facilitator</span>
+        <span class="dim">x402.endpoint   x402.erc8004.agent_id</span>
+
+   6. ENS setOwner(subnode, sellerEoa)
+        closes Reckon402 bootstrap-write window
+
+   <span class="hl">Agent is live and paywalled.</span></div>
+
+        <div class="arch-box">
+<span class="blue">PURCHASE</span> <span class="dim">— per HTTP call, 3 on-chain txs</span>
+
+<span class="hl">BuyingAgent</span>  →  <span class="hl">agent</span>.reckon402.com  <span class="dim">(GET)</span>
+                <span class="dim">│</span>
+                <span class="dim">▼ 402 + x402 PaymentRequirements</span>
+
+BuyingAgent signs EIP-3009 typed-data:
+   <span class="hl">@reckon402/buyer-sdk</span> <span class="dim">locally</span>, or
+   <span class="hl">signing.reckon402.com</span> <span class="dim">(KMS+Lambda)</span>
+                <span class="dim">│</span>
+                <span class="dim">▼ X-Payment header</span>
+
+agent  →  <span class="hl">facilitator</span>  <span class="dim">(/x402/settle)</span>
+
+facilitator <span class="amber">on Base Sepolia</span> sends 3 txs:
+
+   <span class="blue">tx 1 · settle</span>
+     resolve x402.splitter via gateway
+     <span class="amber">USDC</span>.transferWithAuthorization
+     buyer → per-agent Splitter
+
+   <span class="blue">tx 2 · distribute</span>
+     per-agent <span class="hl">Splitter</span>.distribute
+     87% → seller EOA
+     3%  → facilitator fee EOA
+     10% → per-agent Escrow
+
+   <span class="blue">tx 3 · attest</span>
+     <span class="hl">ReputationRegistry</span>.giveFeedback
+     one attestation, facilitator-signed
+     gateway cache invalidated
+
+All three render live on the dashboard
+under <span class="hl">app.reckon402.com</span>.
+
+<span class="dim">─── trust loop ──────────────────────────</span>
+
+Next call from any buyer:
+   gateway re-reads ERC-8004 → trust count
+   tier walks T0 → T1 → T2 ... as count grows
+   withdrawableNow rises in per-agent Escrow
+
+Seller (NFT owner of agentId), any time:
+   <span class="hl">Escrow</span>.withdrawAll()  <span class="dim">via Claim button</span>
+   gated on <span class="hl">IdentityRegistry</span>.ownerOf(agentId)</div>
+
       </div>
     </section>
 
-    <!-- HACKATHON SCOPE -->
-    <section>
-      <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-4">Hackathon scope</h2>
-      <div class="space-y-4 text-gray-300 text-sm leading-relaxed max-w-3xl">
-        <p><strong class="text-white">Built in this hackathon.</strong> Facilitator-signed ERC-8004 attestations on every settlement; CCIP-Read ENS gateway returning the trust count; per-agent SplitterFactory + Escrow with a pluggable, parameterized tier curve; NFT-bound withdraw; fork-tested against live ERC-8004 contracts on Base Sepolia.</p>
-        <p><strong class="text-white">To be built after.</strong> Buyer-side proof-of-non-delivery (zkTLS via Reclaim Protocol on the buyer SDK) that triggers a negative attestation and unlocks Escrow withdrawal back to the buyer. Other history-aware adaptations — pure tier pricing, risk-weighted routing, optimistic-vs-strict handling, investable-agent revenue claims — drop in directly; they’re consumer-side, not protocol-side. The orthogonal problem space (privacy + batching + sub-cent economics) belongs to a different solution vector and is out of scope for Reckon402.</p>
+    <!-- LIVE SERVICES + SDKS -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-4">Live services</h2>
+        <ul class="space-y-3 text-sm">
+          <li class="flex items-start gap-3">
+            <span id="dot-agent" class="dot bg-gray-600 mt-2 shrink-0"></span>
+            <div>
+              <div class="text-white font-bold">agent.reckon402.com</div>
+              <div class="text-gray-500 text-xs">x402-paywalled merchant agent (Hono + <code class="text-gray-400">withX402</code>)</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span id="dot-app" class="dot bg-gray-600 mt-2 shrink-0"></span>
+            <div>
+              <div class="text-white font-bold">app.reckon402.com</div>
+              <div class="text-gray-500 text-xs">SellingAgent onboarding flow + per-agent dashboard</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span id="dot-facilitator" class="dot bg-gray-600 mt-2 shrink-0"></span>
+            <div>
+              <div class="text-white font-bold">facilitator.reckon402.com</div>
+              <div class="text-gray-500 text-xs">x402 verify + settle Worker (D1, ERC-8004 attestation writes)</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span id="dot-gateway" class="dot bg-gray-600 mt-2 shrink-0"></span>
+            <div>
+              <div class="text-white font-bold">gateway.reckon402.com</div>
+              <div class="text-gray-500 text-xs">CCIP-Read ENS gateway (D1, ERC-8004 reads, signed off-chain records)</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span id="dot-signing" class="dot bg-gray-600 mt-2 shrink-0"></span>
+            <div>
+              <div class="text-white font-bold">signing.reckon402.com</div>
+              <div class="text-gray-500 text-xs">EIP-712 typed-data signer for buyer flows (AWS Lambda + KMS)</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-4">SDKs <span class="text-gray-600 normal-case tracking-normal">— shipping with the submission</span></h2>
+        <ul class="space-y-3 text-sm">
+          <li class="flex items-start gap-3">
+            <span class="text-red-400 font-bold text-xs mt-0.5 shrink-0">npm</span>
+            <div>
+              <div class="text-white font-bold">@reckon402/types</div>
+              <div class="text-gray-500 text-xs">Canonical x402 v2 wire-format types</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-red-400 font-bold text-xs mt-0.5 shrink-0">npm</span>
+            <div>
+              <div class="text-white font-bold">@reckon402/buyer-sdk</div>
+              <div class="text-gray-500 text-xs">Buyer-side helpers: paymentId, EIP-3009 sign, encode</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-red-400 font-bold text-xs mt-0.5 shrink-0">npm</span>
+            <div>
+              <div class="text-white font-bold">@reckon402/middleware-hono</div>
+              <div class="text-gray-500 text-xs"><code class="text-gray-400">withX402</code> middleware factory for Hono merchants</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-red-400 font-bold text-xs mt-0.5 shrink-0">npm</span>
+            <div>
+              <div class="text-white font-bold">@reckon402/facilitator-client</div>
+              <div class="text-gray-500 text-xs">Reckon402 facilitator HTTP client</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-red-400 font-bold text-xs mt-0.5 shrink-0">npm</span>
+            <div>
+              <div class="text-white font-bold">@reckon402/erc-8004-client</div>
+              <div class="text-gray-500 text-xs">ERC-8004 Identity + Reputation reads (multichain)</div>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <span class="text-red-400 font-bold text-xs mt-0.5 shrink-0">npm</span>
+            <div>
+              <div class="text-white font-bold">@reckon402/kh-skill</div>
+              <div class="text-gray-500 text-xs">KeeperHub skill bundle (workflow integration)</div>
+            </div>
+          </li>
+        </ul>
       </div>
     </section>
 
     <!-- TECH STACK -->
     <section>
       <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Tech stack</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
         <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-4">
           <div class="text-green-400 font-bold text-base mb-1">x402 v2</div>
           <div class="text-gray-500 text-xs">HTTP payment protocol</div>
@@ -251,34 +415,41 @@ export default {
           <div class="text-gray-500 text-xs">USDC, Splitter, Escrow, ERC-8004</div>
         </div>
         <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="text-purple-300 font-bold text-base mb-1">Ethereum Sepolia</div>
+          <div class="text-gray-500 text-xs">ENS registry, Reckon402Resolver, subnames</div>
+        </div>
+        <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-4">
           <div class="text-green-300 font-bold text-base mb-1">Hono</div>
           <div class="text-gray-500 text-xs">withX402 middleware, facilitator routes</div>
+        </div>
+        <div class="card-hover bg-gray-900 border border-gray-800 rounded-lg p-4">
+          <div class="text-pink-300 font-bold text-base mb-1">AWS Lambda + KMS</div>
+          <div class="text-gray-500 text-xs">EIP-712 typed-data signer</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS -->
+    <section>
+      <h2 class="text-xs uppercase tracking-widest text-gray-500 mb-3">Test posture</h2>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
+          <div class="text-3xl font-bold text-green-400">362</div>
+          <div class="text-xs text-gray-500 mt-1">Vitest tests passing</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
+          <div class="text-3xl font-bold text-amber-400">109</div>
+          <div class="text-xs text-gray-500 mt-1">Forge tests passing</div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
+          <div class="text-3xl font-bold text-blue-400">15/15</div>
+          <div class="text-xs text-gray-500 mt-1">healthz probes green</div>
         </div>
       </div>
     </section>
 
     <!-- FOOTER -->
-    <footer class="border-t border-gray-800 pt-6 space-y-4">
-      <div class="flex flex-wrap gap-2">
-        <a href="https://www.npmjs.com/package/@reckon402/types" target="_blank" rel="noopener" class="npm-badge">
-          <span class="text-red-400 font-bold">npm</span> @reckon402/types
-        </a>
-        <a href="https://www.npmjs.com/package/@reckon402/buyer-sdk" target="_blank" rel="noopener" class="npm-badge">
-          <span class="text-red-400 font-bold">npm</span> @reckon402/buyer-sdk
-        </a>
-        <a href="https://www.npmjs.com/package/@reckon402/middleware-hono" target="_blank" rel="noopener" class="npm-badge">
-          <span class="text-red-400 font-bold">npm</span> @reckon402/middleware-hono
-        </a>
-        <a href="https://www.npmjs.com/package/@reckon402/facilitator-client" target="_blank" rel="noopener" class="npm-badge">
-          <span class="text-red-400 font-bold">npm</span> @reckon402/facilitator-client
-        </a>
-        <a href="https://www.npmjs.com/package/@reckon402/erc-8004-client" target="_blank" rel="noopener" class="npm-badge">
-          <span class="text-red-400 font-bold">npm</span> @reckon402/erc-8004-client
-        </a>
-        <a href="https://www.npmjs.com/package/@reckon402/kh-skill" target="_blank" rel="noopener" class="npm-badge">
-          <span class="text-red-400 font-bold">npm</span> @reckon402/kh-skill
-        </a>
-      </div>
+    <footer class="border-t border-gray-800 pt-6">
       <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-600">
         <span>Built for <span class="text-gray-500">ETHGlobal OpenAgents 2026</span></span>
         <a href="https://github.com/hamiha70/reckon402" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-400">github.com/hamiha70/reckon402</a>
@@ -290,6 +461,8 @@ export default {
   <script>
     (function() {
       var endpoints = [
+        { id: 'dot-agent', url: 'https://agent.reckon402.com/healthz' },
+        { id: 'dot-app', url: 'https://app.reckon402.com/healthz' },
         { id: 'dot-facilitator', url: 'https://facilitator.reckon402.com/healthz' },
         { id: 'dot-gateway', url: 'https://gateway.reckon402.com/healthz' },
         { id: 'dot-signing', url: 'https://signing.reckon402.com/healthz' }

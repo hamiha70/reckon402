@@ -1,14 +1,21 @@
-# L4d Deploy Runbook — EscrowFactory + per-agent Escrow
+# L4d Deploy Runbook — EscrowFactory + LinearMonotonicTierStrategy + per-agent Escrow
 
 Operator-driven on-chain deploy for the L4d on-chain risk-buffer
-Escrow. Lands an `EscrowFactory` on Base Sepolia + smoke-tests a
-single per-agent Escrow before any orchestrator changes ship. Until
-the orchestrator is updated (E2), this factory exists silently — no
-existing onboarding flow uses it. seller9 is unaffected at every
-step.
+Escrow. Lands TWO contracts on Base Sepolia:
+
+1. `LinearMonotonicTierStrategy` (v1 default 8-tier curve) — the
+   pluggable tier-evaluator pinned at every Escrow's deploy time.
+2. `EscrowFactory` — CREATE2 deployer for per-agent Escrows.
+
+Plus a smoke-test per-agent Escrow against an existing on-chain
+agent. Until the orchestrator is updated (E2), this factory + the
+default strategy exist silently — no onboarding flow uses them.
+seller9 is unaffected at every step.
 
 **Paired spec:** `specs/09-l4d-escrow.md`.
 **Predecessor:** L4c factory pattern (`tools/deploy/deploy-l4c-factory.md`).
+**Pre-deploy gate tag:** `L4d-strategy-green` — pluggable refactor
+landed; tests green from a fresh clone.
 **Rollback baseline:** `L4d-pre-onchain-baseline` (`8a468ec`) — reset
 to here if any step fails irrecoverably.
 
@@ -22,13 +29,15 @@ cd ~/Projects/ETHGlobal/ETHGlobal_OpenAgents_2026/reckon402
 
 ## Pre-conditions
 
-- [ ] `L4d-contracts-green` tag is at HEAD or earlier (forge build +
-      forge test green from a fresh clone).
+- [ ] `L4d-strategy-green` tag is at HEAD or earlier (forge build +
+      forge test green from a fresh clone, pluggable strategy refactor
+      landed).
 - [ ] Working tree is clean.
 - [ ] Fresh-clone reproducibility: `git clean -fdx && pnpm install &&
       (cd contracts && forge build && forge test) && pnpm -r run test`
-      exits 0. Forge: 95/95 (= 49 pre-L4d + 46 L4d). Vitest: same as
-      pre-L4d (no worker changes in this layer).
+      exits 0. Forge: 106/106 (= 49 pre-L4d + 57 L4d, where 57 = 26
+      EscrowTest + 14 EscrowFactoryTest + 17 LinearMonotonicTierStrategyTest).
+      Vitest: same as pre-L4d (no worker changes in this layer).
 - [ ] Infisical hydrates: `BASE_SEPOLIA_RPC_PRIMARY`,
       `DEPLOYER_AWS_ACCESS_KEY_ID`, `DEPLOYER_AWS_SECRET_ACCESS_KEY`
       (these route the AWS SDK to the `reckon402-deployer` IAM user
@@ -73,22 +82,32 @@ Expect both ≥ 0.02 ETH (in wei: ≥ 20000000000000000).
 ## Step 1 — Forge gate
 
 ```bash
-(cd contracts && forge test --match-contract "EscrowTest|EscrowFactoryTest" -vv)
+(cd contracts && forge test --match-contract "EscrowTest|EscrowFactoryTest|LinearMonotonicTierStrategyTest" -vv)
 ```
 
-Must exit 0 with **46/46 passing** (32 EscrowTest + 14 EscrowFactoryTest,
-including the 256-run fuzz on `predictAddress↔createEscrow`). Any
-fuzz failure is a STOP — it means the CREATE2 prediction disagrees
-with the EVM's actual deployed address; never broadcast a factory
-that fails this test.
+Must exit 0 with **57/57 passing** (26 EscrowTest + 14 EscrowFactoryTest +
+17 LinearMonotonicTierStrategyTest, including the 256-run fuzz on
+`predictAddress↔createEscrow` and the 256-run fuzz on
+`evaluate(a) <= evaluate(b)` for `a <= b`). Any fuzz failure is a
+STOP — fuzz on `predictAddress` catches CREATE2 prediction drift,
+which would brick the orchestrator's pre-resolution path; fuzz on
+the strategy catches non-monotonic tier behaviour.
 
 ---
 
-## Step 2 — Deploy EscrowFactory on Base Sepolia (KMS-signed)
+## Step 2 — Deploy LinearMonotonicTierStrategy + EscrowFactory on Base Sepolia (KMS-signed)
 
-Pinned constructor args (hardcoded in `tools/deploy/deploy-escrow-factory.mjs`,
-NOT the Foundry script — the Node + viem + KMS path is the canonical
-deploy for any Reckon402 contract that records the KMS deployer EOA):
+Pinned constructor args (hardcoded in `tools/deploy/deploy-escrow-factory.mjs`).
+The single Node + viem + KMS deploy script lands BOTH contracts:
+
+**LinearMonotonicTierStrategy (v1 default 8-tier curve):**
+
+| Param | Value |
+|-------|-------|
+| `thresholds` | `[0, 1, 3, 10, 30, 100, 300, 1000]` |
+| `releaseBps` | `[0, 500, 1500, 3000, 5000, 7000, 8500, 10000]` |
+
+**EscrowFactory:**
 
 | Param | Value | Source |
 |-------|-------|--------|
@@ -96,54 +115,63 @@ deploy for any Reckon402 contract that records the KMS deployer EOA):
 | identityRegistry   | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | ERC-8004 IdentityRegistry (AGENTS.md L4a2) |
 | reputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | ERC-8004 ReputationRegistry (AGENTS.md L4a2) |
 
-Build artifact first, then deploy:
+Build artifacts first, then deploy:
 
 ```bash
 (cd contracts && forge build)
 
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   node tools/deploy/deploy-escrow-factory.mjs
-' | tee /tmp/l4d-factory-deploy.log
+' | tee /tmp/l4d-deploy.log
 ```
 
 The deploy script:
 1. Resolves the deployer address from KMS (`alias/reckon402/mainnet/deployer/evm`) via `tools/sign/kms-account.mjs`.
 2. Re-checks the on-chain balance ≥ 0.01 ETH.
-3. Encodes the constructor args, prepends to bytecode.
-4. Signs with KMS, broadcasts, waits for receipt (120s timeout).
-5. Writes `contracts/deploy-logs/escrow-factory-base-sepolia-<DATE>.md`.
-6. Stdout = the deployed factory address (for `$(...)` capture).
-
-The `Foundry forge script` flow under `script/DeployEscrowFactory.s.sol`
-is retained for local Anvil testing only — it CANNOT sign with KMS.
-
-The deploy script's stdout is the factory address; capture into a shell variable for the next steps.
+3. Encodes the v1 default tier curve into the strategy constructor and broadcasts.
+4. Encodes the factory constructor and broadcasts.
+5. Writes `contracts/deploy-logs/escrow-factory-base-sepolia-<DATE>.md`
+   with both addresses + tx hashes.
+6. Stdout = `"<factoryAddr> <strategyAddr>"` for `$(...)` capture.
 
 Capture from the broadcast output:
 - **EscrowFactory address** — `<TBD>`
-- **Deploy tx hash** — `<TBD>`
-- **Block number** — `<TBD>`
-- **Gas used** — `<TBD>`
+- **Strategy address** — `<TBD>`
+- **Factory deploy tx** — `<TBD>`
+- **Strategy deploy tx** — `<TBD>`
 
 Sanity reads:
 
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   FACTORY="<EscrowFactory address>"
-  echo "token():            $(cast call $FACTORY "token()(address)"             --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
-  echo "identityRegistry(): $(cast call $FACTORY "identityRegistry()(address)"  --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
-  echo "reputationRegistry: $(cast call $FACTORY "reputationRegistry()(address)" --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
+  STRAT="<Strategy address>"
+
+  echo "Factory immutables:"
+  echo "  token():            $(cast call $FACTORY "token()(address)"             --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
+  echo "  identityRegistry(): $(cast call $FACTORY "identityRegistry()(address)"  --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
+  echo "  reputationRegistry: $(cast call $FACTORY "reputationRegistry()(address)" --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
+
+  echo "Strategy v1 default curve:"
+  echo "  thresholds(): $(cast call $STRAT "thresholds()(uint64[])"     --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
+  echo "  releaseBps(): $(cast call $STRAT "releaseBpsArr()(uint16[])" --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
+  echo "  evaluate(0,30): $(cast call $STRAT "evaluate(uint256,uint64)(uint16)" 0 30 --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY")"
 '
 ```
 
 Expected output (case-normalized):
 ```
-token():            0x036CbD53842c5426634e7929541eC2318f3dCF7e
-identityRegistry(): 0x8004A818BFB912233c491871b3d84c89A494BD9e
-reputationRegistry: 0x8004B663056A597Dffe9eCcC1965A193B7388713
+Factory immutables:
+  token():            0x036CbD53842c5426634e7929541eC2318f3dCF7e
+  identityRegistry(): 0x8004A818BFB912233c491871b3d84c89A494BD9e
+  reputationRegistry: 0x8004B663056A597Dffe9eCcC1965A193B7388713
+Strategy v1 default curve:
+  thresholds(): [0,1,3,10,30,100,300,1000]
+  releaseBps(): [0,500,1500,3000,5000,7000,8500,10000]
+  evaluate(0,30): 5000
 ```
 
-If any of those mismatch, **STOP** — the factory was deployed with
+If any of those mismatch, **STOP** — the contracts were deployed with
 wrong constructor args. Re-deploy.
 
 ---
@@ -157,12 +185,9 @@ has rows (the Escrow's tier evaluation will return non-zero).
 Use **agentId = 1** — `seller.reckon402-test.eth` per AGENTS.md L4a2
 (Base Sepolia). This agent already has L4b1 attestation rows.
 
-Tier curve passed to the Escrow:
-
-```
-thresholds = [0, 1, 3, 10, 30, 100, 300, 1000]
-releaseBps = [0, 500, 1500, 3000, 5000, 7000, 8500, 10000]
-```
+The Escrow is wired to the v1 default `LinearMonotonicTierStrategy`
+deployed in step 2. The Escrow itself holds NO tier arrays — they
+live in the strategy contract.
 
 Salt: `keccak256("reckon402-l4d-probe-2026-05-02")`.
 
@@ -175,17 +200,17 @@ KMS round-trips for a single smoke probe.
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   FACTORY="<EscrowFactory address from step 2>"
+  STRATEGY="<Strategy address from step 2>"
   FACILITATOR=0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455
   AGENT_ID=1
   SALT=$(cast keccak "reckon402-l4d-probe-2026-05-02")
 
   # First predict the address (read-only, no gas).
   PREDICTED=$(cast call "$FACTORY" \
-    "predictAddress(uint256,address,uint64[],uint16[],string,string,bytes32)(address)" \
+    "predictAddress(uint256,address,address,string,string,bytes32)(address)" \
     "$AGENT_ID" \
     "$FACILITATOR" \
-    "[0,1,3,10,30,100,300,1000]" \
-    "[0,500,1500,3000,5000,7000,8500,10000]" \
+    "$STRATEGY" \
     "payment" \
     "x402-settlement" \
     "$SALT" \
@@ -195,11 +220,10 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
 
   # Now deploy.
   cast send "$FACTORY" \
-    "createEscrow(uint256,address,uint64[],uint16[],string,string,bytes32)(address)" \
+    "createEscrow(uint256,address,address,string,string,bytes32)(address)" \
     "$AGENT_ID" \
     "$FACILITATOR" \
-    "[0,1,3,10,30,100,300,1000]" \
-    "[0,500,1500,3000,5000,7000,8500,10000]" \
+    "$STRATEGY" \
     "payment" \
     "x402-settlement" \
     "$SALT" \
@@ -223,6 +247,9 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
 
   echo "owner():              $(cast call $ESCROW "owner()(address)"         --rpc-url $RPC)"
   echo "agentId():            $(cast call $ESCROW "agentId()(uint256)"       --rpc-url $RPC)"
+  echo "tierStrategy():       $(cast call $ESCROW "tierStrategy()(address)"  --rpc-url $RPC)"
+  echo "tag1():               $(cast call $ESCROW "tag1()(string)"           --rpc-url $RPC)"
+  echo "tag2():               $(cast call $ESCROW "tag2()(string)"           --rpc-url $RPC)"
   echo "attestationCount():   $(cast call $ESCROW "attestationCount()(uint64)" --rpc-url $RPC)"
   echo "releasedBps():        $(cast call $ESCROW "releasedBps()(uint16)"    --rpc-url $RPC)"
   echo "totalDeposited():     $(cast call $ESCROW "totalDeposited()(uint256)" --rpc-url $RPC)"
@@ -440,10 +467,14 @@ the deployed contract. Rollback at this layer means:
 ## References
 
 - `specs/09-l4d-escrow.md` — spec.
-- `contracts/src/Escrow.sol` — Escrow contract (~210 LOC).
+- `contracts/src/interfaces/ITierStrategy.sol` — pluggable tier interface.
+- `contracts/src/LinearMonotonicTierStrategy.sol` — v1 default strategy.
+- `contracts/src/Escrow.sol` — Escrow contract (~200 LOC).
 - `contracts/src/EscrowFactory.sol` — factory (~150 LOC).
-- `contracts/test/Escrow.t.sol` — 32-case test suite.
+- `contracts/test/LinearMonotonicTierStrategy.t.sol` — 17-case test suite incl. fuzz.
+- `contracts/test/Escrow.t.sol` — 26-case test suite.
 - `contracts/test/EscrowFactory.t.sol` — 14-case test suite incl. fuzz.
-- `contracts/script/DeployEscrowFactory.s.sol` — deploy script.
+- `tools/deploy/deploy-escrow-factory.mjs` — KMS-signed Node deploy script
+  (deploys both contracts in one go).
 - `tools/deploy/deploy-l4c-factory.md` — predecessor deploy runbook
   (this runbook's parent pattern; reuse Infisical conventions).

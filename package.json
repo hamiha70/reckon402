@@ -11,6 +11,7 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "lint": "echo 'lint not yet wired'",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm --filter @reckon402/frontend run typecheck"
   }
 }

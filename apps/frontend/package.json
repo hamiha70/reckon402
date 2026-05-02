@@ -6,6 +6,10 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "deploy": "echo 'apps/frontend has no standalone deploy. The dist/ directory is bundled into the onboard-orchestrator Worker via Workers Assets — run `just deploy-orchestrator` to ship UI changes to app.reckon402.com.' && exit 1"
+    "deploy": "echo 'apps/frontend has no standalone deploy. The dist/ directory is bundled into the onboard-orchestrator Worker via Workers Assets — run `just deploy-orchestrator` to ship UI changes to app.reckon402.com.' && exit 1",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
 }

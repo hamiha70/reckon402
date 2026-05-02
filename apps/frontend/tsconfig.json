@@ -1,0 +1,27 @@
+{
+  "//1": "Type-check only — apps/frontend/dist/app.js is hand-edited vanilla JS",
+  "//2": "(see package.json description). This config gates that file behind",
+  "//3": "tsc --noEmit so a `pnpm typecheck` run catches typos / wrong arity /",
+  "//4": "obvious nullability bugs without forcing a full TS migration. The",
+  "//5": "lib targets DOM + ES2022 because the file runs in modern browsers,",
+  "//6": "not in node. Strict mode is off intentionally — we accept JSDoc casts",
+  "//7": "for things like window.ethereum without forcing exhaustive type",
+  "//8": "annotations across the whole 970-line file. Full TS migration is a",
+  "//9": "v1.5 polish item.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": []
+  },
+  "include": ["dist/app.js"]
+}

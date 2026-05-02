@@ -1,6 +1,14 @@
+// @ts-check
 // Reckon402 L4c frontend — vanilla module, no bundler.
 // Served at the same origin as the onboard-orchestrator worker so all fetches
 // are relative paths (no CORS configuration).
+//
+// `// @ts-check` above flips on tsc-driven JSDoc-aware diagnostics for this
+// file. Type-check via `pnpm typecheck` from apps/frontend/. The config is
+// non-strict on purpose — the goal is catching typos, undefined vars, and
+// wrong arg counts, not enforcing exhaustive type annotations. Full TS
+// migration is a v1.5 polish item; until then JSDoc casts (e.g. window
+// .ethereum) bridge the EIP-1193 boundary.
 
 // ─── Config ───────────────────────────────────────────────────────────────
 const CFG = {

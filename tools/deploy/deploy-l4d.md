@@ -29,12 +29,20 @@ cd ~/Projects/ETHGlobal/ETHGlobal_OpenAgents_2026/reckon402
       (cd contracts && forge build && forge test) && pnpm -r run test`
       exits 0. Forge: 95/95 (= 49 pre-L4d + 46 L4d). Vitest: same as
       pre-L4d (no worker changes in this layer).
-- [ ] Infisical hydrates `BASE_SEPOLIA_RPC_PRIMARY` and `DEPLOYER_PK`
-      (KMS alias `alias/reckon402/mainnet/deployer/evm`, EOA
-      `0x66C2858D9A8605957c516a77262Eb66EE6be113C`).
-- [ ] Deployer has ≥ 0.02 ETH on Base Sepolia. EscrowFactory deploy
-      is ~0.0015 ETH; the smoke-test Escrow deploy is another
-      ~0.0015 ETH. Total budget: ~0.005 ETH.
+- [ ] Infisical hydrates: `BASE_SEPOLIA_RPC_PRIMARY`,
+      `DEPLOYER_AWS_ACCESS_KEY_ID`, `DEPLOYER_AWS_SECRET_ACCESS_KEY`
+      (these route the AWS SDK to the `reckon402-deployer` IAM user
+      that has `kms:Sign` + `kms:GetPublicKey` on the deployer key
+      alias `alias/reckon402/mainnet/deployer/evm`, controlling EOA
+      `0x66C2858D9A8605957c516a77262Eb66EE6be113C`),
+      and `RECKON402_DEPLOYER_PK` (the L4c orchestrator's
+      software-key for cast probes — distinct from the KMS deployer
+      EOA; used by step 3's probe deploy because cast cannot sign
+      with KMS).
+- [ ] Deployer (KMS) has ≥ 0.02 ETH on Base Sepolia for the factory
+      deploy. The Step 3 probe Escrow is signed by
+      `RECKON402_DEPLOYER_PK` (facilitator EOA) so its balance must
+      also be ≥ 0.005 ETH.
 
 ---
 
@@ -49,12 +57,16 @@ check.
 
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
+  echo "KMS deployer (factory deploy):"
   cast balance 0x66C2858D9A8605957c516a77262Eb66EE6be113C \
+    --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY"
+  echo "Software deployer (probe Escrow + smoke):"
+  cast balance 0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455 \
     --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY"
 '
 ```
 
-Expect ≥ 0.02 ETH (in wei: ≥ 20000000000000000).
+Expect both ≥ 0.02 ETH (in wei: ≥ 20000000000000000).
 
 ---
 
@@ -72,29 +84,40 @@ that fails this test.
 
 ---
 
-## Step 2 — Deploy EscrowFactory on Base Sepolia
+## Step 2 — Deploy EscrowFactory on Base Sepolia (KMS-signed)
 
-Pinned addresses for the constructor:
+Pinned constructor args (hardcoded in `tools/deploy/deploy-escrow-factory.mjs`,
+NOT the Foundry script — the Node + viem + KMS path is the canonical
+deploy for any Reckon402 contract that records the KMS deployer EOA):
 
 | Param | Value | Source |
 |-------|-------|--------|
-| `ESCROW_FACTORY_TOKEN`        | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | USDC on Base Sepolia (AGENTS.md L3) |
-| `ESCROW_FACTORY_IDENTITY`     | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | ERC-8004 IdentityRegistry on Base Sepolia (AGENTS.md L4a2 multichain table) |
-| `ESCROW_FACTORY_REPUTATION`   | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | ERC-8004 ReputationRegistry on Base Sepolia (AGENTS.md L4a2 multichain table) |
+| token              | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | USDC Base Sepolia (AGENTS.md L3) |
+| identityRegistry   | `0x8004A818BFB912233c491871b3d84c89A494BD9e` | ERC-8004 IdentityRegistry (AGENTS.md L4a2) |
+| reputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` | ERC-8004 ReputationRegistry (AGENTS.md L4a2) |
+
+Build artifact first, then deploy:
 
 ```bash
+(cd contracts && forge build)
+
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
-  cd contracts
-  ESCROW_FACTORY_TOKEN=0x036CbD53842c5426634e7929541eC2318f3dCF7e \
-  ESCROW_FACTORY_IDENTITY=0x8004A818BFB912233c491871b3d84c89A494BD9e \
-  ESCROW_FACTORY_REPUTATION=0x8004B663056A597Dffe9eCcC1965A193B7388713 \
-  forge script script/DeployEscrowFactory.s.sol:DeployEscrowFactory \
-    --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
-    --private-key "$DEPLOYER_PK" \
-    --broadcast \
-    -vvv
+  node tools/deploy/deploy-escrow-factory.mjs
 ' | tee /tmp/l4d-factory-deploy.log
 ```
+
+The deploy script:
+1. Resolves the deployer address from KMS (`alias/reckon402/mainnet/deployer/evm`) via `tools/sign/kms-account.mjs`.
+2. Re-checks the on-chain balance ≥ 0.01 ETH.
+3. Encodes the constructor args, prepends to bytecode.
+4. Signs with KMS, broadcasts, waits for receipt (120s timeout).
+5. Writes `contracts/deploy-logs/escrow-factory-base-sepolia-<DATE>.md`.
+6. Stdout = the deployed factory address (for `$(...)` capture).
+
+The `Foundry forge script` flow under `script/DeployEscrowFactory.s.sol`
+is retained for local Anvil testing only — it CANNOT sign with KMS.
+
+The deploy script's stdout is the factory address; capture into a shell variable for the next steps.
 
 Capture from the broadcast output:
 - **EscrowFactory address** — `<TBD>`
@@ -143,9 +166,15 @@ releaseBps = [0, 500, 1500, 3000, 5000, 7000, 8500, 10000]
 
 Salt: `keccak256("reckon402-l4d-probe-2026-05-02")`.
 
+The probe Escrow is signed by `RECKON402_DEPLOYER_PK` (facilitator
+software EOA `0x0A0228E6...`), NOT the KMS deployer. The factory has
+no admin function — anyone can call `createEscrow`. This keeps the
+probe deploy on a hot key path so we can iterate quickly without
+KMS round-trips for a single smoke probe.
+
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
-  FACTORY="<EscrowFactory address>"
+  FACTORY="<EscrowFactory address from step 2>"
   FACILITATOR=0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455
   AGENT_ID=1
   SALT=$(cast keccak "reckon402-l4d-probe-2026-05-02")
@@ -175,8 +204,7 @@ infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
     "x402-settlement" \
     "$SALT" \
     --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
-    --private-key "$DEPLOYER_PK" \
-    -vvv
+    --private-key "$RECKON402_DEPLOYER_PK"
 ' | tee /tmp/l4d-probe-escrow.log
 ```
 
@@ -224,25 +252,28 @@ Any cast revert here is a STOP — debug before proceeding.
 
 ## Step 5 — Smoke: non-owner withdraw must revert
 
-Pick any reckon402-controlled EOA that is NOT the seller of agent 1.
-Suggestion: facilitator EOA `0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455`.
+We use `cast call` (read-only, doesn't broadcast) with `--from` set
+to the facilitator EOA. This routes through the EVM as if a write
+were attempted, so all reverts surface, but no gas is spent.
 
 ```bash
 infisical run --env dev --domain https://secrets.intentralabs.com -- bash -c '
   ESCROW="<probe escrow address>"
-  # FACILITATOR_PK is in Infisical — should match facilitator EOA which is NOT the agent-1 owner.
-  cast send "$ESCROW" "withdraw(uint256)" 1 \
-    --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY" \
-    --private-key "$FACILITATOR_PK" \
-    -vvv
+  cast call "$ESCROW" "withdraw(uint256)" 1 \
+    --from 0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455 \
+    --rpc-url "$BASE_SEPOLIA_RPC_PRIMARY"
 '
 ```
 
 Expected: revert with `NotOwner()` selector (`0x30cd7471`).
+The output should be along the lines of:
+```
+execution reverted, data: "0x30cd7471"  (NotOwner)
+```
 
-If the call succeeds, **STOP** — the owner check is broken on the
-deployed bytecode. Verify the constructor args were passed correctly
-by re-reading `agentId()` + `identityRegistry()` from the contract.
+If the call succeeds (no revert), **STOP** — the owner check is broken
+on the deployed bytecode. Verify constructor args round-trip by
+reading `agentId()` + `identityRegistry()` from the contract.
 
 ---
 

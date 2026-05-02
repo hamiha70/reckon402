@@ -1406,6 +1406,26 @@ LinearMonotonicTierStrategy). Vitest: unchanged from
   records are off-chain-only metadata served by the gateway worker.
   See `docs/trust-architecture.md` for the architecture rationale.
 
+### Test posture (H-9)
+
+Single-page status report at `docs/test-posture-h-9.md`. Snapshot:
+
+- Foundry 109/109 default + 3 fork tests under `just fork-tests-all`.
+  - `EscrowFork.t.sol` (NEW) — Base Sepolia fork: fresh-deploy +
+    register agent on real IdentityRegistry + write 10 feedbacks via
+    real ReputationRegistry + tier walk T0→T3 + withdraw with
+    NotOwner-revert assertion. Plus 2 read-only sanity tests against
+    the live `seller11` Escrow + `EscrowFactory` immutables.
+  - Forge coverage: 96–100% lines on every L4d source contract.
+- Vitest 360/360 default + 3 live-RPC tests under
+  `infisical run -- pnpm vitest …` (verified PASS at H-9).
+- Frontend `pnpm typecheck` (`// @ts-check` + tsconfig) — 0 errors.
+- All deployed L4d contracts re-verified live at H-9 via `cast call`
+  against Base Sepolia.
+
+Re-run: `pnpm test && cd contracts && forge test && pnpm typecheck`
+for offline gate; `just fork-tests-all` for live-fork gate.
+
 ## L4d demo agent (seller11, canonical, locked)
 
 Onboarded 2026-05-02 via the L4d 6-step CLI flow (`just onboard-l4d`).

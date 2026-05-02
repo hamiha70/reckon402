@@ -250,7 +250,7 @@ curl -s https://gateway.reckon402.com/healthz</pre>
       <div class="bg-gray-900 border border-gray-800 rounded-lg divide-y divide-gray-800">
         <div class="p-4 text-sm">
           <div class="text-gray-400 text-xs uppercase tracking-wider mb-1">Reckon402Resolver — Ethereum Sepolia</div>
-          <div class="font-mono text-blue-300 break-all">0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a</div>
+          <div class="font-mono text-blue-300 break-all"><a class="evidence-link" href="https://sepolia.etherscan.io/address/0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a" target="_blank" rel="noopener">0x479660B8760b32045FF4b9A64f9Ba2EeF8521f3a</a></div>
           <div class="text-xs text-gray-500 mt-1">deploy tx <a class="evidence-link" href="https://sepolia.etherscan.io/tx/0xb658d064556f217be83f322f9800f19dcc07bff61a6dde22f85d7fa28edc945f" target="_blank" rel="noopener">0xb658d064…</a> · block 10,749,903</div>
         </div>
         <div class="p-4 text-sm">
@@ -264,9 +264,9 @@ curl -s https://gateway.reckon402.com/healthz</pre>
           <div class="text-xs text-gray-500 mt-1">5 ERC-8004 attestations · tier T2 · releasedBps 1500 · NFT-bound Escrow <a class="evidence-link" href="https://sepolia.basescan.org/address/0x863d2105B57Cb98129B68b934FF5708DC9432aAA" target="_blank" rel="noopener">0x863d2105…</a></div>
         </div>
         <div class="p-4 text-sm">
-          <div class="text-gray-400 text-xs uppercase tracking-wider mb-1">Live gateway</div>
-          <div><a class="evidence-link" href="https://gateway.reckon402.com" target="_blank" rel="noopener">https://gateway.reckon402.com</a></div>
-          <div class="text-xs text-gray-500 mt-1">CCIP-Read + ENSIP-25 + ERC-8004 reads</div>
+          <div class="text-gray-400 text-xs uppercase tracking-wider mb-1">Live gateway — try the seller11 record map</div>
+          <div class="text-xs"><a class="evidence-link" href="https://gateway.reckon402.com/records/seller11.reckon402-test.eth" target="_blank" rel="noopener">https://gateway.reckon402.com/records/seller11.reckon402-test.eth</a></div>
+          <div class="text-xs text-gray-500 mt-1">flat JSON of every <code class="inline">x402.*</code> ENS text record served via CCIP-Read · gateway healthz at <a class="evidence-link" href="https://gateway.reckon402.com/healthz" target="_blank" rel="noopener">/healthz</a></div>
         </div>
       </div>
       <p class="text-xs text-gray-600 mt-3 leading-relaxed">

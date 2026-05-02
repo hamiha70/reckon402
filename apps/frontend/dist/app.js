@@ -68,10 +68,11 @@ const BASE_SEPOLIA_CHAIN_ID_HEX = '0x14a34'  // 84532
 // contracts/src/Escrow.sol + IdentityRegistry. Hardcoded so the frontend
 // doesn't need a runtime keccak library.
 const SEL = {
-  getStats:        '0xc59d4847', // Escrow.getStats() — 7 return slots
-  withdrawAll:     '0x853828b6', // Escrow.withdrawAll() — no args
-  withdraw:        '0x2e1a7d4d', // Escrow.withdraw(uint256)
-  ownerOf:         '0x6352211e', // IERC721.ownerOf(uint256)
+  getStats:          '0xc59d4847', // Escrow.getStats() — 7 return slots
+  withdrawAll:       '0x853828b6', // Escrow.withdrawAll() — no args
+  withdraw:          '0x2e1a7d4d', // Escrow.withdraw(uint256)
+  ownerOf:           '0x6352211e', // IERC721.ownerOf(uint256)
+  getAllRecipients:  '0xb74513c1', // Splitter.getAllRecipients() (address[],uint16[])
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -190,6 +191,36 @@ async function readNftOwner(rpcUrl, identityRegistry, agentId) {
   const slots = decodeSlots(raw)
   if (!slots[0]) throw new Error(`bad ownerOf() response: ${raw}`)
   return slotToAddress(slots[0]).toLowerCase()
+}
+
+// Read Splitter.getAllRecipients() — returns the immutable (recipients, bps)
+// pair as parallel arrays. Splitter values are constructor-locked, so the
+// caller can cache by splitter address forever.
+//
+// ABI layout for `(address[] memory, uint16[] memory)` from a view return:
+//   slot 0: head offset of array A (in bytes)
+//   slot 1: head offset of array B
+//   ...
+//   at byte offset_A: slot = length(A)
+//   following slots: A[0], A[1], ...
+//   at byte offset_B: slot = length(B)
+//   following slots: B[0], B[1], ...
+async function readSplitterRecipients(rpcUrl, splitterAddr) {
+  const raw = await ethCall(rpcUrl, splitterAddr, SEL.getAllRecipients, '')
+  const slots = decodeSlots(raw)
+  if (slots.length < 4) throw new Error(`bad getAllRecipients() response: ${raw}`)
+
+  const offA = Number(slotToBigInt(slots[0])) / 32
+  const offB = Number(slotToBigInt(slots[1])) / 32
+  const lenA = Number(slotToBigInt(slots[offA]))
+  const lenB = Number(slotToBigInt(slots[offB]))
+  if (lenA !== lenB) throw new Error(`recipients/bps length mismatch: ${lenA} vs ${lenB}`)
+
+  const recipients = []
+  const bps        = []
+  for (let i = 0; i < lenA; i++) recipients.push(slotToAddress(slots[offA + 1 + i]))
+  for (let i = 0; i < lenB; i++) bps.push(Number(slotToBigInt(slots[offB + 1 + i])))
+  return { recipients, bps }
 }
 
 // ─── Routing (hash-based) ─────────────────────────────────────────────────
@@ -445,11 +476,16 @@ let activeEns = null
 let escrowSnapshot = null
 let escrowAddrCached = null
 let agentIdCached    = null
+// Splitter config is constructor-locked so we cache by splitter address.
+// Map<splitterAddrLower, { recipients: string[], bps: number[] }>.
+const splitterConfigCache = new Map()
+let splitterAddrCached = null
 
 function startDashboard(ens) {
   stopDashboard()
   activeEns = ens
   escrowSnapshot = null; escrowAddrCached = null; agentIdCached = null
+  splitterAddrCached = null
   // Reset wallet-status row so a stale state from a prior agent doesn't
   // leak across navigations.
   refreshClaimGate()
@@ -481,6 +517,24 @@ async function refreshDashboard() {
 
     escrowAddrCached = recordsRes.escrow ?? null
     agentIdCached    = recordsRes.agentId ?? null
+    splitterAddrCached = recordsRes.splitter ?? null
+
+    // Splitter is immutable so we read once per address and reuse forever.
+    if (splitterAddrCached) {
+      const key = splitterAddrCached.toLowerCase()
+      let cfg = splitterConfigCache.get(key)
+      if (!cfg) {
+        try {
+          cfg = await readSplitterRecipients(CFG.BASE_SEPOLIA_RPC, splitterAddrCached)
+          splitterConfigCache.set(key, cfg)
+        } catch (err) {
+          console.error('splitter getAllRecipients failed', err)
+        }
+      }
+      if (cfg) renderSplitterRecipients(cfg, recordsRes.escrow)
+    } else {
+      renderSplitterRecipients(null)
+    }
 
     // L4d on-chain mode: pull the authoritative counters from
     // Escrow.getStats() directly. Falls back to off-chain accounting if
@@ -581,6 +635,57 @@ function renderDashboardHeader(r) {
 
   $('#dash-agent-id').textContent = r.agentId ?? '—'
   $('#dash-owner').textContent = '—'  // not returned by flat-records; populated if needed
+}
+
+// Render the on-chain Splitter recipients table. `cfg` is { recipients, bps }
+// from readSplitterRecipients(), or null if no splitter could be resolved.
+// `escrowAddr` is the per-agent Escrow address (lowercase) from the gateway —
+// used to render the escrow row with a distinct label, since the address
+// alone is opaque.
+function renderSplitterRecipients(cfg, escrowAddr) {
+  const tbody = $('#splitter-recipients-table')
+  if (!tbody) return
+  if (!cfg || !cfg.recipients || cfg.recipients.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-gray-600 italic py-2 text-center text-xs">no splitter found for this agent</td></tr>`
+    return
+  }
+  const escrowLower = (escrowAddr ?? '').toLowerCase()
+  const facilitatorLower = '0x0a0228e6a5e1d7be234a190a8d9a3af9e08ec455'
+  const riskBufferLower  = '0x66c2858d9a8605957c516a77262eb66ee6be113c'
+
+  const rows = cfg.recipients.map((addr, i) => {
+    const lower = addr.toLowerCase()
+    let label = ''
+    if (i === 0)                       label = 'seller'
+    else if (lower === facilitatorLower) label = 'facilitator fee'
+    else if (lower === escrowLower && escrowLower) label = 'per-agent Escrow'
+    else if (lower === riskBufferLower) label = 'shared risk-buffer EOA (legacy)'
+    const labelHtml = label
+      ? `<span class="ml-2 text-[10px] uppercase tracking-wider text-gray-500">${escapeHtml(label)}</span>`
+      : ''
+    const bps = cfg.bps[i] ?? 0
+    const pct = (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2)
+    return `
+      <tr class="border-t border-gray-800/60">
+        <td class="py-1.5 text-gray-500 text-xs">${i}</td>
+        <td class="py-1.5 break-all">
+          <a href="${CFG.BASESCAN_ADDR}${addr}" target="_blank" class="text-blue-400 underline">${trunc(addr, 8)}</a>
+          ${labelHtml}
+        </td>
+        <td class="py-1.5 text-right text-gray-300">${bps}</td>
+        <td class="py-1.5 text-right text-amber-200 font-bold tabular-nums">${pct}%</td>
+      </tr>`
+  })
+  const sumBps = cfg.bps.reduce((a, b) => a + b, 0)
+  const sumOk = sumBps === 10_000
+  rows.push(`
+    <tr class="border-t border-gray-800">
+      <td class="py-1.5"></td>
+      <td class="py-1.5 text-[10px] uppercase tracking-wider text-gray-500">sum</td>
+      <td class="py-1.5 text-right text-gray-400">${sumBps}</td>
+      <td class="py-1.5 text-right ${sumOk ? 'text-emerald-300' : 'text-red-300'} font-bold">${(sumBps / 100).toFixed(0)}%${sumOk ? '' : ' (!)'}</td>
+    </tr>`)
+  tbody.innerHTML = rows.join('')
 }
 
 function renderTerminalPane(r) {

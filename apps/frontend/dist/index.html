@@ -228,8 +228,38 @@
         </dl>
       </div>
 
+      <!-- Splitter recipients panel — read live from Splitter.getAllRecipients() -->
+      <div class="bg-gray-900 border border-gray-800 rounded-lg p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm uppercase tracking-wider text-gray-500">On-chain Splitter recipients</h3>
+          <span id="splitter-source-badge"
+            class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-gray-800 text-gray-500">
+            from Splitter.getAllRecipients()
+          </span>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="text-[10px] uppercase text-gray-500 tracking-wider">
+            <tr>
+              <th class="text-left py-1">Slot</th>
+              <th class="text-left py-1">Address</th>
+              <th class="text-right py-1">BPS</th>
+              <th class="text-right py-1">%</th>
+            </tr>
+          </thead>
+          <tbody id="splitter-recipients-table" class="font-mono">
+            <tr><td colspan="4" class="text-gray-600 italic py-2 text-center text-xs">reading on-chain…</td></tr>
+          </tbody>
+        </table>
+        <div class="text-[10px] text-gray-600 mt-3 leading-snug">
+          BPS is locked at deploy time in the Splitter constructor (immutable).
+          For new agents the canonical default is
+          <span class="font-mono text-gray-400">[8700, 300, 1000]</span>
+          (87% seller / 3% facilitator / 10% Escrow). Operators can deploy alternate splits per agent.
+        </div>
+      </div>
+
       <!-- ENS Text Records panel (collapsible) -->
-      <details class="bg-gray-900 border border-gray-800 rounded-lg" open>
+      <details class="bg-gray-900 border border-gray-800 rounded-lg">
         <summary class="p-4 cursor-pointer text-sm uppercase tracking-wider text-gray-500 select-none">
           ENS Text Records (ENSIP-25)
         </summary>

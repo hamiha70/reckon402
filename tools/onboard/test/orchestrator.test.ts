@@ -174,6 +174,28 @@ describe('runOnboard', () => {
       expect(sinkEvents[i]!.error).toBeUndefined()
     }
 
+    // Every step's end-event must carry an inline `note` annotation so the
+    // form can render salient post-result values (subname, splitter address,
+    // agentId, record count, ownership transfer) below each step row in the
+    // amber/yellow inline style. This also drives the agent-mint result card.
+    const endEventFor = (id: number) =>
+      sinkEvents.find(e => e.id === id && e.completedAt !== undefined)
+
+    expect(endEventFor(1)!.note).toBe('subname=seller9.reckon402-test.eth')
+    expect(endEventFor(2)!.note).toBe(`splitter=${PREDICTED_SPLITTER}`)
+    expect(endEventFor(3)!.note).toBe('agentId=3')
+    expect(endEventFor(4)!.note).toBe('records=12')
+    expect(endEventFor(5)!.note).toBe('owner=seller')
+
+    // Every end-event must also carry a measurable startedAt + completedAt so
+    // the frontend can render a duration tag. The orchestrator stamps both;
+    // we don't assert exact values, only that completedAt >= startedAt.
+    for (const id of [1, 2, 3, 4, 5] as const) {
+      const ev = endEventFor(id)!
+      expect(ev.startedAt).toBeGreaterThan(0)
+      expect(ev.completedAt).toBeGreaterThanOrEqual(ev.startedAt)
+    }
+
     // Step 1: first ENS write was setSubnodeOwner; second was setResolver.
     expect(calls.ensWrites[0]!.args.functionName).toBe('setSubnodeOwner')
     expect(calls.ensWrites[1]!.args.functionName).toBe('setResolver')

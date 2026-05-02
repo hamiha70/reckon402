@@ -62,7 +62,7 @@ export async function runOnboard(
   async function step<T>(
     id: StepId,
     label: string,
-    fn: () => Promise<{ result: T; txHash?: `0x${string}`; externalLink?: string }>,
+    fn: () => Promise<{ result: T; txHash?: `0x${string}`; externalLink?: string; note?: string }>,
   ): Promise<T> {
     const blob: OnboardStep = { id, label, startedAt: Date.now() }
     steps.push(blob)
@@ -72,6 +72,7 @@ export async function runOnboard(
       blob.completedAt = Date.now()
       if (r.txHash) blob.txHash = r.txHash
       if (r.externalLink) blob.externalLink = r.externalLink
+      if (r.note) blob.note = r.note
       await sink({ ...blob })
       return r.result
     } catch (err) {
@@ -90,7 +91,12 @@ export async function runOnboard(
       sellerEoa:  args.sellerEoa,
       transferToSeller: false,
     }, funderAddress)
-    return { result: r, txHash: r.subnameRegisterTx, externalLink: r.externalLink }
+    return {
+      result: r,
+      txHash: r.subnameRegisterTx,
+      externalLink: r.externalLink,
+      note: `subname=${args.name}`,
+    }
   })
 
   // Step 2 — deploy Splitter via factory
@@ -106,6 +112,7 @@ export async function runOnboard(
       result: r,
       txHash: r.splitterDeployTx ?? undefined,
       externalLink: r.externalLink,
+      note: `splitter=${r.splitter}`,
     }
   })
 
@@ -117,7 +124,12 @@ export async function runOnboard(
       deployerEoa:      deployerAddress,
       sellerEoa:        args.sellerEoa,
     })
-    return { result: r, txHash: r.agentRegisterTx, externalLink: r.externalLink }
+    return {
+      result:       r,
+      txHash:       r.agentRegisterTx,
+      externalLink: r.externalLink,
+      note:         `agentId=${r.agentId}`,
+    }
   })
 
   // Step 4 — set ENS records via gateway /admin/bootstrap (signed by onboarding key)
@@ -142,7 +154,11 @@ export async function runOnboard(
       records,
       onboardingPk:   env.RECKON402_ONBOARDING_PK,
     }, { fetch: fetchImpl })
-    return { result: r, externalLink: r.externalLink }
+    return {
+      result: r,
+      externalLink: r.externalLink,
+      note: `records=${Object.keys(records).length}`,
+    }
   })
 
   // Step 5 — seed gateway agent_id_index + final subnode transfer
@@ -166,6 +182,7 @@ export async function runOnboard(
       result: { transferTx },
       txHash: transferTx,
       externalLink: `https://sepolia.etherscan.io/tx/${transferTx}`,
+      note: 'owner=seller',
     }
   })
 

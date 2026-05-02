@@ -7,6 +7,13 @@ export interface OnboardStep {
   label:         string
   txHash?:       Hex
   externalLink?: string
+  /**
+   * Free-form one-line annotation surfaced inline in the progress UI. Used for
+   * salient post-result values that aren't a tx hash (e.g. step 3 sets this to
+   * `agentId=<n>` so the user sees the minted ERC-8004 id in the form before
+   * being redirected to the dashboard).
+   */
+  note?:         string
   startedAt:     number
   completedAt?:  number
   error?:        string

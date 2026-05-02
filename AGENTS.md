@@ -1406,6 +1406,74 @@ LinearMonotonicTierStrategy). Vitest: unchanged from
   records are off-chain-only metadata served by the gateway worker.
   See `docs/trust-architecture.md` for the architecture rationale.
 
+## L4d demo agent (seller11, canonical, locked)
+
+Onboarded 2026-05-02 via the L4d 6-step CLI flow (`just onboard-l4d`).
+This is the live demo target for the submission cycle. The legacy
+seller (`seller.reckon402-test.eth` + Splitter `0x372c0b95…`) is
+preserved on-chain but no longer fronted by `agent.reckon402.com`.
+
+### On-chain locks
+
+| Item | Value |
+|------|-------|
+| ENS subname | `seller11.reckon402-test.eth` |
+| Seller EOA (NFT owner) | `0xD53ffac42496d73B3Faf946786688a8454F57b1f` |
+| ERC-8004 agentId | `5423` |
+| Splitter (3-recipient, factory-deployed) | `0x9fc28c71a539645bECc6bEd26288a8e097AD17Eb` |
+| Escrow (per-agent, factory-deployed) | `0x863d2105B57Cb98129B68b934FF5708DC9432aAA` |
+| BPS split | seller `8700` (87%) / facilitator-fee `300` (3%) / escrow `1000` (10%) |
+| Tier strategy | `0xc498155bc4a2e4ba979ad5797298107c63b26c4e` (LinearMonotonicTierStrategy v1) |
+| Agent worker | `agent.reckon402.com` (re-pointed from seller → seller11; version `02492303-f3f4-4c46-9250-2168dd85e192`) |
+| Onboarding orchestrator | `app.reckon402.com` (L4d 6-step flow live) |
+
+The factory + strategy come from the L4d on-chain Escrow section above
+(`L4d-strategy-deployed` tag). The Splitter + Escrow are seller-specific
+artefacts of the onboarding run.
+
+### Closed-loop end-to-end (5 rounds, 2026-05-02)
+
+| Field | Value |
+|-------|-------|
+| Total settlements | 5 (each `0.01` USDC) |
+| Total deposited to Escrow | `5000` atomic = `0.005000` USDC (10% of 0.05 USDC settled) |
+| Attestations written | 5 (facilitator-signed; clientAddress = `0x0A0228…c455`) |
+| Final tier | T2 (3 ≤ count < 10) |
+| `releasedBps` after 5 rounds | `1500` (15%) |
+| `withdrawableNow` after 5 rounds | `750` atomic = `0.000750` USDC |
+| Gateway-side discount BEFORE | `100000` (base) |
+| Gateway-side discount AFTER | `90000` (T2, 15% off) |
+| Frontend dashboard | renders all 7 counters from `Escrow.getStats()` via raw `eth_call`; tier table highlights the active row |
+
+Per-round artefacts in
+`tools/integration-tests/results-full-flow-l4b-2026-05-02T09-{16-11,17-32,17-48,18-05,18-20}Z.md`.
+
+Consolidated end-to-end report:
+`tools/integration-tests/results-full-flow-l4d-seller11-2026-05-02.md`.
+
+### Operator demo flow
+
+1. `https://app.reckon402.com/#/agent/seller11.reckon402-test.eth`
+   — dashboard view.
+2. `Run Test Call` button (or `just fullflow-l4b` with
+   `SELLER_NAME=seller11.reckon402-test.eth SELLER_ENS=seller11.reckon402-test.eth`)
+   — drives one paid call + one attestation; counters update live.
+3. `Connect Wallet` → import seller PK in MetaMask → Claim All button
+   activates once the connected address matches
+   `IdentityRegistry.ownerOf(5423) = 0xD53ffac4…7b1f`.
+4. `Claim All` → MetaMask signs `Escrow.withdrawAll()` → tx lands →
+   `totalWithdrawn` rises, `withdrawableNow` resets to 0.
+
+### Forward-compat / next layers
+
+- **E4-claim** still pending: MetaMask-import seller PK, click Claim
+  All on the dashboard, verify `withdrawAll()` lands and
+  `totalWithdrawn` updates. Tag `L4d-end-to-end-green`.
+- **agent.reckon402.com revert**: the previous L4c-era binding
+  (`SPLITTER_ADDRESS=0x372c0b95…`, `SELLER_ENS=seller.reckon402-test.eth`)
+  is preserved as a comment in `workers/agent/wrangler.toml`. To roll
+  back the live agent, restore the two var values and redeploy.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

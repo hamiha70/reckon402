@@ -1252,6 +1252,120 @@ SellingAgent keys return 403.
 8. Smoke: `just fullflow-l4c-onboard` runs the automated harness.
 9. Push tag `L4c-onboarding-green`.
 
+## L4d on-chain Escrow (v1, locked)
+
+Shipped 2026-05-02. EscrowFactory + first probe Escrow live on Base
+Sepolia. Closes the on-chain story for the risk-buffer slice of every
+settlement: the Splitter sends a fixed BPS slice (10% in v1) to a
+per-agent Escrow, and the agent's NFT owner withdraws subject to a
+tier curve that reads on-chain attestation count from the
+ReputationRegistry.
+
+**Canonical reproducible tags:**
+- `L4d-pre-onchain-baseline` (`8a468ec`) — pre-L4d state, demo intact;
+  rollback target if L4d work needs to be unwound.
+- `L4d-contracts-green` (`b2ab6ef`) — contracts compile + 46 tests
+  green from a fresh clone, no live chain footprint yet.
+- `L4d-deployed` (this section) — EscrowFactory + probe Escrow live
+  on Base Sepolia; constructor sanity reads + non-owner revert smoke
+  both green.
+
+### Contract addresses (Base Sepolia)
+
+| Item | Value |
+|------|-------|
+| EscrowFactory address | `0xb57ada3c2edffb5ce250b495d16d47e120d33d8b` |
+| Factory deploy tx | `0xc5826f3485b8ec4388c6e9ccf8b12f1257797ab0b66a9fbf222d8db37a2ff8f2` |
+| Factory deploy block | 40970567 |
+| Factory deploy gas | 2_347_208 |
+| Factory deploy signer | `0x66c2858d9a8605957c516a77262eb66ee6be113c` (KMS `alias/reckon402/mainnet/deployer/evm`) |
+| Probe Escrow (agentId=1) | `0x4f79aA82E7cf4e09Be9add4Df61887d270cFD95E` |
+| Probe Escrow tx | `0xe92f34cdb59129ff20ff589a34a76c34dd1c9a6e0752a0ac7695424ba1c2be66` |
+| Probe Escrow block | 40970580 |
+| Probe Escrow signer | `0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455` (`RECKON402_DEPLOYER_PK`; factory has no admin so anyone may call `createEscrow`) |
+| Token (USDC, all Escrows) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| IdentityRegistry (8004) | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| ReputationRegistry (8004) | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+
+### v1 default tier curve (passed by orchestrator + probe)
+
+```
+thresholds = [0, 1, 3, 10, 30, 100, 300, 1000]
+releaseBps = [0, 500, 1500, 3000, 5000, 7000, 8500, 10000]
+tag1       = "payment"
+tag2       = "x402-settlement"
+facilitatorClient = 0x0A0228E6a5E1d7Be234A190A8D9A3af9E08ec455
+```
+
+The Escrow constructor enforces strict-monotonic thresholds and
+non-decreasing releaseBps, each ≤ 10_000. Different agents can use
+different curves at deploy without contract changes.
+
+### Smoke results (probe Escrow, 2026-05-02)
+
+| view                    | observed                                | meaning |
+|-------------------------|------------------------------------------|---------|
+| `owner()`               | `0x21fdEd74C901129977B8e28C2588595163E1e235` | Current IdentityRegistry NFT owner of agentId=1 |
+| `agentId()`             | 1                                        | matches constructor |
+| `facilitatorClient()`   | `0x0A0228E6...c455`                      | matches L4b1 facilitator EOA |
+| `attestationCount()`    | 16                                       | live read of L4b1 attestations from ReputationRegistry on Base Sepolia |
+| `releasedBps()`         | 3000 (= 30%)                             | T3 tier at 16 attestations (between thresholds 10 and 30) |
+| `totalDeposited()`      | 0                                        | Escrow is brand-new; no settlements have flowed |
+| `currentlyHeld()`       | 0                                        | matches |
+| `totalWithdrawn`        | 0                                        | matches |
+| Non-owner withdraw      | reverts `0x30cd7471` (`NotOwner()`)      | owner gate works on deployed bytecode |
+
+### Files
+
+- Spec: `specs/09-l4d-escrow.md`
+- Deploy log: `contracts/deploy-logs/escrow-factory-base-sepolia-2026-05-02.md`
+- Runbook: `tools/deploy/deploy-l4d.md`
+- Deploy script (KMS-signed, Node + viem): `tools/deploy/deploy-escrow-factory.mjs`
+- Local-test deploy script (Foundry, no KMS): `contracts/script/DeployEscrowFactory.s.sol`
+- Contracts: `contracts/src/Escrow.sol`, `contracts/src/EscrowFactory.sol`, `contracts/src/interfaces/{IIdentityRegistry,IReputationRegistry}.sol`
+- Tests: `contracts/test/Escrow.t.sol` (32 cases), `contracts/test/EscrowFactory.t.sol` (14 cases incl. 256-run fuzz)
+
+### Forge: 95/95 from a fresh clone
+
+39 pre-L4d (Splitter + invariant + SplitterFactory + SplitterFork +
+Reckon402Resolver) + 46 L4d (32 Escrow + 14 EscrowFactory). Vitest:
+unchanged from `L4c-onboarding-green` since L4d ships no worker code
+in this layer (E2 onboarding integration is the next layer).
+
+### Forward-compat / next layers
+
+- **E2 (orchestrator)** — extend `tools/onboard/src/steps/` with a
+  step-3.5 that deploys an Escrow at the predicted address before
+  setting ENS records. New ENS record `x402.escrow`. Splitter
+  recipients change from `[seller, facilitator-fee, facilitator-EOA-as-buffer]`
+  to `[seller, facilitator-fee, predictedEscrowAddr]` once
+  `ENABLE_L4D_ESCROW="true"` is set on the orchestrator.
+- **E3 (frontend)** — `window.ethereum` connect + NFT-owner gating +
+  `Claim` button calls `Escrow.withdraw` via wallet directly. Three
+  counters fed by `Escrow.getStats()` (one eth_call).
+- **E4 (e2e)** — onboard `seller10.reckon402-test.eth` via the new
+  flow. Fund some attestations through `full-flow-l4b.sh` to ramp
+  the tier. MetaMask-import the seller PK, click Claim, verify
+  on-chain. Tag `L4d-end-to-end-green`.
+
+### Q-09-* open questions (deferred)
+
+- **Q-09-5 (pluggable `ITierStrategy`):** v1.5 polish — extract the
+  tier-evaluator into a separate strategy contract, plug-in style.
+  Current shape (constructor arrays) is one external call away from
+  this refactor.
+- **Q-09-6 (sybil floor — documented for judges):** ReputationRegistry
+  derives `clientAddress` from `msg.sender` at write time, NOT a
+  parameter. Combined with the Escrow's `getSummary(agentId,
+  [facilitatorClient], tag1, tag2)` filter, only the holder of the
+  facilitator's private key can produce attestations the Escrow
+  counts. Closed.
+- **Q-09-7 (CCIP-Read off-chain ENS unreadable from contract):** the
+  Escrow does not and cannot read ENS text records served via
+  CCIP-Read. All tier-relevant inputs come from on-chain registries
+  (IdentityRegistry for owner, ReputationRegistry for count). ENS
+  records are off-chain-only metadata. Closed.
+
 ## Open questions
 
 Track as Markdown files under `specs/open-questions/` (created lazily

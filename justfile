@@ -51,6 +51,15 @@ tail-facilitator:
 tail-agent:
     {{secrets}} bash -c 'cd workers/agent && pnpm exec wrangler tail reckon402-agent --format pretty'
 
+# Note: deployed name is reckon402-onboard-orchestrator-production
+# because wrangler.toml uses [env.production] for the app.reckon402.com
+# custom-domain route. `--env production` lets wrangler resolve the
+# suffixed name from the toml.
+#
+# Stream live logs from the onboard-orchestrator Worker (app.reckon402.com)
+tail-orchestrator:
+    {{secrets}} bash -c 'cd workers/onboard-orchestrator && pnpm exec wrangler tail --env production --format pretty'
+
 # Run the live end-to-end L3 integration test on Base Sepolia
 fullflow-l3:
     {{secrets}} bash -c 'cd tools/integration-tests && bash full-flow-l3.sh'

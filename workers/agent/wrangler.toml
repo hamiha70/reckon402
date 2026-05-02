@@ -10,15 +10,23 @@ pattern       = "agent.reckon402.com"
 custom_domain = true
 
 [vars]
-# L4d demo agent — points at seller11.reckon402-test.eth (per-agent Splitter
-# 0x9fc28c71... + per-agent Escrow 0x863d2105... wired in via SplitterFactory).
+# L4d demo agent — points at seller19.reckon402-test.eth (per-agent Splitter
+# 0x96A8B60c... + per-agent Escrow 0x8E7cd755... wired in via SplitterFactory).
+# AMOUNT=100000 (0.10 USDC) matches seller19's onboarded x402.amount ENS record;
+# this is a deviation from the AGENTS.md canonical 0.01 USDC test convention,
+# accepted for the H-9 demo so dashboard "Current price" matches what the buyer
+# actually pays per call.
+# Previous L4d config preserved for revert: SELLER_ENS=seller11.reckon402-test.eth
+# + SPLITTER_ADDRESS=0x9fc28c71a539645bECc6bEd26288a8e097AD17Eb + AMOUNT=10000
+# (0.01 USDC); seller11 has 5 attestations / T2 captured in the seller11 results
+# doc — its dashboard freezes at that state until/unless we revert.
 # Previous L4c config preserved for revert: SELLER_ENS=seller.reckon402-test.eth
 # + SPLITTER_ADDRESS=0x372c0b951035da05058b175a15b4fe7d29f1fc4c (legacy demo
 # splitter; on-chain state still works, but the agent worker now drives the
 # L4d 3-recipient split with the on-chain Escrow risk buffer).
 NETWORK          = "eip155:84532"
 USDC_ADDRESS     = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
-AMOUNT           = "10000"                                         # 0.01 USDC
+AMOUNT           = "100000"                                        # 0.10 USDC
 FACILITATOR_URL  = "https://facilitator.reckon402.com/x402"
-SPLITTER_ADDRESS = "0x9fc28c71a539645bECc6bEd26288a8e097AD17Eb"
-SELLER_ENS       = "seller11.reckon402-test.eth"
+SPLITTER_ADDRESS = "0x96A8B60c4C5511FA6381c5460a892db519e5dE56"
+SELLER_ENS       = "seller19.reckon402-test.eth"
